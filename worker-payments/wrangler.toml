@@ -1,0 +1,21 @@
+name = "breakout-worker-payments"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# Runs the settlement sweep. Hourly is a reasonable default - adjust once you
+# know how promptly you want challenges to settle after endDate passes.
+[triggers]
+crons = ["0 * * * *"]
+
+# Secrets (set with `wrangler secret put <NAME>`, never in this file):
+#   STRIPE_SECRET_KEY        - Stripe test/live secret key (sk_test_... / sk_live_...)
+#   STRIPE_WEBHOOK_SECRET    - from the Stripe Dashboard webhook endpoint (whsec_...)
+#   FIREBASE_SERVICE_ACCOUNT - the full JSON of your Firebase service account key, as one string
+#
+# Plain (non-secret) vars - safe to keep here or move to .dev.vars for local dev:
+[vars]
+FIREBASE_PROJECT_ID = "REPLACE_WITH_YOUR_FIREBASE_PROJECT_ID"
+ALLOWED_ORIGIN = "REPLACE_WITH_YOUR_APP_ORIGIN"
+CHECKOUT_SUCCESS_URL = "REPLACE_WITH_YOUR_APP_URL/?challenge_paid=1"
+CHECKOUT_CANCEL_URL = "REPLACE_WITH_YOUR_APP_URL/?challenge_paid=0"
+PLATFORM_FEE_BPS = "1000"

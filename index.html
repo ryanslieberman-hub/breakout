@@ -5044,9 +5044,44 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
       <div class="wc-label">CHALLENGE END DATE</div>
       <input class="wc-input" id="wc-end-date" type="datetime-local">
     </div>
+    <div class="wc-field">
+      <div class="wc-label">ENTRY FEE (USD, 0 for a free challenge)</div>
+      <input class="wc-input" id="wc-entry-fee" type="number" min="0" step="1" placeholder="0" value="0">
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-top:5px;line-height:1.5;">Top 3 split the pool 50/30/20 after a 10% platform fee. Paid entries go through Stripe Checkout, not a direct Firestore write.</div>
+    </div>
     <div class="wc-btns">
       <button class="wc-btn secondary" onclick="closeCreateChallenge()">Cancel</button>
       <button class="wc-btn primary" onclick="submitCreateChallenge()">Create Challenge</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ COMPLIANCE GATE (paid challenges) ═══ -->
+<div class="wc-create-modal" id="compliance-modal">
+  <div class="wc-create-box" style="max-width:420px;">
+    <div class="wc-create-title">Before You Enter a Paid Challenge</div>
+    <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:16px;">
+      Paid challenges involve real money in and real money out. We need a few things confirmed before your first entry.
+    </div>
+    <div class="wc-field">
+      <div class="wc-label">YOUR STATE</div>
+      <select class="wc-input" id="cg-state" onchange="onComplianceStateChange()"></select>
+      <div id="cg-state-warning" style="display:none;color:var(--red);font-family:var(--font-mono);font-size:10px;margin-top:6px;">Paid challenges aren't available in this state yet.</div>
+    </div>
+    <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:12px;font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.5;cursor:pointer;">
+      <input type="checkbox" id="cg-age" onchange="onComplianceCheckChange()" style="margin-top:2px;flex-shrink:0;">
+      I confirm I am 18 years of age or older.
+    </label>
+    <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.5;cursor:pointer;">
+      <input type="checkbox" id="cg-tos" onchange="onComplianceCheckChange()" style="margin-top:2px;flex-shrink:0;">
+      I agree to the <span onclick="event.preventDefault();document.getElementById('cg-tos-text').style.display=document.getElementById('cg-tos-text').style.display==='none'?'block':'none';" style="color:var(--green);text-decoration:underline;cursor:pointer;">Terms of Service</span> for paid challenges.
+    </label>
+    <div id="cg-tos-text" style="display:none;background:var(--bg);border:1px solid var(--hairline);border-radius:6px;padding:10px;font-family:var(--font-mono);font-size:9px;color:var(--muted);line-height:1.6;margin-bottom:12px;">
+      ⚠ Placeholder — this app does not yet have attorney-drafted Terms of Service and is not currently authorized to offer real-money contests in any jurisdiction. This text exists only so the acceptance flow can be wired up ahead of a real ToS being written.
+    </div>
+    <div class="wc-btns">
+      <button class="wc-btn secondary" onclick="closeComplianceGate()">Cancel</button>
+      <button class="wc-btn primary" id="cg-submit" onclick="submitComplianceGate()" disabled>Continue</button>
     </div>
   </div>
 </div>
@@ -5135,7 +5170,38 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 
 <script>
 // Firebase vars (initialized by module script at bottom)
-let db = null, auth = null, currentUser = null;
+let db = null, auth = null, currentUser = null, isAdminUser = false;
+
+// Base URL of the worker-payments Cloudflare Worker (see /worker-payments).
+// Replace with the deployed Worker URL - http://localhost:8787 only works
+// while running `npm run dev` inside worker-payments locally.
+const PAYMENTS_WORKER_URL = 'http://localhost:8787';
+
+async function paymentsWorkerFetch(path, options = {}) {
+  if (!currentUser) throw new Error('Sign in first');
+  const idToken = await currentUser.getIdToken();
+  const res = await fetch(`${PAYMENTS_WORKER_URL}${path}`, {
+    ...options,
+    headers: { ...(options.headers || {}), Authorization: `Bearer ${idToken}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+
+// Admin status comes from a Firebase custom claim on the user's ID token
+// (set server-side via the Firebase Admin SDK - see scripts/set-admin-claim.js).
+// Never gate admin actions on a client-side secret: anything compared in this
+// file is readable by anyone via "view source."
+async function refreshAdminClaim() {
+  isAdminUser = false;
+  if (!currentUser) return false;
+  try {
+    const result = await currentUser.getIdTokenResult(true);
+    isAdminUser = result.claims && result.claims.admin === true;
+  } catch (e) { console.warn('Could not check admin claim:', e); }
+  return isAdminUser;
+}
 let userProfile = null;
 const START_VALUE = 100000;
 
@@ -7904,9 +7970,9 @@ let _antKeyResolve;
 const _antKeyReady = new Promise(res => { _antKeyResolve = res; });
 if (ANT_KEY) _antKeyResolve(); // already have it locally
 
-function openSettings(){
-  const pw = prompt('Enter admin password:');
-  if (pw !== 'LIEBO3506*') { if (pw !== null) showToast('Incorrect password'); return; }
+async function openSettings(){
+  await refreshAdminClaim();
+  if (!isAdminUser) { showToast('Admin access only'); return; }
   updateSettingsAccount();
   document.getElementById('settings-modal').classList.add('open');
   const keyEl = document.getElementById('ant-key-input');
@@ -13621,6 +13687,7 @@ function updateSettingsAccount() {
 
 async function handleAuthChange(user) {
   currentUser = user;
+  await refreshAdminClaim();
   try { if (window._updateGate) window._updateGate(user); } catch(e){}
   try { if (user && window._registerNativePush) window._registerNativePush(); } catch(e){}
   if (user) {
@@ -13853,11 +13920,35 @@ function openProfile() {
       <div class="profile-row" style="margin-top:8px;">
         <button class="profile-btn secondary" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:6px;" onclick="enablePushNotifications()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>Enable Notifications</button>
       </div>
+      <div class="profile-row" style="margin-top:8px;flex-direction:column;align-items:stretch;gap:6px;">
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);">Payout account (for paid challenge winnings)</div>
+        <div id="connect-status-text" style="font-family:var(--font-mono);font-size:10px;color:var(--muted);">Checking status…</div>
+        <button class="profile-btn secondary" style="width:100%;" onclick="startConnectOnboarding()">Set Up Payout Account</button>
+      </div>
       <div class="profile-row" style="margin-top:8px;">
         <button class="profile-btn secondary" style="width:100%;font-size:10px;opacity:0.7;" onclick="resetPriceData()">Reset all prices (rarely needed - prices self-heal on load)</button>
       </div>`;
+    refreshConnectStatusUI();
   }
   modal.classList.add('open');
+}
+
+async function refreshConnectStatusUI() {
+  const el = document.getElementById('connect-status-text');
+  if (!el) return;
+  try {
+    const status = await paymentsWorkerFetch('/connect/status');
+    if (!status.connected) el.textContent = 'Not set up yet.';
+    else if (status.payoutsEnabled) { el.textContent = 'Ready to receive payouts.'; el.style.color = 'var(--green)'; }
+    else el.textContent = 'Onboarding started - a few steps left with Stripe.';
+  } catch (e) { el.textContent = 'Could not check status: ' + e.message; }
+}
+
+async function startConnectOnboarding() {
+  try {
+    const { url } = await paymentsWorkerFetch('/connect/onboard', { method: 'POST' });
+    window.location.href = url;
+  } catch (e) { showToast('Could not start onboarding: ' + e.message); }
 }
 
 function closeProfile(){ document.getElementById('profile-modal').classList.remove('open'); }
@@ -14656,9 +14747,9 @@ async function renderGlobalLeaderboard() {
 // ═══════════════════════════════════════════
 //  WEEKLY CHALLENGE
 // ═══════════════════════════════════════════
-function openCreateChallenge() {
-  const pw = prompt('Admin password:');
-  if (pw !== 'LIEBO3506*') { showToast('Incorrect password'); return; }
+async function openCreateChallenge() {
+  await refreshAdminClaim();
+  if (!isAdminUser) { showToast('Admin access only'); return; }
   // Default dates: join deadline = 24h from now, end = 7 days from now
   const now = new Date();
   const pad = n => String(n).padStart(2,'0');
@@ -14669,6 +14760,7 @@ function openCreateChallenge() {
   document.getElementById('wc-end-date').value = toLocal(end);
   document.getElementById('wc-name').value = '';
   document.getElementById('wc-desc').value = '';
+  document.getElementById('wc-entry-fee').value = '0';
   document.getElementById('wc-create-modal').classList.add('open');
 }
 
@@ -14681,25 +14773,120 @@ async function submitCreateChallenge() {
   const desc = document.getElementById('wc-desc').value.trim();
   const joinDeadline = document.getElementById('wc-join-deadline').value;
   const endDate = document.getElementById('wc-end-date').value;
+  const entryFee = Math.max(0, Math.round(Number(document.getElementById('wc-entry-fee').value) || 0));
   if (!name || !joinDeadline || !endDate) { showToast('Please fill in all required fields'); return; }
   if (new Date(endDate) <= new Date(joinDeadline)) { showToast('End date must be after join deadline'); return; }
   if (!db) { showToast('Firebase not ready'); return; }
   try {
     const challengeId = 'challenge_' + Date.now();
+    // participants is intentionally omitted here - firestore.rules blocks
+    // clients from writing it, and paid entries are recorded exclusively by
+    // worker-payments after Stripe confirms payment (see joinChallenge()).
     await window._fbSetDoc(window._fbDoc(db, 'challenges', challengeId), {
       id: challengeId,
       name,
       desc,
+      entryFee,
       joinDeadline: new Date(joinDeadline).getTime(),
       endDate: new Date(endDate).getTime(),
       createdAt: Date.now(),
-      participants: {},
       active: true,
     });
     closeCreateChallenge();
     showToast('Challenge created!');
     await renderChallengeTab();
   } catch(e) { showToast('Failed: ' + e.message); }
+}
+
+// ═══════════════════════════════════════════
+//  COMPLIANCE GATE (paid challenges)
+// ═══════════════════════════════════════════
+// Baseline self-attestation gate shown before a user's first entry into a
+// paid challenge. This is NOT a substitute for legal review of real-money
+// contest law per state - it's the minimum a real-money feature should ask
+// for before launch. Confirm actual legality per state independently.
+const US_STATES = [
+  ['AL','Alabama'],['AK','Alaska'],['AZ','Arizona'],['AR','Arkansas'],['CA','California'],
+  ['CO','Colorado'],['CT','Connecticut'],['DE','Delaware'],['DC','District of Columbia'],
+  ['FL','Florida'],['GA','Georgia'],['HI','Hawaii'],['ID','Idaho'],['IL','Illinois'],
+  ['IN','Indiana'],['IA','Iowa'],['KS','Kansas'],['KY','Kentucky'],['LA','Louisiana'],
+  ['ME','Maine'],['MD','Maryland'],['MA','Massachusetts'],['MI','Michigan'],['MN','Minnesota'],
+  ['MS','Mississippi'],['MO','Missouri'],['MT','Montana'],['NE','Nebraska'],['NV','Nevada'],
+  ['NH','New Hampshire'],['NJ','New Jersey'],['NM','New Mexico'],['NY','New York'],
+  ['NC','North Carolina'],['ND','North Dakota'],['OH','Ohio'],['OK','Oklahoma'],['OR','Oregon'],
+  ['PA','Pennsylvania'],['RI','Rhode Island'],['SC','South Carolina'],['SD','South Dakota'],
+  ['TN','Tennessee'],['TX','Texas'],['UT','Utah'],['VT','Vermont'],['VA','Virginia'],
+  ['WA','Washington'],['WV','West Virginia'],['WI','Wisconsin'],['WY','Wyoming'],
+];
+// Starting denylist - states with specific DFS/skill-contest restrictions.
+// Not exhaustive and not a legal determination - verify before real launch.
+const RESTRICTED_STATES = ['AZ','CT','DE','IA','LA','MT','WA'];
+
+let _complianceGateResolve = null;
+
+function isComplianceGateSatisfied() {
+  const c = userProfile?.compliance;
+  return !!(c && c.state && !RESTRICTED_STATES.includes(c.state) && c.ageConfirmed && c.tosAcceptedAt);
+}
+
+function populateComplianceStateOptions() {
+  const sel = document.getElementById('cg-state');
+  if (!sel || sel.options.length) return;
+  sel.innerHTML = '<option value="">Select a state…</option>' +
+    US_STATES.map(([code, name]) => `<option value="${code}">${name}</option>`).join('');
+}
+
+// Shows the gate if needed and resolves true once the user passes it (or
+// already had), false if they cancel or their state is restricted.
+function requireComplianceGate() {
+  return new Promise((resolve) => {
+    if (isComplianceGateSatisfied()) { resolve(true); return; }
+    _complianceGateResolve = resolve;
+    populateComplianceStateOptions();
+    document.getElementById('cg-state').value = '';
+    document.getElementById('cg-age').checked = false;
+    document.getElementById('cg-tos').checked = false;
+    document.getElementById('cg-tos-text').style.display = 'none';
+    document.getElementById('cg-state-warning').style.display = 'none';
+    document.getElementById('cg-submit').disabled = true;
+    document.getElementById('compliance-modal').classList.add('open');
+  });
+}
+
+function closeComplianceGate() {
+  document.getElementById('compliance-modal').classList.remove('open');
+  if (_complianceGateResolve) { _complianceGateResolve(false); _complianceGateResolve = null; }
+}
+
+function onComplianceStateChange() {
+  const state = document.getElementById('cg-state').value;
+  const blocked = RESTRICTED_STATES.includes(state);
+  document.getElementById('cg-state-warning').style.display = blocked ? 'block' : 'none';
+  onComplianceCheckChange();
+}
+
+function onComplianceCheckChange() {
+  const state = document.getElementById('cg-state').value;
+  const blocked = RESTRICTED_STATES.includes(state);
+  const age = document.getElementById('cg-age').checked;
+  const tos = document.getElementById('cg-tos').checked;
+  document.getElementById('cg-submit').disabled = !state || blocked || !age || !tos;
+}
+
+async function submitComplianceGate() {
+  const state = document.getElementById('cg-state').value;
+  const age = document.getElementById('cg-age').checked;
+  const tos = document.getElementById('cg-tos').checked;
+  if (!state || RESTRICTED_STATES.includes(state) || !age || !tos) return;
+  if (!currentUser || !db) { showToast('Sign in first'); return; }
+  try {
+    const compliance = { state, ageConfirmed: true, tosAcceptedAt: Date.now(), tosVersion: 'placeholder-v0' };
+    await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), { compliance }, { merge: true });
+    userProfile = userProfile || {};
+    userProfile.compliance = compliance;
+    document.getElementById('compliance-modal').classList.remove('open');
+    if (_complianceGateResolve) { _complianceGateResolve(true); _complianceGateResolve = null; }
+  } catch (e) { showToast('Could not save: ' + e.message); }
 }
 
 async function joinChallenge(challengeId) {
@@ -14711,6 +14898,20 @@ async function joinChallenge(challengeId) {
     if (!snap.exists()) { showToast('Challenge not found'); return; }
     const data = snap.data();
     if (Date.now() > data.joinDeadline) { showToast('Join deadline has passed'); return; }
+
+    const entryFee = Number(data.entryFee) || 0;
+    if (entryFee > 0) {
+      const passed = await requireComplianceGate();
+      if (!passed) return;
+      showToast('Redirecting to checkout…');
+      const { url } = await paymentsWorkerFetch(`/challenges/${challengeId}/checkout`, { method: 'POST' });
+      window.location.href = url;
+      return; // participants.{uid} gets written by worker-payments after Stripe confirms payment
+    }
+
+    // Free challenge - unchanged direct write, same trust model as the
+    // casual leaderboard (no money at stake). firestore.rules only allows
+    // this path when entryFee is 0/unset.
     const participants = data.participants || {};
     participants[currentUser.uid] = {
       uid: currentUser.uid,
@@ -14732,8 +14933,9 @@ async function renderChallengeTab() {
   if (!el) return;
   el.innerHTML = `<div class="g10-loading">Loading challenge…</div>`;
 
-  // Admin button
-  const adminBtn = `<button class="wc-admin-btn" onclick="openCreateChallenge()" style="display:inline-flex;align-items:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Create New Challenge</button>`;
+  // Admin button - only rendered for users with the Firebase custom "admin" claim
+  await refreshAdminClaim();
+  const adminBtn = isAdminUser ? `<button class="wc-admin-btn" onclick="openCreateChallenge()" style="display:inline-flex;align-items:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Create New Challenge</button>` : '';
 
   if (!db) { el.innerHTML = adminBtn + `<div class="wc-no-challenge">Firebase not connected.</div>`; return; }
 
@@ -14760,6 +14962,11 @@ async function renderChallengeTab() {
 
     const fmtDate = ts => new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
 
+    const entryFee = Number(challenge.entryFee) || 0;
+    const potDollars = participantUids.length * entryFee;
+    const netPotDollars = Math.round(potDollars * 0.9 * 100) / 100; // 10% platform fee
+    const enterLabel = entryFee > 0 ? `Enter — $${entryFee}` : 'Join Challenge';
+
     let html = adminBtn + `
       <div class="wc-banner">
         <div class="wc-banner-header">
@@ -14771,7 +14978,9 @@ async function renderChallengeTab() {
           <div class="wc-meta-item">Join by: <span>${fmtDate(challenge.joinDeadline)}</span></div>
           <div class="wc-meta-item">Ends: <span>${fmtDate(challenge.endDate)}</span></div>
           <div class="wc-meta-item">Participants: <span>${participantUids.length}</span></div>
-        </div>`;
+          ${entryFee > 0 ? `<div class="wc-meta-item">Entry: <span>$${entryFee}</span></div>` : ''}
+        </div>
+        ${entryFee > 0 ? `<div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-top:6px;line-height:1.6;">Pool: $${potDollars.toLocaleString()} · Platform fee 10% · Payout pool: $${netPotDollars.toLocaleString()}<br>Split 50/30/20 across the top 3 finishers.</div>` : ''}`;
 
     if (!ended && !joinDeadlinePassed) {
       if (!currentUser) {
@@ -14779,7 +14988,7 @@ async function renderChallengeTab() {
       } else if (isParticipant) {
         html += `<button class="wc-join-btn joined" disabled>Joined</button>`;
       } else {
-        html += `<button class="wc-join-btn" onclick="joinChallenge('${challenge.id}')">Join Challenge</button>`;
+        html += `<button class="wc-join-btn" onclick="joinChallenge('${challenge.id}')">${enterLabel}</button>`;
       }
     } else if (!ended && joinDeadlinePassed) {
       if (isParticipant) {

@@ -1,0 +1,7 @@
+## Copy this file to .dev.vars (gitignored) for local `wrangler dev` testing.
+## Never commit the real .dev.vars file.
+
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+## The full JSON content of your Firebase service account key, on one line.
+FIREBASE_SERVICE_ACCOUNT={"type":"service_account","project_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"...","...":"..."}

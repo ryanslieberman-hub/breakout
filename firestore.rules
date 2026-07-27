@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Shared config docs (price cache, etc.) - unchanged from current behavior.
+    // NOTE: config/app currently stores a third-party API key here, readable
+    // by all users. That's a separate pre-existing issue, flagged but not
+    // fixed by this ruleset - see project notes.
+    match /config/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Trade log - append-only, owner-authored, no money implication.
+    match /trades/{tradeId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // User profiles / free practice leaderboard - unchanged. Self-reported
+    // portfolioValue/returnPct here is fine for the free leaderboard (no real
+    // money rides on it). Real-money challenge settlement NEVER reads this
+    // doc - see challengeSnapshots below.
+    match /users/{uid} {
+      allow read: if true;
+      allow create, update: if request.auth != null && request.auth.uid == uid;
+      allow delete: if false;
+    }
+
+    match /portfolios/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Comments (player comments + challenge chat, same collection) -
+    // owner-authored, owner-deletable, likes are the only field anyone
+    // else can bump.
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']);
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    // Challenges: admins (Firebase custom "admin" claim) may create a
+    // challenge and edit its non-participant fields directly (name, dates,
+    // description, entryFee).
+    match /challenges/{challengeId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.token.admin == true;
+
+      // Admins may edit any field except participants - that's handled below
+      // (free challenges) or exclusively by worker-payments (paid challenges).
+      allow update: if request.auth != null && request.auth.token.admin == true
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['participants']);
+
+      // Any signed-in user may join a FREE challenge (entryFee 0 or unset) by
+      // writing only their own participants.{uid} entry - same trust model as
+      // the free/casual leaderboard (no money at stake). A challenge with a
+      // real entryFee can only gain participants via worker-payments, after
+      // Stripe confirms payment - there is no client write path for that case.
+      allow update: if request.auth != null
+        && (!('entryFee' in resource.data) || resource.data.entryFee == 0)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants'])
+        && request.resource.data.participants.diff(resource.data.get('participants', {})).affectedKeys().hasOnly([request.auth.uid]);
+
+      allow delete: if false;
+    }
+
+    // Trusted, tamper-proof portfolio snapshots used ONLY to settle
+    // real-money challenges. Written exclusively by the settlement job's
+    // service account (see worker-payments). Never client-writable.
+    match /challengeSnapshots/{challengeId}/entries/{uid} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Default deny - anything not explicitly allowed above is rejected.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
