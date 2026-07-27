@@ -13687,7 +13687,7 @@ function updateSettingsAccount() {
 
 async function handleAuthChange(user) {
   currentUser = user;
-  await refreshAdminClaim();
+  refreshAdminClaim(); // fire-and-forget - never block sign-in on this
   try { if (window._updateGate) window._updateGate(user); } catch(e){}
   try { if (user && window._registerNativePush) window._registerNativePush(); } catch(e){}
   if (user) {
