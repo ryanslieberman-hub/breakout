@@ -33,22 +33,25 @@
 <meta name="apple-touch-fullscreen" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:#04070e; --surface:#0a1120; --card:#0e1626; --card2:#141f33;
-  --border:#101c31; --border2:#22345a;
+  --bg:#06070a; --surface:#0d0f14; --card:#101318; --card2:#171b22;
+  --border:#1a1e26; --border2:#2a2f3a;
   --green:#12d47e; --red:#f5445f; --gold:#f2b843;
-  --blue:#3d9bff; --purple:#9d6fff; --text:#e9eef7; --muted:#617693; --dim:#09111e;
+  --blue:#3d9bff; --purple:#9d6fff; --text:#e9eef7; --muted:#7d8794; --dim:#030405;
   --t1:#f2b843; --t2:#b8ccdc; --t3:#e8823a; --t4:#9d6fff; --t5:#4a8fa8;
-  /* Typography tokens - Stage 1: these point at the CURRENT fonts so tokenizing
-     changes nothing visually. Swapping a font later is now a one-line edit here.
+  /* Typography tokens - Stage 2: neutral slate palette + Fira Code/Fira Sans
+     (swapped from a blue-tinted navy palette + Archivo/Space Grotesk/IBM Plex Mono,
+     which read as a generic dark-mode SaaS default). Fira Code doing double duty as
+     both display and mono keeps headers and price data visually related - a trading
+     terminal, not a marketing site.
        --font-display : big headers, the "Breakout" wordmark, section titles
        --font-body    : UI text, labels, buttons
        --font-mono    : prices and numeric data (mono keeps digits from jittering) */
-  --font-display: 'Archivo', sans-serif;
-  --font-body: 'Space Grotesk', sans-serif;
-  --font-mono: 'IBM Plex Mono', monospace;
+  --font-display: 'Fira Code', monospace;
+  --font-body: 'Fira Sans', sans-serif;
+  --font-mono: 'Fira Code', monospace;
   /* Hairline token - Stage 3: structural borders point here. Set very dim so cards
      separate by surface contrast and spacing, with the outline only a faint whisper
      rather than a hard cage. Semantic borders (green buy, tier colors) keep their own
@@ -566,11 +569,11 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .ob-title{font-family:var(--font-display);font-size:30px;letter-spacing:2px;margin-bottom:8px;}
 .ob-title span{color:var(--green);}
 .ob-body{font-family:var(--font-body);font-size:14px;color:#aabbcc;line-height:1.7;margin-bottom:24px;}
-.ob-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px;}
-.ob-card{background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:14px;}
-.ob-card-icon{font-size:22px;margin-bottom:6px;}
-.ob-card-title{font-family:var(--font-body);font-weight:700;font-size:12px;margin-bottom:3px;}
-.ob-card-desc{font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.5;}
+.ob-rules{display:flex;flex-direction:column;margin-bottom:24px;border-top:1px solid var(--hairline);}
+.ob-rule{display:flex;align-items:flex-start;gap:12px;padding:11px 4px 11px 14px;border-bottom:1px solid var(--hairline);border-left:2px solid var(--rule-color);}
+.ob-rule-icon{flex-shrink:0;margin-top:1px;color:var(--rule-color);display:flex;}
+.ob-rule-title{font-family:var(--font-body);font-weight:700;font-size:12px;margin-bottom:2px;}
+.ob-rule-desc{font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.5;}
 .ob-stat-row{display:flex;gap:12px;margin-bottom:24px;}
 .ob-stat{flex:1;background:var(--card);border:1px solid var(--hairline);border-radius:8px;padding:12px;text-align:center;}
 .ob-stat-val{font-family:var(--font-display);font-size:28px;color:var(--green);}
@@ -15474,53 +15477,38 @@ window.addEventListener('appinstalled', () => {
       <div class="ob-slide">
         <div class="ob-title">Prices move on <span>real stats</span></div>
         <div class="ob-body">During and after every game, prices update automatically based on performance vs expectations.</div>
-        <div class="ob-cards">
-          <div class="ob-card">
-            <div class="ob-card-icon" style="color:var(--green)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg></div>
-            <div class="ob-card-title">Big game? Price spikes</div>
-            <div class="ob-card-desc">Buy before the game. Sell after the spike.</div>
+        <div class="ob-rules">
+          <div class="ob-rule" style="--rule-color:var(--green)">
+            <span class="ob-rule-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg></span>
+            <div><div class="ob-rule-title">Big game, price spikes</div><div class="ob-rule-desc">Buy before the game. Sell after the spike.</div></div>
           </div>
-          <div class="ob-card">
-            <div class="ob-card-icon" style="color:var(--red)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg></div>
-            <div class="ob-card-title">Bad night? Buy the dip</div>
-            <div class="ob-card-desc">Stars bounce back. Dips are entry points.</div>
+          <div class="ob-rule" style="--rule-color:var(--red)">
+            <span class="ob-rule-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg></span>
+            <div><div class="ob-rule-title">Bad night, buy the dip</div><div class="ob-rule-desc">Stars bounce back. Dips are entry points.</div></div>
           </div>
-          <div class="ob-card">
-            <div class="ob-card-icon" style="color:var(--gold)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
-            <div class="ob-card-title">Injuries matter</div>
-            <div class="ob-card-desc">Players ruled out decay in price. Stay ahead of news.</div>
+          <div class="ob-rule" style="--rule-color:var(--gold)">
+            <span class="ob-rule-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>
+            <div><div class="ob-rule-title">Injuries move the price before the news does</div><div class="ob-rule-desc">Ruled out players decay fast. Stay ahead of it.</div></div>
           </div>
-          <div class="ob-card">
-            <div class="ob-card-icon" style="color:var(--purple)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></div>
-            <div class="ob-card-title">Find the breakout</div>
-            <div class="ob-card-desc">D-tier rookies are cheap. One hot streak = massive gains.</div>
+          <div class="ob-rule" style="--rule-color:var(--purple)">
+            <span class="ob-rule-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></span>
+            <div><div class="ob-rule-title">D-tier rookies are cheap</div><div class="ob-rule-desc">One hot streak is all it takes.</div></div>
           </div>
         </div>
       </div>
 
       <!-- SLIDE 3: CTA - challenge + sign in -->
       <div class="ob-slide">
-        <div class="ob-title">Ready to <span>trade?</span></div>
+        <div class="ob-title">Back your <span>conviction</span>.</div>
         <div class="ob-body">
-          Sign in with Google to save your portfolio, hit the leaderboard, and compete in weekly challenges against your friends.
+          Sign in to save your portfolio, climb the leaderboard, and run it back against everyone else in weekly challenges.
         </div>
-        <div style="background:linear-gradient(135deg,#0a1a0a,#0d2a0d);border:1px solid var(--green);border-radius:10px;padding:16px 18px;margin-bottom:16px;">
-          <div style="font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--green);margin-bottom:4px;">Weekly Challenge</div>
-          <div style="font-family:var(--font-mono);font-size:10px;color:#aaa;line-height:1.6;">A new challenge drops every week. Join, trade, and see who ends up on top. Sign in to compete.</div>
+        <div style="background:var(--card);border:1px solid var(--green);border-radius:10px;padding:16px 18px;margin-bottom:16px;">
+          <div style="font-family:var(--font-display);font-size:14px;letter-spacing:.5px;color:var(--green);margin-bottom:4px;">New board, every week</div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.6;">Same $100K start for everyone. No carryover, no head start - just who calls it right.</div>
         </div>
-        <div class="ob-cards">
-          <div class="ob-card">
-            <div class="ob-card-icon" style="font-family:var(--font-mono);font-size:11px;color:var(--green);">01</div>
-            <div class="ob-card-title">Sign in</div>
-            <div class="ob-card-desc">Free - just your Google account</div>
-          </div>
-          <div class="ob-card">
-            <div class="ob-card-icon" style="font-family:var(--font-mono);font-size:11px;color:var(--green);">02</div>
-            <div class="ob-card-title">Buy players</div>
-            <div class="ob-card-desc">Any league, any name, any tier</div>
-          </div>
-        </div>
-        <button class="google-signin-btn" id="ob-google-signin-btn" style="margin-top:8px;">
+        <div class="ob-body" style="font-size:11px;margin-bottom:16px;">One click. No account to create, no card to add.</div>
+        <button class="google-signin-btn" id="ob-google-signin-btn" style="margin-top:0;">
           <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path></svg>
           Sign in with Google
         </button>
