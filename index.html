@@ -14948,7 +14948,7 @@ async function renderChallengeTab() {
 
   try {
     // Get the most recent active challenge
-    const snap = await (window._fbGetDocsFromServer || window._fbGetDocs)(window._fbQuery(window._fbCollection(db, 'challenges'), window._fbLimit(10)));
+    const snap = await (window._fbGetDocsFromServer || window._fbGetDocs)(window._fbQuery(window._fbCollection(db, 'challenges'), window._fbOrderBy('createdAt', 'desc'), window._fbLimit(10)));
     const challenges = snap.docs.map(d => d.data()).sort((a,b) => b.createdAt - a.createdAt);
     const challenge = challenges[0]; // most recent
 
