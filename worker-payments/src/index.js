@@ -23,6 +23,17 @@ function json(data, status, env) {
   });
 }
 
+// "This id isn't valid on this Stripe account" - which is what every stored
+// Stripe id looks like after switching Stripe accounts, or between test and
+// live. Stripe reports it differently per resource type: 404/resource_missing
+// for most objects, but 403/account_invalid for Connect accounts (verified
+// against the real API - assuming 404 everywhere silently missed the Connect
+// case). Anything NOT matching here is a transient/real error and must keep
+// throwing, so a blip is never mistaken for "this object is gone".
+function isUnknownStripeObject(e) {
+  return e.status === 404 || e.code === 'resource_missing' || e.code === 'account_invalid';
+}
+
 // Mirrors US_STATES/RESTRICTED_STATES in index.html - kept in sync manually,
 // same as leagueForRank's rank-range comment below. This is the server-side
 // copy that actually gates entry (see handleIdentitySession); the client-side
@@ -158,7 +169,7 @@ async function handleConnectOnboard(request, env) {
     try {
       await stripe.getAccount(accountId);
     } catch (e) {
-      if (e.status === 404 || e.code === 'resource_missing') {
+      if (isUnknownStripeObject(e)) {
         console.warn(`Connect account ${accountId} unknown on this Stripe account for ${user.uid} - re-creating.`);
         accountId = null;
       } else throw e;
@@ -196,7 +207,7 @@ async function handleConnectStatus(request, env) {
     // Unknown to this platform account (left over from a different Stripe
     // account or mode) - report it as simply not connected so the UI offers
     // onboarding again rather than erroring out.
-    if (e.status === 404 || e.code === 'resource_missing') return json({ connected: false }, 200, env);
+    if (isUnknownStripeObject(e)) return json({ connected: false }, 200, env);
     throw e;
   }
   return json(
@@ -223,7 +234,7 @@ async function syncIdentitySession(env, uid, sessionId) {
     // of 500ing and bricking the compliance gate for that user. Anything else
     // (network blip, auth failure, Stripe outage) must still throw: silently
     // treating those as "missing" would abandon a real in-flight verification.
-    if (e.status === 404 || e.code === 'resource_missing') {
+    if (isUnknownStripeObject(e)) {
       console.warn(`Verification session ${sessionId} not found on this Stripe account for ${uid} - starting fresh.`);
       return { status: 'unusable' };
     }
