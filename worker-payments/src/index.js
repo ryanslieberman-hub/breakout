@@ -102,6 +102,16 @@ async function handleStripeWebhook(request, env) {
   try {
     await verifyStripeWebhookSignature(payload, sigHeader, env.STRIPE_WEBHOOK_SECRET);
   } catch (e) {
+    // Log loudly. A rejected webhook is otherwise completely invisible: this
+    // path returns 400 without throwing, and `wrangler tail` prints "Ok" for
+    // any request that didn't raise an exception - so a silently rejected
+    // delivery looks IDENTICAL to a successful one while paid entries quietly
+    // never get recorded. That is exactly how a $20 test payment went through
+    // with no participant written and nothing to show for it in the logs.
+    console.error(
+      `Stripe webhook signature verification FAILED: ${e.message}. ` +
+      `STRIPE_WEBHOOK_SECRET is probably not the signing secret of the endpoint that sent this event.`
+    );
     return new Response(`Signature verification failed: ${e.message}`, { status: 400 });
   }
 
@@ -405,7 +415,9 @@ export async function runSettlementSweep(env) {
   const ended = await firestoreQuery(env, 'challenges', [
     { field: 'endDate', op: 'LESS_THAN', value: Date.now() },
   ]);
-  const unsettled = ended.filter(c => c.settled !== true);
+  // settlementBlocked = tried, can't be priced, already escalated for manual
+  // review (see settleChallenge). Excluded so it stops consuming every sweep.
+  const unsettled = ended.filter(c => c.settled !== true && c.settlementBlocked !== true);
 
   let settledCount = 0;
   for (const challenge of unsettled) {
@@ -441,12 +453,23 @@ async function settleChallenge(env, challenge) {
     return val;
   }
 
+  // Score ONLY what happened inside the challenge window. `trades` is a
+  // lifetime, append-only log, so replaying all of it ranks people on activity
+  // from before the challenge existed - and since every replay restarts from a
+  // single $100k, a long history inevitably overdraws and gets mass-rejected
+  // (one user showed 11 "tampered" trades that were nothing of the sort).
+  // The product promises "same $100K start for everyone, no carryover"; this
+  // is what makes settlement actually mean it.
+  const windowStart = challenge.joinDeadline || challenge.createdAt || 0;
+  const windowEnd = challenge.endDate;
+
   const valuations = [];
   for (const uid of participantUids) {
-    const trades = await firestoreQuery(env, 'trades', [{ field: 'uid', op: 'EQUAL', value: uid }]);
+    const allTrades = await firestoreQuery(env, 'trades', [{ field: 'uid', op: 'EQUAL', value: uid }]);
+    const trades = allTrades.filter(t => t.ts >= windowStart && t.ts <= windowEnd);
     const { cash, holdings, rejected } = replayTrades(trades);
     if (rejected.length) {
-      console.warn(`${rejected.length} rejected (tampered/invalid) trade(s) for ${uid} in challenge ${challenge.id}`);
+      console.warn(`${rejected.length} rejected (invalid) in-window trade(s) for ${uid} in challenge ${challenge.id}`);
     }
 
     const heldRanks = Object.keys(holdings).map(Number);
@@ -454,10 +477,27 @@ async function settleChallenge(env, challenge) {
     for (const rank of heldRanks) {
       const price = await trustedPrice(rank);
       if (price == null) {
-        console.error(
-          `Challenge ${challenge.id}: no trusted ${leagueForRank(rank)} price for rank ${rank} (held by ${uid}) ` +
-          `as of ${asOfDate} - skipping automatic settlement, will retry next sweep.`
-        );
+        // Long-dead challenges whose price data never materialised were retrying
+        // every hour forever, burning a sweep and filling the logs with the same
+        // six errors. Past a grace period the data isn't coming, so flag it and
+        // stop. Deliberately NOT marked `settled` - that would make an unpaid
+        // challenge indistinguishable from one that paid out correctly. This
+        // needs a human, so it's recorded as needing one.
+        const STALE_MS = 14 * 24 * 60 * 60 * 1000;
+        const reason = `no trusted ${leagueForRank(rank)} price for rank ${rank} (held by ${uid}) as of ${asOfDate}`;
+        if (Date.now() - challenge.endDate > STALE_MS) {
+          await firestorePatchDoc(env, `challenges/${challenge.id}`, {
+            settlementBlocked: true,
+            settlementBlockedReason: reason,
+            settlementBlockedAt: Date.now(),
+          });
+          console.error(
+            `Challenge ${challenge.id} ended over 14 days ago and still cannot be priced (${reason}) - ` +
+            `flagged settlementBlocked and will no longer be retried. Needs manual review.`
+          );
+          return false;
+        }
+        console.error(`Challenge ${challenge.id}: ${reason} - skipping automatic settlement, will retry next sweep.`);
         return false;
       }
       priceByRank[rank] = price;
