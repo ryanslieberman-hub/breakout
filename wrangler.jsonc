@@ -1,5 +1,12 @@
 {
   // Deploys index.html as static assets to the "square-block-4d1b" Worker.
+  //
+  // HEADS UP: wrangler resolves JSON/JSONC config ahead of wrangler.toml, so a
+  // bare `wrangler deploy` run from worker-payments/ or worker-pricing-engine/
+  // picks THIS file up and deploys the static site instead of that Worker. Both
+  // of those package.json scripts therefore pass `-c wrangler.toml` explicitly -
+  // keep it that way, and deploy them via `npm run deploy`, never a bare
+  // `npx wrangler deploy`.
   // Committing this avoids Wrangler's zero-config "set up this project"
   // wizard running on every Cloudflare build - that wizard was installing
   // wrangler's own `workerd` runtime (122 MiB) straight into this repo's

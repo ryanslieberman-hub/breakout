@@ -14920,6 +14920,7 @@ async function submitCreateChallenge() {
 // state - it's the minimum a real-money feature should ask for before launch.
 let _complianceGateResolve = null;
 let _complianceIdentityUnsub = null; // Firestore onSnapshot unsubscribe, scoped to the gate being open
+let _complianceIdentityPoll = null;  // /identity/status poll handle, same scope
 let _pendingIdentityUrl = null;
 
 function onComplianceCheckChange() {
@@ -14945,10 +14946,23 @@ async function refreshIdentityVerificationStatus() {
       warnEl.textContent = `Paid challenges aren't available from your detected location${result.geoState ? ' (' + result.geoState + ')' : ''}.`;
       warnEl.style.display = 'block';
     } else if (result.alreadyVerified) {
-      statusEl.textContent = '✓ Identity verified';
+      statusEl.textContent = result.adult === false
+        ? '✗ Verified, but you must be 18+ to enter paid challenges.'
+        : '✓ Identity verified';
+    } else if (result.processing) {
+      statusEl.textContent = 'Verification submitted - waiting on the result…';
+      startIdentityStatusPolling();
     } else {
       _pendingIdentityUrl = result.url;
-      statusEl.textContent = 'Not yet verified.';
+      // An abandoned/failed prior attempt comes back as a resumable session, so
+      // say so rather than showing a bare "Not yet verified" that gives no hint
+      // the last try didn't take.
+      statusEl.textContent = result.errorCode === 'abandoned'
+        ? 'Last attempt was exited before it finished - you can pick it back up.'
+        : result.errorReason
+          ? 'Last attempt didn’t go through: ' + result.errorReason
+          : 'Not yet verified.';
+      btn.textContent = result.errorCode ? 'Resume verification ↗' : 'Verify Identity ↗';
       btn.style.display = 'block';
     }
   } catch (e) {
@@ -14957,10 +14971,58 @@ async function refreshIdentityVerificationStatus() {
   onComplianceCheckChange();
 }
 
+// Polls the worker (which re-reads Stripe) while the gate is open. The Firestore
+// listener alone isn't enough: it only ever fires if something WRITES the user
+// doc, which needs the Stripe webhook to have been delivered. If that webhook
+// isn't configured or is delayed, this is what still moves the UI - and it's the
+// only path that can surface a failed or abandoned attempt at all, instead of
+// leaving the gate sitting on "waiting…" forever.
+function startIdentityStatusPolling() {
+  if (_complianceIdentityPoll) return;
+  _complianceIdentityPoll = setInterval(async () => {
+    if (!currentUser) return;
+    try {
+      const s = await paymentsWorkerFetch('/identity/status');
+      const statusEl = document.getElementById('cg-verify-status');
+      const btn = document.getElementById('cg-verify-btn');
+      if (!statusEl) return;
+      if (s.status === 'verified') {
+        userProfile = userProfile || {};
+        userProfile.identityVerified = true;
+        userProfile.identityVerifiedAdult = s.adult;
+        btn.style.display = 'none';
+        statusEl.textContent = s.adult === false
+          ? '✗ Verified, but you must be 18+ to enter paid challenges.'
+          : '✓ Identity verified';
+        stopIdentityStatusPolling();
+        onComplianceCheckChange();
+      } else if (s.status === 'processing') {
+        statusEl.textContent = 'Verification submitted - waiting on the result…';
+        btn.style.display = 'none';
+      } else if (s.status === 'requires_input' && s.errorCode) {
+        // Only react once the attempt has actually failed/been abandoned -
+        // a fresh, untouched session also sits in requires_input.
+        _pendingIdentityUrl = s.url || _pendingIdentityUrl;
+        statusEl.textContent = s.errorCode === 'abandoned'
+          ? 'That attempt was exited before it finished - you can pick it back up.'
+          : 'That attempt didn’t go through' + (s.errorReason ? ': ' + s.errorReason : '.');
+        btn.textContent = 'Resume verification ↗';
+        btn.style.display = 'block';
+      }
+    } catch (e) { /* transient - next tick retries */ }
+  }, 4000);
+}
+
+function stopIdentityStatusPolling() {
+  if (_complianceIdentityPoll) { clearInterval(_complianceIdentityPoll); _complianceIdentityPoll = null; }
+}
+
 function startIdentityVerification() {
   if (!_pendingIdentityUrl) return;
   window.open(_pendingIdentityUrl, '_blank');
   document.getElementById('cg-verify-status').textContent = 'Waiting for verification to complete in the other tab…';
+  document.getElementById('cg-verify-btn').style.display = 'none';
+  startIdentityStatusPolling();
 }
 
 // Shows the gate and resolves true once the user completes it, false if they
@@ -14968,6 +15030,7 @@ function startIdentityVerification() {
 function requireComplianceGate() {
   return new Promise((resolve) => {
     _complianceGateResolve = resolve;
+    stopIdentityStatusPolling(); // clear any poll left over from a previous open
     document.getElementById('cg-tos').checked = false;
     document.getElementById('cg-tos-text').style.display = 'none';
     document.getElementById('cg-state-warning').style.display = 'none';
@@ -14998,6 +15061,7 @@ function requireComplianceGate() {
 function closeComplianceGate() {
   document.getElementById('compliance-modal').classList.remove('open');
   if (_complianceIdentityUnsub) { _complianceIdentityUnsub(); _complianceIdentityUnsub = null; }
+  stopIdentityStatusPolling();
   if (_complianceGateResolve) { _complianceGateResolve(false); _complianceGateResolve = null; }
 }
 
@@ -15012,6 +15076,7 @@ async function submitComplianceGate() {
     userProfile.compliance = { ...(userProfile.compliance || {}), ...compliance };
     document.getElementById('compliance-modal').classList.remove('open');
     if (_complianceIdentityUnsub) { _complianceIdentityUnsub(); _complianceIdentityUnsub = null; }
+    stopIdentityStatusPolling();
     if (_complianceGateResolve) { _complianceGateResolve(true); _complianceGateResolve = null; }
   } catch (e) { showToast('Could not save: ' + e.message); }
 }
@@ -15992,16 +16057,54 @@ window.addEventListener('DOMContentLoaded', function() {
   // console. If phone and web show different tags, the phone is serving stale cache.
   try { const bt = document.getElementById('build-tag'); if (bt && window.BREAKOUT_VERSION) bt.textContent = window.BREAKOUT_VERSION; } catch(e){}
   // Return trip from the Stripe Identity hosted verification tab
-  // (worker-payments' IDENTITY_RETURN_URL) - that tab was opened via
-  // window.open() from the compliance gate, so window.close() works here;
-  // completion itself is reported separately via the Stripe webhook, this is
-  // just tidying up the now-done tab.
+  // (worker-payments' IDENTITY_RETURN_URL). Stripe sends the user back here for
+  // ANY exit, including backing out without submitting a document - so this must
+  // never assert that verification succeeded. It asks the server what actually
+  // happened and reports that, and only auto-closes on a real success; a failed
+  // or abandoned attempt stays on screen with a way back in, since silently
+  // closing the tab on a failure is exactly how someone ends up thinking they
+  // verified when they didn't.
   try {
     if (new URLSearchParams(location.search).get('identity_return') === '1') {
       history.replaceState(null, '', location.pathname);
       document.body.insertAdjacentHTML('beforeend',
-        '<div style="position:fixed;inset:0;background:var(--bg,#000);color:var(--fg,#fff);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:var(--font-mono,monospace);font-size:13px;z-index:99999;">Verification submitted. You can close this tab and return to Breakout.</div>');
-      setTimeout(() => { try { window.close(); } catch(e){} }, 1500);
+        '<div id="identity-return-veil" style="position:fixed;inset:0;background:var(--bg,#000);color:var(--text,#fff);display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:var(--font-mono,monospace);font-size:13px;line-height:1.7;z-index:99999;">' +
+        '<div id="identity-return-msg">Checking your verification…</div>' +
+        '<div id="identity-return-actions"></div></div>');
+      const msgEl = () => document.getElementById('identity-return-msg');
+      const actEl = () => document.getElementById('identity-return-actions');
+      const btn = (label, onclick) =>
+        `<button onclick="${onclick}" style="font-family:var(--font-mono,monospace);font-size:12px;padding:8px 18px;border-radius:8px;border:1px solid var(--hairline,#333);background:transparent;color:var(--green,#12d47e);cursor:pointer;">${label}</button>`;
+      (async () => {
+        // Auth is restored asynchronously - wait for it before asking the worker,
+        // which authenticates by Firebase ID token.
+        for (let i = 0; i < 40 && !currentUser; i++) await new Promise(r => setTimeout(r, 250));
+        if (!currentUser) {
+          msgEl().textContent = 'Signed out here, so we can’t check the result. Return to the Breakout tab.';
+          actEl().innerHTML = btn('Close tab', 'window.close()');
+          return;
+        }
+        try {
+          const s = await paymentsWorkerFetch('/identity/status');
+          if (s.status === 'verified') {
+            msgEl().textContent = s.adult === false
+              ? '✗ Verified, but you must be 18+ to enter paid challenges.'
+              : '✓ Identity verified. Returning you to Breakout…';
+            if (s.adult !== false) { setTimeout(() => { try { window.close(); } catch(e){} }, 1400); return; }
+          } else if (s.status === 'processing') {
+            msgEl().textContent = 'Verification submitted and still processing. Breakout will update on its own once it finishes.';
+          } else if (s.status === 'requires_input') {
+            msgEl().textContent = s.errorCode === 'abandoned'
+              ? 'Verification wasn’t completed - the ID check was exited before it finished. You can pick it back up from the Breakout tab.'
+              : 'Verification didn’t go through' + (s.errorReason ? ': ' + s.errorReason : '.') + ' You can try again from the Breakout tab.';
+          } else {
+            msgEl().textContent = 'Verification wasn’t completed. You can try again from the Breakout tab.';
+          }
+        } catch (e) {
+          msgEl().textContent = 'Could not check the result: ' + e.message;
+        }
+        actEl().innerHTML = btn('Close tab', 'window.close()');
+      })();
     }
   } catch(e){}
   const overlay = document.getElementById('ob-overlay');

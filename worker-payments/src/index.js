@@ -115,24 +115,17 @@ async function handleStripeWebhook(request, env) {
     });
   }
   if (event.type === 'identity.verification_session.verified') {
-    let session = event.data.object;
+    const session = event.data.object;
     const uid = session.metadata?.uid;
     if (!uid) {
       console.error('identity.verification_session.verified missing uid metadata', session.id);
       return new Response('ok', { status: 200 }); // ack anyway - not retryable
     }
-    if (!session.verified_outputs) {
-      // Some API versions omit verified_outputs from the webhook payload -
-      // re-fetch the full session rather than trust an absent dob as "not an adult".
-      const stripe = stripeClient(env.STRIPE_SECRET_KEY);
-      session = await stripe.getVerificationSession(session.id);
-    }
-    const dob = session.verified_outputs?.dob;
-    await firestorePatchDoc(env, `users/${uid}`, {
-      identityVerified: true,
-      identityVerifiedAt: Date.now(),
-      identityVerifiedAdult: dob ? isAdultDob(dob) : false,
-    });
+    // Re-fetch through the shared helper rather than trusting the event payload:
+    // some API versions omit verified_outputs from the webhook body, and an
+    // absent dob must never be read as "not an adult". Idempotent, so webhook
+    // retries and the client's own polling can both land here harmlessly.
+    await syncIdentitySession(env, uid, session.id);
   }
   return new Response('ok', { status: 200 });
 }
@@ -189,12 +182,43 @@ async function handleConnectStatus(request, env) {
   );
 }
 
+// Reads the live state of a user's Stripe Identity session and mirrors any
+// finished result into Firestore. This is what keeps the flow working when the
+// webhook doesn't do its job - a missing event subscription, a delayed delivery,
+// a failed retry - because the client can always ask Stripe (through us) what
+// actually happened rather than waiting forever on a push that isn't coming.
+async function syncIdentitySession(env, uid, sessionId) {
+  const stripe = stripeClient(env.STRIPE_SECRET_KEY);
+  const session = await stripe.getVerificationSession(sessionId);
+
+  if (session.status === 'verified') {
+    const dob = session.verified_outputs?.dob;
+    const adult = dob ? isAdultDob(dob) : false;
+    await firestorePatchDoc(env, `users/${uid}`, {
+      identityVerified: true,
+      identityVerifiedAt: Date.now(),
+      identityVerifiedAdult: adult,
+    });
+    return { status: 'verified', adult };
+  }
+  if (session.status === 'processing') return { status: 'processing' };
+  if (session.status === 'canceled') return { status: 'canceled' };
+
+  // requires_input: either never started, or an attempt failed / was abandoned.
+  // The session's own url stays valid, so this doubles as the "they closed the
+  // tab early, let them pick it back up" path.
+  return {
+    status: 'requires_input',
+    url: session.url || null,
+    errorCode: session.last_error?.code || null,
+    errorReason: session.last_error?.reason || null,
+  };
+}
+
 // ── POST /identity/session ──
-// Starts (or reuses) real, server-verified identity + location checks for a
+// Starts (or resumes) real, server-verified identity + location checks for a
 // paid-challenge entry. Geolocation comes from Cloudflare's own edge network
-// (request.cf), never from anything the client claims. Identity comes from a
-// Stripe Identity hosted session, opened by the client in a separate tab;
-// completion is reported back asynchronously via the Stripe webhook below.
+// (request.cf), never from anything the client claims.
 async function handleIdentitySession(request, env) {
   const user = await requireUser(request, env);
   const userDoc = (await firestoreGetDoc(env, `users/${user.uid}`)) || {};
@@ -211,21 +235,55 @@ async function handleIdentitySession(request, env) {
   }
 
   if (userDoc.identityVerified === true) {
-    return json({ alreadyVerified: true, geoState, geoCountry }, 200, env);
+    return json({ alreadyVerified: true, adult: userDoc.identityVerifiedAdult === true, geoState, geoCountry }, 200, env);
   }
 
+  // Resume the existing session rather than stacking up new ones on every open
+  // of the gate. This also self-heals a verification that already succeeded but
+  // never made it into Firestore because the webhook didn't deliver.
+  if (userDoc.stripeIdentitySessionId) {
+    const s = await syncIdentitySession(env, user.uid, userDoc.stripeIdentitySessionId);
+    if (s.status === 'verified') {
+      return json({ alreadyVerified: true, adult: s.adult, geoState, geoCountry }, 200, env);
+    }
+    if (s.status === 'processing') {
+      return json({ blocked: false, processing: true, geoState, geoCountry }, 200, env);
+    }
+    if (s.status === 'requires_input' && s.url) {
+      return json({ blocked: false, url: s.url, errorCode: s.errorCode, errorReason: s.errorReason, geoState, geoCountry }, 200, env);
+    }
+    // canceled, or no resumable url - fall through and start a fresh session.
+  }
+
+  // No idempotency key here on purpose: a fixed per-uid key pins this to the
+  // FIRST session created in Stripe's 24h idempotency window, so a canceled or
+  // unusable session could never be replaced. Duplicate sessions are harmless
+  // (Stripe bills verification attempts, not created sessions) and the resume
+  // branch above means we only ever reach this when there's nothing to reuse.
   const stripe = stripeClient(env.STRIPE_SECRET_KEY);
-  const session = await stripe.createVerificationSession(
-    {
-      type: 'document',
-      metadata: { uid: user.uid },
-      options: { document: { require_matching_selfie: true } },
-      return_url: env.IDENTITY_RETURN_URL,
-    },
-    `identity-session:${user.uid}`
-  );
+  const session = await stripe.createVerificationSession({
+    type: 'document',
+    metadata: { uid: user.uid },
+    options: { document: { require_matching_selfie: true } },
+    return_url: env.IDENTITY_RETURN_URL,
+  });
   await firestorePatchDoc(env, `users/${user.uid}`, { stripeIdentitySessionId: session.id });
   return json({ blocked: false, url: session.url, geoState, geoCountry }, 200, env);
+}
+
+// ── GET /identity/status ──
+// Polled by the client while the compliance gate is open. Deliberately creates
+// nothing and re-checks no geo - it only reports where the existing verification
+// stands, re-read from Stripe, so the UI can react to a real outcome (including
+// a failed or abandoned attempt) instead of waiting on a webhook indefinitely.
+async function handleIdentityStatus(request, env) {
+  const user = await requireUser(request, env);
+  const userDoc = (await firestoreGetDoc(env, `users/${user.uid}`)) || {};
+  if (userDoc.identityVerified === true) {
+    return json({ status: 'verified', adult: userDoc.identityVerifiedAdult === true }, 200, env);
+  }
+  if (!userDoc.stripeIdentitySessionId) return json({ status: 'none' }, 200, env);
+  return json(await syncIdentitySession(env, user.uid, userDoc.stripeIdentitySessionId), 200, env);
 }
 
 // ── Settlement sweep (Cron Trigger) ──
@@ -394,6 +452,9 @@ export default {
       }
       if (request.method === 'POST' && url.pathname === '/identity/session') {
         return await handleIdentitySession(request, env);
+      }
+      if (request.method === 'GET' && url.pathname === '/identity/status') {
+        return await handleIdentityStatus(request, env);
       }
       // Manual trigger for local/dev testing of the settlement sweep - remove
       // or protect further before going to production with real money.
