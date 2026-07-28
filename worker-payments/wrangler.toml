@@ -12,10 +12,15 @@ crons = ["0 * * * *"]
 #   STRIPE_WEBHOOK_SECRET    - from the Stripe Dashboard webhook endpoint (whsec_...)
 #   FIREBASE_SERVICE_ACCOUNT - the full JSON of your Firebase service account key, as one string
 #
+# Manual step (Stripe Dashboard, not code): the webhook endpoint must have
+# `identity.verification_session.verified` added to its subscribed events,
+# alongside the existing `checkout.session.completed`.
+#
 # Plain (non-secret) vars - safe to keep here or move to .dev.vars for local dev:
 [vars]
 FIREBASE_PROJECT_ID = "athletex-ae63d"
 ALLOWED_ORIGIN = "https://square-block-4d1b.ryanslieberman.workers.dev"
 CHECKOUT_SUCCESS_URL = "https://square-block-4d1b.ryanslieberman.workers.dev/?challenge_paid=1"
 CHECKOUT_CANCEL_URL = "https://square-block-4d1b.ryanslieberman.workers.dev/?challenge_paid=0"
+IDENTITY_RETURN_URL = "https://square-block-4d1b.ryanslieberman.workers.dev/?identity_return=1"
 PLATFORM_FEE_BPS = "1000"

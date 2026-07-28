@@ -23,6 +23,12 @@ function json(data, status, env) {
   });
 }
 
+// Mirrors US_STATES/RESTRICTED_STATES in index.html - kept in sync manually,
+// same as leagueForRank's rank-range comment below. This is the server-side
+// copy that actually gates entry (see handleIdentitySession); the client-side
+// list is only used for the pre-verification UI hint.
+const RESTRICTED_STATES = ['AZ', 'CT', 'DE', 'IA', 'LA', 'MT', 'WA'];
+
 async function requireUser(request, env) {
   const token = bearerToken(request);
   if (!token) throw new HttpError(401, 'Missing Authorization header');
@@ -108,7 +114,39 @@ async function handleStripeWebhook(request, env) {
       stripeSessionId: session.id,
     });
   }
+  if (event.type === 'identity.verification_session.verified') {
+    let session = event.data.object;
+    const uid = session.metadata?.uid;
+    if (!uid) {
+      console.error('identity.verification_session.verified missing uid metadata', session.id);
+      return new Response('ok', { status: 200 }); // ack anyway - not retryable
+    }
+    if (!session.verified_outputs) {
+      // Some API versions omit verified_outputs from the webhook payload -
+      // re-fetch the full session rather than trust an absent dob as "not an adult".
+      const stripe = stripeClient(env.STRIPE_SECRET_KEY);
+      session = await stripe.getVerificationSession(session.id);
+    }
+    const dob = session.verified_outputs?.dob;
+    await firestorePatchDoc(env, `users/${uid}`, {
+      identityVerified: true,
+      identityVerifiedAt: Date.now(),
+      identityVerifiedAdult: dob ? isAdultDob(dob) : false,
+    });
+  }
   return new Response('ok', { status: 200 });
+}
+
+// dob: { day, month, year } as returned by Stripe Identity's verified_outputs.
+function isAdultDob(dob) {
+  const today = new Date();
+  const birthDate = new Date(Date.UTC(dob.year, dob.month - 1, dob.day));
+  let age = today.getUTCFullYear() - birthDate.getUTCFullYear();
+  const hadBirthdayThisYear =
+    today.getUTCMonth() > birthDate.getUTCMonth() ||
+    (today.getUTCMonth() === birthDate.getUTCMonth() && today.getUTCDate() >= birthDate.getUTCDate());
+  if (!hadBirthdayThisYear) age--;
+  return age >= 18;
 }
 
 // ── POST /connect/onboard ──
@@ -149,6 +187,45 @@ async function handleConnectStatus(request, env) {
     200,
     env
   );
+}
+
+// ── POST /identity/session ──
+// Starts (or reuses) real, server-verified identity + location checks for a
+// paid-challenge entry. Geolocation comes from Cloudflare's own edge network
+// (request.cf), never from anything the client claims. Identity comes from a
+// Stripe Identity hosted session, opened by the client in a separate tab;
+// completion is reported back asynchronously via the Stripe webhook below.
+async function handleIdentitySession(request, env) {
+  const user = await requireUser(request, env);
+  const userDoc = (await firestoreGetDoc(env, `users/${user.uid}`)) || {};
+
+  const geoCountry = request.cf?.country || null;
+  const geoState = request.cf?.regionCode || null;
+  await firestorePatchDoc(env, `users/${user.uid}`, {
+    geoCountry, geoState, geoCheckedAt: Date.now(),
+  });
+
+  const restricted = geoCountry !== 'US' || RESTRICTED_STATES.includes(geoState);
+  if (restricted) {
+    return json({ blocked: true, reason: 'restricted_location', geoState, geoCountry }, 200, env);
+  }
+
+  if (userDoc.identityVerified === true) {
+    return json({ alreadyVerified: true, geoState, geoCountry }, 200, env);
+  }
+
+  const stripe = stripeClient(env.STRIPE_SECRET_KEY);
+  const session = await stripe.createVerificationSession(
+    {
+      type: 'document',
+      metadata: { uid: user.uid },
+      options: { document: { require_matching_selfie: true } },
+      return_url: env.IDENTITY_RETURN_URL,
+    },
+    `identity-session:${user.uid}`
+  );
+  await firestorePatchDoc(env, `users/${user.uid}`, { stripeIdentitySessionId: session.id });
+  return json({ blocked: false, url: session.url, geoState, geoCountry }, 200, env);
 }
 
 // ── Settlement sweep (Cron Trigger) ──
@@ -314,6 +391,9 @@ export default {
       }
       if (request.method === 'GET' && url.pathname === '/connect/status') {
         return await handleConnectStatus(request, env);
+      }
+      if (request.method === 'POST' && url.pathname === '/identity/session') {
+        return await handleIdentitySession(request, env);
       }
       // Manual trigger for local/dev testing of the settlement sweep - remove
       // or protect further before going to production with real money.

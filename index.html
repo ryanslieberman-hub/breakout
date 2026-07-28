@@ -5061,17 +5061,14 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   <div class="wc-create-box" style="max-width:420px;">
     <div class="wc-create-title">Before You Enter a Paid Challenge</div>
     <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:16px;">
-      Paid challenges involve real money in and real money out. We need a few things confirmed before your first entry.
+      Paid challenges involve real money in and real money out. We need to verify your identity and location before your first entry.
     </div>
     <div class="wc-field">
-      <div class="wc-label">YOUR STATE</div>
-      <select class="wc-input" id="cg-state" onchange="onComplianceStateChange()"></select>
-      <div id="cg-state-warning" style="display:none;color:var(--red);font-family:var(--font-mono);font-size:10px;margin-top:6px;">Paid challenges aren't available in this state yet.</div>
+      <div class="wc-label">IDENTITY &amp; LOCATION</div>
+      <div id="cg-verify-status" style="font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:8px;">Checking…</div>
+      <button class="wc-btn primary" id="cg-verify-btn" style="display:none;width:100%;" onclick="startIdentityVerification()">Verify Identity ↗</button>
+      <div id="cg-state-warning" style="display:none;color:var(--red);font-family:var(--font-mono);font-size:10px;margin-top:6px;"></div>
     </div>
-    <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:12px;font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.5;cursor:pointer;">
-      <input type="checkbox" id="cg-age" onchange="onComplianceCheckChange()" style="margin-top:2px;flex-shrink:0;">
-      I confirm I am 18 years of age or older.
-    </label>
     <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.5;cursor:pointer;">
       <input type="checkbox" id="cg-tos" onchange="onComplianceCheckChange()" style="margin-top:2px;flex-shrink:0;">
       I agree to the <span onclick="event.preventDefault();document.getElementById('cg-tos-text').style.display=document.getElementById('cg-tos-text').style.display==='none'?'block':'none';" style="color:var(--green);text-decoration:underline;cursor:pointer;">Terms of Service</span> for paid challenges.
@@ -14808,90 +14805,110 @@ async function submitCreateChallenge() {
 // ═══════════════════════════════════════════
 //  COMPLIANCE GATE (paid challenges)
 // ═══════════════════════════════════════════
-// Baseline self-attestation gate shown before a user's first entry into a
-// paid challenge. This is NOT a substitute for legal review of real-money
-// contest law per state - it's the minimum a real-money feature should ask
-// for before launch. Confirm actual legality per state independently.
-const US_STATES = [
-  ['AL','Alabama'],['AK','Alaska'],['AZ','Arizona'],['AR','Arkansas'],['CA','California'],
-  ['CO','Colorado'],['CT','Connecticut'],['DE','Delaware'],['DC','District of Columbia'],
-  ['FL','Florida'],['GA','Georgia'],['HI','Hawaii'],['ID','Idaho'],['IL','Illinois'],
-  ['IN','Indiana'],['IA','Iowa'],['KS','Kansas'],['KY','Kentucky'],['LA','Louisiana'],
-  ['ME','Maine'],['MD','Maryland'],['MA','Massachusetts'],['MI','Michigan'],['MN','Minnesota'],
-  ['MS','Mississippi'],['MO','Missouri'],['MT','Montana'],['NE','Nebraska'],['NV','Nevada'],
-  ['NH','New Hampshire'],['NJ','New Jersey'],['NM','New Mexico'],['NY','New York'],
-  ['NC','North Carolina'],['ND','North Dakota'],['OH','Ohio'],['OK','Oklahoma'],['OR','Oregon'],
-  ['PA','Pennsylvania'],['RI','Rhode Island'],['SC','South Carolina'],['SD','South Dakota'],
-  ['TN','Tennessee'],['TX','Texas'],['UT','Utah'],['VT','Vermont'],['VA','Virginia'],
-  ['WA','Washington'],['WV','West Virginia'],['WI','Wisconsin'],['WY','Wyoming'],
-];
-// Starting denylist - states with specific DFS/skill-contest restrictions.
-// Not exhaustive and not a legal determination - verify before real launch.
-const RESTRICTED_STATES = ['AZ','CT','DE','IA','LA','MT','WA'];
-
+// Real, server-verified gate shown before every entry into a paid challenge:
+// - Identity + real age come from a Stripe Identity hosted session (worker-
+//   payments' /identity/session), stored once on users/{uid} and reused
+//   across future entries.
+// - Location comes from Cloudflare's own edge geolocation on the request to
+//   worker-payments (never anything the client claims), re-checked on every
+//   open of this gate since a user's location can change between visits in a
+//   way their identity/ToS acceptance doesn't.
+// This is NOT a substitute for legal review of real-money contest law per
+// state - it's the minimum a real-money feature should ask for before launch.
 let _complianceGateResolve = null;
+let _complianceIdentityUnsub = null; // Firestore onSnapshot unsubscribe, scoped to the gate being open
+let _pendingIdentityUrl = null;
 
-function isComplianceGateSatisfied() {
-  const c = userProfile?.compliance;
-  return !!(c && c.state && !RESTRICTED_STATES.includes(c.state) && c.ageConfirmed && c.tosAcceptedAt);
+function onComplianceCheckChange() {
+  const tos = document.getElementById('cg-tos').checked;
+  const verified = userProfile?.identityVerified === true && userProfile?.identityVerifiedAdult === true;
+  document.getElementById('cg-submit').disabled = !tos || !verified;
 }
 
-function populateComplianceStateOptions() {
-  const sel = document.getElementById('cg-state');
-  if (!sel || sel.options.length) return;
-  sel.innerHTML = '<option value="">Select a state…</option>' +
-    US_STATES.map(([code, name]) => `<option value="${code}">${name}</option>`).join('');
+// Calls worker-payments to (a) refresh the server's geolocation read on this
+// request and (b) start/reuse a Stripe Identity session if not yet verified.
+async function refreshIdentityVerificationStatus() {
+  const statusEl = document.getElementById('cg-verify-status');
+  const btn = document.getElementById('cg-verify-btn');
+  const warnEl = document.getElementById('cg-state-warning');
+  statusEl.textContent = 'Checking your location…';
+  btn.style.display = 'none';
+  warnEl.style.display = 'none';
+  _pendingIdentityUrl = null;
+  try {
+    const result = await paymentsWorkerFetch('/identity/session', { method: 'POST' });
+    if (result.blocked) {
+      statusEl.textContent = '';
+      warnEl.textContent = `Paid challenges aren't available from your detected location${result.geoState ? ' (' + result.geoState + ')' : ''}.`;
+      warnEl.style.display = 'block';
+    } else if (result.alreadyVerified) {
+      statusEl.textContent = '✓ Identity verified';
+    } else {
+      _pendingIdentityUrl = result.url;
+      statusEl.textContent = 'Not yet verified.';
+      btn.style.display = 'block';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Could not check verification status: ' + e.message;
+  }
+  onComplianceCheckChange();
 }
 
-// Shows the gate if needed and resolves true once the user passes it (or
-// already had), false if they cancel or their state is restricted.
+function startIdentityVerification() {
+  if (!_pendingIdentityUrl) return;
+  window.open(_pendingIdentityUrl, '_blank');
+  document.getElementById('cg-verify-status').textContent = 'Waiting for verification to complete in the other tab…';
+}
+
+// Shows the gate and resolves true once the user completes it, false if they
+// cancel.
 function requireComplianceGate() {
   return new Promise((resolve) => {
-    if (isComplianceGateSatisfied()) { resolve(true); return; }
     _complianceGateResolve = resolve;
-    populateComplianceStateOptions();
-    document.getElementById('cg-state').value = '';
-    document.getElementById('cg-age').checked = false;
     document.getElementById('cg-tos').checked = false;
     document.getElementById('cg-tos-text').style.display = 'none';
     document.getElementById('cg-state-warning').style.display = 'none';
+    document.getElementById('cg-verify-btn').style.display = 'none';
     document.getElementById('cg-submit').disabled = true;
     document.getElementById('compliance-modal').classList.add('open');
+
+    if (db && currentUser && window._fbOnSnapshot && window._fbDoc) {
+      _complianceIdentityUnsub = window._fbOnSnapshot(window._fbDoc(db, 'users', currentUser.uid), (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+        userProfile = userProfile || {};
+        userProfile.identityVerified = data.identityVerified;
+        userProfile.identityVerifiedAdult = data.identityVerifiedAdult;
+        if (data.identityVerified) {
+          document.getElementById('cg-verify-btn').style.display = 'none';
+          document.getElementById('cg-verify-status').textContent = data.identityVerifiedAdult === false
+            ? '✗ Verified, but you must be 18+ to enter paid challenges.'
+            : '✓ Identity verified';
+        }
+        onComplianceCheckChange();
+      });
+    }
+    refreshIdentityVerificationStatus();
   });
 }
 
 function closeComplianceGate() {
   document.getElementById('compliance-modal').classList.remove('open');
+  if (_complianceIdentityUnsub) { _complianceIdentityUnsub(); _complianceIdentityUnsub = null; }
   if (_complianceGateResolve) { _complianceGateResolve(false); _complianceGateResolve = null; }
 }
 
-function onComplianceStateChange() {
-  const state = document.getElementById('cg-state').value;
-  const blocked = RESTRICTED_STATES.includes(state);
-  document.getElementById('cg-state-warning').style.display = blocked ? 'block' : 'none';
-  onComplianceCheckChange();
-}
-
-function onComplianceCheckChange() {
-  const state = document.getElementById('cg-state').value;
-  const blocked = RESTRICTED_STATES.includes(state);
-  const age = document.getElementById('cg-age').checked;
-  const tos = document.getElementById('cg-tos').checked;
-  document.getElementById('cg-submit').disabled = !state || blocked || !age || !tos;
-}
-
 async function submitComplianceGate() {
-  const state = document.getElementById('cg-state').value;
-  const age = document.getElementById('cg-age').checked;
   const tos = document.getElementById('cg-tos').checked;
-  if (!state || RESTRICTED_STATES.includes(state) || !age || !tos) return;
+  if (!tos || userProfile?.identityVerified !== true || userProfile?.identityVerifiedAdult !== true) return;
   if (!currentUser || !db) { showToast('Sign in first'); return; }
   try {
-    const compliance = { state, ageConfirmed: true, tosAcceptedAt: Date.now(), tosVersion: 'placeholder-v0' };
+    const compliance = { tosAcceptedAt: Date.now(), tosVersion: 'placeholder-v0' };
     await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), { compliance }, { merge: true });
     userProfile = userProfile || {};
-    userProfile.compliance = compliance;
+    userProfile.compliance = { ...(userProfile.compliance || {}), ...compliance };
     document.getElementById('compliance-modal').classList.remove('open');
+    if (_complianceIdentityUnsub) { _complianceIdentityUnsub(); _complianceIdentityUnsub = null; }
     if (_complianceGateResolve) { _complianceGateResolve(true); _complianceGateResolve = null; }
   } catch (e) { showToast('Could not save: ' + e.message); }
 }
@@ -15871,6 +15888,19 @@ window.addEventListener('DOMContentLoaded', function() {
   // Build tag in Settings: lets any device confirm which build it's running without a
   // console. If phone and web show different tags, the phone is serving stale cache.
   try { const bt = document.getElementById('build-tag'); if (bt && window.BREAKOUT_VERSION) bt.textContent = window.BREAKOUT_VERSION; } catch(e){}
+  // Return trip from the Stripe Identity hosted verification tab
+  // (worker-payments' IDENTITY_RETURN_URL) - that tab was opened via
+  // window.open() from the compliance gate, so window.close() works here;
+  // completion itself is reported separately via the Stripe webhook, this is
+  // just tidying up the now-done tab.
+  try {
+    if (new URLSearchParams(location.search).get('identity_return') === '1') {
+      history.replaceState(null, '', location.pathname);
+      document.body.insertAdjacentHTML('beforeend',
+        '<div style="position:fixed;inset:0;background:var(--bg,#000);color:var(--fg,#fff);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:var(--font-mono,monospace);font-size:13px;z-index:99999;">Verification submitted. You can close this tab and return to Breakout.</div>');
+      setTimeout(() => { try { window.close(); } catch(e){} }, 1500);
+    }
+  } catch(e){}
   const overlay = document.getElementById('ob-overlay');
   if (!overlay) return;
   overlay.addEventListener('click', function(e) {

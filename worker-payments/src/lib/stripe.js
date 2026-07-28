@@ -58,6 +58,9 @@ export function stripeClient(secretKey) {
     createAccountLink: (params) => request('POST', '/account_links', params),
     createTransfer: (params, idempotencyKey) =>
       request('POST', '/transfers', params, idempotencyKey),
+    createVerificationSession: (params, idempotencyKey) =>
+      request('POST', '/identity/verification_sessions', params, idempotencyKey),
+    getVerificationSession: (id) => request('GET', `/identity/verification_sessions/${id}`),
   };
 }
 

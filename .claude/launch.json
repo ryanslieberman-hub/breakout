@@ -4,8 +4,14 @@
     {
       "name": "breakout-static",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8765"],
-      "port": 8765
+      "runtimeArgs": ["-m", "http.server", "8766"],
+      "port": 8766
+    },
+    {
+      "name": "worker-payments-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "worker-payments", "run", "dev", "--", "--port", "8787"],
+      "port": 8787
     }
   ]
 }

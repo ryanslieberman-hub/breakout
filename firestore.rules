@@ -20,13 +20,33 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // User profiles / free practice leaderboard - unchanged. Self-reported
+    // User profiles / free practice leaderboard. Self-reported
     // portfolioValue/returnPct here is fine for the free leaderboard (no real
     // money rides on it). Real-money challenge settlement NEVER reads this
     // doc - see challengeSnapshots below.
+    //
+    // A fixed set of fields is carved out as server-only (written exclusively
+    // by worker-payments via its service account, which bypasses these rules
+    // entirely) - the client may create/update its own doc but may never set
+    // these directly:
+    //   - stripeConnectId: settlement's payout code trusts this as the Stripe
+    //     Connect destination for real money transfers. Letting a client set
+    //     it themselves would let them redirect payouts to an arbitrary
+    //     Connect account.
+    //   - identityVerified / identityVerifiedAt / identityVerifiedAdult /
+    //     stripeIdentitySessionId: real ID-verification results (Stripe
+    //     Identity) - a client claiming these itself defeats the entire point
+    //     of verifying identity server-side.
+    //   - geoState / geoCountry / geoCheckedAt: real network-geolocation used
+    //     to gate paid-challenge entry by jurisdiction - same reasoning as
+    //     identity above.
     match /users/{uid} {
       allow read: if true;
-      allow create, update: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'stripeConnectId', 'identityVerified', 'identityVerifiedAt', 'identityVerifiedAdult',
+          'stripeIdentitySessionId', 'geoState', 'geoCountry', 'geoCheckedAt'
+        ]);
       allow delete: if false;
     }
 
