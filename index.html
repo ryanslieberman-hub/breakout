@@ -13335,8 +13335,14 @@ async function refreshAll() {
   // first) - a plain server-side reset alone doesn't stick, because the next client
   // to load with an un-migrated local cache just re-uploads its own still-corrupted
   // closes on its normal sync and undoes it.
-  if (!localStorage.getItem('ax_mlb_reset_v1')) {
-    localStorage.setItem('ax_mlb_reset_v1', '1');
+  if (localStorage.getItem('ax_mlb_reset_v1') !== 'full') {
+    // Two stages ('local' then 'full') because db often isn't ready yet at this
+    // point in boot - the Firestore half of this reset runs later, in
+    // _backgroundSync(), where dbInst is guaranteed ready and this is properly
+    // awaited BEFORE loadPricesFromFirestore() - otherwise that load can win the
+    // race and merge the still-unreset cloud closes right back into memory,
+    // silently undoing the local half below.
+    localStorage.setItem('ax_mlb_reset_v1', 'local');
     mlbPlayers.forEach(p => {
       delete closes[p.rank];
       liveP[p.rank] = p.statPrice;
@@ -13348,46 +13354,7 @@ async function refreshAll() {
     _saveCloses();
     _saveLastNight();
     try { localStorage.setItem('ax_liveP_cache', JSON.stringify(liveP)); } catch(e) {}
-    if (db) {
-      (async () => {
-        try {
-          const ref = window._fbDoc(db, 'config', 'prices');
-          const snap = await window._fbGetDoc(ref);
-          const d = snap.exists() ? snap.data() : {};
-          const closesObj = { ...(d.closes || {}) };
-          const livePObj = { ...(d.liveP || {}) };
-          const todayHxObj = { ...(d.todayHx || {}) };
-          const intradayObj = { ...(d.intraday || {}) };
-          mlbPlayers.forEach(p => {
-            delete closesObj[p.rank];
-            delete todayHxObj[p.rank];
-            delete intradayObj[p.rank];
-            livePObj[p.rank] = p.statPrice;
-          });
-          // merge:false (full overwrite) - a merge:true write can only add/update
-          // fields present in the payload, it can never remove one that's absent,
-          // so this is the only way to actually drop the old corrupted MLB entries
-          // instead of just failing to add new ones alongside them.
-          await window._fbSetDoc(ref, { ...d, closes: closesObj, liveP: livePObj, todayHx: todayHxObj, intraday: intradayObj }, { merge: false });
-
-          const paRef = window._fbDoc(db, 'config', 'priceApplied');
-          const paSnap = await window._fbGetDoc(paRef);
-          const paD = paSnap.exists() ? paSnap.data() : {};
-          const datesObj = { ...(paD.dates || {}) };
-          mlbPlayers.forEach(p => { delete datesObj[p.rank]; });
-          await window._fbSetDoc(paRef, { ...paD, dates: datesObj }, { merge: false });
-
-          const lnRef = window._fbDoc(db, 'config', 'lastNight');
-          const lnSnap = await window._fbGetDoc(lnRef);
-          if (lnSnap.exists() && lnSnap.data().data) {
-            const lnData = { ...lnSnap.data().data };
-            mlbPlayers.forEach(p => { delete lnData[p.rank]; });
-            await window._fbSetDoc(lnRef, { ...lnSnap.data(), data: lnData }, { merge: false });
-          }
-        } catch (e) { console.warn('[mlb reset v1] Firestore reset failed:', e.message); }
-      })();
-    }
-    console.log('[mlb reset v1] Cleared MLB closes/history - reset to flat statPrice');
+    console.log('[mlb reset v1] Cleared local MLB closes/history - reset to flat statPrice');
   }
 
   // ONE-TIME: reset every user's portfolio back to the $100K starting state, paired
@@ -13492,6 +13459,49 @@ async function _backgroundSync() {
   const dbInst = await firestoreReady;
 
   if (dbInst) {
+    // Finish the MLB reset's Firestore half (see refreshAll()'s "local" stage above)
+    // BEFORE loadPricesFromFirestore() runs below - otherwise that load can read the
+    // still-corrupted cloud doc first and merge it right back into memory.
+    if (localStorage.getItem('ax_mlb_reset_v1') === 'local') {
+      try {
+        const ref = window._fbDoc(dbInst, 'config', 'prices');
+        const snap = await window._fbGetDoc(ref);
+        const d = snap.exists() ? snap.data() : {};
+        const closesObj = { ...(d.closes || {}) };
+        const livePObj = { ...(d.liveP || {}) };
+        const todayHxObj = { ...(d.todayHx || {}) };
+        const intradayObj = { ...(d.intraday || {}) };
+        mlbPlayers.forEach(p => {
+          delete closesObj[p.rank];
+          delete todayHxObj[p.rank];
+          delete intradayObj[p.rank];
+          livePObj[p.rank] = p.statPrice;
+        });
+        // merge:false (full overwrite) - a merge:true write can only add/update
+        // fields present in the payload, it can never remove one that's absent,
+        // so this is the only way to actually drop the old corrupted MLB entries
+        // instead of just failing to add new ones alongside them.
+        await window._fbSetDoc(ref, { ...d, closes: closesObj, liveP: livePObj, todayHx: todayHxObj, intraday: intradayObj }, { merge: false });
+
+        const paRef = window._fbDoc(dbInst, 'config', 'priceApplied');
+        const paSnap = await window._fbGetDoc(paRef);
+        const paD = paSnap.exists() ? paSnap.data() : {};
+        const datesObj = { ...(paD.dates || {}) };
+        mlbPlayers.forEach(p => { delete datesObj[p.rank]; });
+        await window._fbSetDoc(paRef, { ...paD, dates: datesObj }, { merge: false });
+
+        const lnRef = window._fbDoc(dbInst, 'config', 'lastNight');
+        const lnSnap = await window._fbGetDoc(lnRef);
+        if (lnSnap.exists() && lnSnap.data().data) {
+          const lnData = { ...lnSnap.data().data };
+          mlbPlayers.forEach(p => { delete lnData[p.rank]; });
+          await window._fbSetDoc(lnRef, { ...lnSnap.data(), data: lnData }, { merge: false });
+        }
+        localStorage.setItem('ax_mlb_reset_v1', 'full');
+        console.log('[mlb reset v1] Cleared cloud MLB closes/history too - fully reset');
+      } catch (e) { console.warn('[mlb reset v1] Firestore reset failed, will retry next load:', e.message); }
+    }
+
     // Fire all Firestore reads simultaneously
     const [cfgSnap, pgSnap] = await Promise.allSettled([
       window._fbGetDoc(window._fbDoc(dbInst, 'config', 'app')).catch(() => null),
