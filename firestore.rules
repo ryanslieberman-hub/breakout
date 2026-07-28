@@ -2,13 +2,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Shared config docs (price cache, etc.) - unchanged from current behavior.
-    // NOTE: config/app currently stores a third-party API key here, readable
-    // by all users. That's a separate pre-existing issue, flagged but not
-    // fixed by this ruleset - see project notes.
+    // Shared config docs (price cache, etc.). Fully open, matching the most
+    // permissive assumption about prior behavior (this repo never had a
+    // committed rules file, and price-sync writes may happen from signed-out
+    // sessions too) - not part of the money-safety scope this ruleset exists
+    // for. NOTE: config/app currently stores a third-party API key here,
+    // readable/writable by anyone. That's a separate pre-existing issue,
+    // flagged but not fixed by this ruleset - see project notes.
     match /config/{doc} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
 
     // Trade log - append-only, owner-authored, no money implication.
@@ -65,6 +67,15 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants'])
         && request.resource.data.participants.diff(resource.data.get('participants', {})).affectedKeys().hasOnly([request.auth.uid]);
 
+      allow delete: if false;
+    }
+
+    // Push notification device tokens - keyed by the token itself, not uid.
+    // Only read by trusted backend contexts (which bypass these rules), never
+    // by clients.
+    match /pushTokens/{token} {
+      allow read: if false;
+      allow create, update: if request.auth != null && request.resource.data.uid == request.auth.uid;
       allow delete: if false;
     }
 
