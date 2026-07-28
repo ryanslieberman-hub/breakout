@@ -542,13 +542,46 @@ async function settleChallenge(env, challenge) {
     }
   }
 
+  // A failed transfer must NOT close the challenge. Marking it settled while a
+  // payout errored means the winner is never paid and the sweep never looks at
+  // it again - the failure just sits in a field nobody reads. Retrying is safe:
+  // each transfer uses a per-(challenge,winner) idempotency key, so a payout
+  // that already succeeded can never be sent twice.
+  const failed = payouts.filter(p => p.status !== 'paid');
+  const attempts = (Number(challenge.payoutAttempts) || 0) + 1;
+  const MAX_PAYOUT_ATTEMPTS = 24; // ~1 day at the hourly sweep
+
+  if (failed.length && attempts < MAX_PAYOUT_ATTEMPTS) {
+    await firestorePatchDoc(env, `challenges/${challenge.id}`, {
+      potCents, netPotCents, payouts,
+      payoutAttempts: attempts,
+      lastPayoutAttemptAt: Date.now(),
+      lastPayoutError: failed[0].error || failed[0].status,
+    });
+    console.error(
+      `Challenge ${challenge.id}: ${failed.length} payout(s) failed (${failed[0].error || failed[0].status}) - ` +
+      `leaving unsettled, will retry next sweep (attempt ${attempts}/${MAX_PAYOUT_ATTEMPTS}).`
+    );
+    return false;
+  }
+
   await firestorePatchDoc(env, `challenges/${challenge.id}`, {
     settled: true,
     settledAt: Date.now(),
     potCents,
     netPotCents,
     payouts,
+    payoutAttempts: attempts,
+    // Exhausted retries with something still unpaid: stop looping, but flag it
+    // loudly rather than letting `settled` imply everyone got their money.
+    ...(failed.length ? { payoutsIncomplete: true, lastPayoutError: failed[0].error || failed[0].status } : {}),
   });
+  if (failed.length) {
+    console.error(
+      `Challenge ${challenge.id}: giving up after ${attempts} attempts with ${failed.length} unpaid payout(s) - ` +
+      `flagged payoutsIncomplete, needs manual review.`
+    );
+  }
   return true;
 }
 
@@ -578,9 +611,12 @@ export default {
       if (request.method === 'GET' && url.pathname === '/identity/status') {
         return await handleIdentityStatus(request, env);
       }
-      // Manual trigger for local/dev testing of the settlement sweep - remove
-      // or protect further before going to production with real money.
+      // Manual trigger for the settlement sweep. ADMIN ONLY: this moves real
+      // money (it creates Stripe transfers), so it must never be reachable by
+      // anyone who merely knows the URL - it was previously wide open.
       if (request.method === 'POST' && url.pathname === '/internal/run-settlement') {
+        const user = await requireUser(request, env);
+        if (!user.admin) throw new HttpError(403, 'Admin only');
         return json(await runSettlementSweep(env), 200, env);
       }
       return json({ error: 'Not found' }, 404, env);
