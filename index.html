@@ -14923,6 +14923,17 @@ let _complianceIdentityUnsub = null; // Firestore onSnapshot unsubscribe, scoped
 let _complianceIdentityPoll = null;  // /identity/status poll handle, same scope
 let _pendingIdentityUrl = null;
 
+// Wording for a verified identity, by age outcome. `adult` is tri-state:
+// true = confirmed 18+, false = confirmed under 18, null/undefined = the
+// document carried no date of birth so age is simply unknown. Unknown must not
+// be worded as "you must be 18+" - that asserts something false about the user
+// and reads identically to a genuine underage rejection.
+function identityVerifiedText(adult) {
+  if (adult === true) return '✓ Identity verified';
+  if (adult === false) return '✗ Verified, but you must be 18+ to enter paid challenges.';
+  return '✓ Identity verified — but your ID didn’t include a date of birth, so we couldn’t confirm you’re 18+.';
+}
+
 function onComplianceCheckChange() {
   const tos = document.getElementById('cg-tos').checked;
   const verified = userProfile?.identityVerified === true && userProfile?.identityVerifiedAdult === true;
@@ -14946,9 +14957,7 @@ async function refreshIdentityVerificationStatus() {
       warnEl.textContent = `Paid challenges aren't available from your detected location${result.geoState ? ' (' + result.geoState + ')' : ''}.`;
       warnEl.style.display = 'block';
     } else if (result.alreadyVerified) {
-      statusEl.textContent = result.adult === false
-        ? '✗ Verified, but you must be 18+ to enter paid challenges.'
-        : '✓ Identity verified';
+      statusEl.textContent = identityVerifiedText(result.adult);
     } else if (result.processing) {
       statusEl.textContent = 'Verification submitted - waiting on the result…';
       startIdentityStatusPolling();
@@ -14991,9 +15000,7 @@ function startIdentityStatusPolling() {
         userProfile.identityVerified = true;
         userProfile.identityVerifiedAdult = s.adult;
         btn.style.display = 'none';
-        statusEl.textContent = s.adult === false
-          ? '✗ Verified, but you must be 18+ to enter paid challenges.'
-          : '✓ Identity verified';
+        statusEl.textContent = identityVerifiedText(s.adult);
         stopIdentityStatusPolling();
         onComplianceCheckChange();
       } else if (s.status === 'processing') {
@@ -15047,9 +15054,7 @@ function requireComplianceGate() {
         userProfile.identityVerifiedAdult = data.identityVerifiedAdult;
         if (data.identityVerified) {
           document.getElementById('cg-verify-btn').style.display = 'none';
-          document.getElementById('cg-verify-status').textContent = data.identityVerifiedAdult === false
-            ? '✗ Verified, but you must be 18+ to enter paid challenges.'
-            : '✓ Identity verified';
+          document.getElementById('cg-verify-status').textContent = identityVerifiedText(data.identityVerifiedAdult);
         }
         onComplianceCheckChange();
       });
@@ -16087,10 +16092,12 @@ window.addEventListener('DOMContentLoaded', function() {
         try {
           const s = await paymentsWorkerFetch('/identity/status');
           if (s.status === 'verified') {
-            msgEl().textContent = s.adult === false
-              ? '✗ Verified, but you must be 18+ to enter paid challenges.'
-              : '✓ Identity verified. Returning you to Breakout…';
-            if (s.adult !== false) { setTimeout(() => { try { window.close(); } catch(e){} }, 1400); return; }
+            msgEl().textContent = s.adult === true
+              ? '✓ Identity verified. Returning you to Breakout…'
+              : identityVerifiedText(s.adult);
+            // Only a confirmed 18+ pass closes itself - anything the user needs
+            // to read stays on screen.
+            if (s.adult === true) { setTimeout(() => { try { window.close(); } catch(e){} }, 1400); return; }
           } else if (s.status === 'processing') {
             msgEl().textContent = 'Verification submitted and still processing. Breakout will update on its own once it finishes.';
           } else if (s.status === 'requires_input') {

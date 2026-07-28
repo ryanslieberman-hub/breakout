@@ -67,7 +67,11 @@ export function stripeClient(secretKey) {
       request('POST', '/transfers', params, idempotencyKey),
     createVerificationSession: (params, idempotencyKey) =>
       request('POST', '/identity/verification_sessions', params, idempotencyKey),
-    getVerificationSession: (id) => request('GET', `/identity/verification_sessions/${id}`),
+    // verified_outputs (which carries the verified date of birth) is NOT
+    // returned by default - without this expand it is always undefined, so any
+    // age check silently reads as "no DOB" no matter what the user submitted.
+    getVerificationSession: (id) =>
+      request('GET', `/identity/verification_sessions/${id}?expand[]=verified_outputs`),
   };
 }
 

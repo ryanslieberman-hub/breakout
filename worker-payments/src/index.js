@@ -243,7 +243,14 @@ async function syncIdentitySession(env, uid, sessionId) {
 
   if (session.status === 'verified') {
     const dob = session.verified_outputs?.dob;
-    const adult = dob ? isAdultDob(dob) : false;
+    // Tri-state on purpose: true / false / null.
+    // A missing DOB means "we could not determine an age", NOT "this person is
+    // under 18" - not every accepted document carries one (Stripe's test-mode
+    // passport has no dob field at all). Collapsing the two told a 20-year-old
+    // they were underage, which is both false and indistinguishable from a
+    // real underage block. Unknown still doesn't grant entry; it just says so
+    // honestly.
+    const adult = dob ? isAdultDob(dob) : null;
     await firestorePatchDoc(env, `users/${uid}`, {
       identityVerified: true,
       identityVerifiedAt: Date.now(),
@@ -284,8 +291,12 @@ async function handleIdentitySession(request, env) {
     return json({ blocked: true, reason: 'restricted_location', geoState, geoCountry }, 200, env);
   }
 
-  if (userDoc.identityVerified === true) {
-    return json({ alreadyVerified: true, adult: userDoc.identityVerifiedAdult === true, geoState, geoCountry }, 200, env);
+  // Short-circuit only on a fully settled pass. If identity is verified but age
+  // is unknown or failed, fall through and re-read Stripe: that self-heals rows
+  // written by the earlier bug (which stored false for "no DOB") and picks up a
+  // DOB that a later, better document supplied.
+  if (userDoc.identityVerified === true && userDoc.identityVerifiedAdult === true) {
+    return json({ alreadyVerified: true, adult: true, geoState, geoCountry }, 200, env);
   }
 
   // Resume the existing session rather than stacking up new ones on every open
@@ -330,8 +341,11 @@ async function handleIdentitySession(request, env) {
 async function handleIdentityStatus(request, env) {
   const user = await requireUser(request, env);
   const userDoc = (await firestoreGetDoc(env, `users/${user.uid}`)) || {};
-  if (userDoc.identityVerified === true) {
-    return json({ status: 'verified', adult: userDoc.identityVerifiedAdult === true }, 200, env);
+  // Same reasoning as handleIdentitySession: only a confirmed adult short-
+  // circuits; anything else re-reads Stripe so a stale/unknown age can correct
+  // itself rather than being frozen in.
+  if (userDoc.identityVerified === true && userDoc.identityVerifiedAdult === true) {
+    return json({ status: 'verified', adult: true }, 200, env);
   }
   if (!userDoc.stripeIdentitySessionId) return json({ status: 'none' }, 200, env);
   const s = await syncIdentitySession(env, user.uid, userDoc.stripeIdentitySessionId);
