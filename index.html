@@ -13327,6 +13327,83 @@ async function refreshAll() {
     console.log('[price reset v3] Cleared corrupted closes + Firestore');
   }
 
+  // ONE-TIME: reset MLB prices to flat (statPrice), MLB only. mlbTick's yesterday-
+  // backfill (see its comment a few hundred lines up) silently corrupted MLB closes
+  // for roughly a third of the roster by chaining off statPrice instead of a real
+  // prior close whenever it ran before Firestore's price history had loaded.
+  // Version-gated so EVERY client applies this once (not just whichever one runs it
+  // first) - a plain server-side reset alone doesn't stick, because the next client
+  // to load with an un-migrated local cache just re-uploads its own still-corrupted
+  // closes on its normal sync and undoes it.
+  if (!localStorage.getItem('ax_mlb_reset_v1')) {
+    localStorage.setItem('ax_mlb_reset_v1', '1');
+    mlbPlayers.forEach(p => {
+      delete closes[p.rank];
+      liveP[p.rank] = p.statPrice;
+      delete priceHx[p.rank];
+      delete intraday[p.rank];
+      delete lastNight[p.rank];
+      if (ENGINE.BASE && ENGINE.BASE[p.rank]) delete ENGINE.BASE[p.rank];
+    });
+    _saveCloses();
+    _saveLastNight();
+    try { localStorage.setItem('ax_liveP_cache', JSON.stringify(liveP)); } catch(e) {}
+    if (db) {
+      (async () => {
+        try {
+          const ref = window._fbDoc(db, 'config', 'prices');
+          const snap = await window._fbGetDoc(ref);
+          const d = snap.exists() ? snap.data() : {};
+          const closesObj = { ...(d.closes || {}) };
+          const livePObj = { ...(d.liveP || {}) };
+          const todayHxObj = { ...(d.todayHx || {}) };
+          const intradayObj = { ...(d.intraday || {}) };
+          mlbPlayers.forEach(p => {
+            delete closesObj[p.rank];
+            delete todayHxObj[p.rank];
+            delete intradayObj[p.rank];
+            livePObj[p.rank] = p.statPrice;
+          });
+          // merge:false (full overwrite) - a merge:true write can only add/update
+          // fields present in the payload, it can never remove one that's absent,
+          // so this is the only way to actually drop the old corrupted MLB entries
+          // instead of just failing to add new ones alongside them.
+          await window._fbSetDoc(ref, { ...d, closes: closesObj, liveP: livePObj, todayHx: todayHxObj, intraday: intradayObj }, { merge: false });
+
+          const paRef = window._fbDoc(db, 'config', 'priceApplied');
+          const paSnap = await window._fbGetDoc(paRef);
+          const paD = paSnap.exists() ? paSnap.data() : {};
+          const datesObj = { ...(paD.dates || {}) };
+          mlbPlayers.forEach(p => { delete datesObj[p.rank]; });
+          await window._fbSetDoc(paRef, { ...paD, dates: datesObj }, { merge: false });
+
+          const lnRef = window._fbDoc(db, 'config', 'lastNight');
+          const lnSnap = await window._fbGetDoc(lnRef);
+          if (lnSnap.exists() && lnSnap.data().data) {
+            const lnData = { ...lnSnap.data().data };
+            mlbPlayers.forEach(p => { delete lnData[p.rank]; });
+            await window._fbSetDoc(lnRef, { ...lnSnap.data(), data: lnData }, { merge: false });
+          }
+        } catch (e) { console.warn('[mlb reset v1] Firestore reset failed:', e.message); }
+      })();
+    }
+    console.log('[mlb reset v1] Cleared MLB closes/history - reset to flat statPrice');
+  }
+
+  // ONE-TIME: reset every user's portfolio back to the $100K starting state, paired
+  // with the MLB price reset above. The actual users/{uid} and portfolios/{uid} docs
+  // were already reset server-side (Admin SDK, bypassing rules that block one client
+  // from writing another's doc) - this just clears THIS device's own local cache so
+  // it doesn't re-upload a stale pre-reset portfolio on its next normal save and
+  // undo that (same failure mode as the MLB price reset above).
+  if (!localStorage.getItem('ax_portfolio_reset_v1')) {
+    localStorage.setItem('ax_portfolio_reset_v1', '1');
+    ['ax_portfolio','ax_last_bonus','ax_bonus_streak'].forEach(k => {
+      try { localStorage.removeItem(k); } catch(e) {}
+    });
+    console.log('[portfolio reset v1] Cleared local portfolio cache - will reload from the reset cloud state');
+  }
+
   loadLocalPortfolio();
 
   // DEBUG: log closes state for SGA and Wemby
