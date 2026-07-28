@@ -5175,7 +5175,7 @@ let db = null, auth = null, currentUser = null, isAdminUser = false;
 // Base URL of the worker-payments Cloudflare Worker (see /worker-payments).
 // Replace with the deployed Worker URL - http://localhost:8787 only works
 // while running `npm run dev` inside worker-payments locally.
-const PAYMENTS_WORKER_URL = 'http://localhost:8787';
+const PAYMENTS_WORKER_URL = 'https://breakout-worker-payments.ryanslieberman.workers.dev';
 
 async function paymentsWorkerFetch(path, options = {}) {
   if (!currentUser) throw new Error('Sign in first');

@@ -14,8 +14,8 @@ crons = ["0 * * * *"]
 #
 # Plain (non-secret) vars - safe to keep here or move to .dev.vars for local dev:
 [vars]
-FIREBASE_PROJECT_ID = "REPLACE_WITH_YOUR_FIREBASE_PROJECT_ID"
-ALLOWED_ORIGIN = "REPLACE_WITH_YOUR_APP_ORIGIN"
-CHECKOUT_SUCCESS_URL = "REPLACE_WITH_YOUR_APP_URL/?challenge_paid=1"
-CHECKOUT_CANCEL_URL = "REPLACE_WITH_YOUR_APP_URL/?challenge_paid=0"
+FIREBASE_PROJECT_ID = "athletex-ae63d"
+ALLOWED_ORIGIN = "https://square-block-4d1b.ryanslieberman.workers.dev"
+CHECKOUT_SUCCESS_URL = "https://square-block-4d1b.ryanslieberman.workers.dev/?challenge_paid=1"
+CHECKOUT_CANCEL_URL = "https://square-block-4d1b.ryanslieberman.workers.dev/?challenge_paid=0"
 PLATFORM_FEE_BPS = "1000"

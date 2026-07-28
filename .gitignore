@@ -6,4 +6,5 @@ node_modules/
 .dev.vars
 *serviceAccount*.json
 *service-account*.json
+*firebase-adminsdk*.json
 .wrangler/
