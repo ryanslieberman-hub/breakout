@@ -79,10 +79,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Trusted, tamper-proof portfolio snapshots used ONLY to settle
-    // real-money challenges. Written exclusively by the settlement job's
-    // service account (see worker-payments). Never client-writable.
-    match /challengeSnapshots/{challengeId}/entries/{uid} {
+    // Authoritative, server-computed player prices (currently NBA only - see
+    // worker-pricing-engine). Written exclusively by that Worker's service
+    // account, independently recomputed from real ESPN/balldontlie data -
+    // never derived from anything a client can write. This is what
+    // settlement values holdings against; it is NOT the same as the
+    // client-writable config/prices cache used for casual display.
+    match /priceEngine/{doc} {
       allow read: if request.auth != null;
       allow write: if false;
     }
