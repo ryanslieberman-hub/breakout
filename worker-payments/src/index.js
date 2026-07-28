@@ -517,11 +517,40 @@ async function settleChallenge(env, challenge) {
 
   const stripe = stripeClient(env.STRIPE_SECRET_KEY);
   const payouts = [];
+  const attemptNo = (Number(challenge.payoutAttempts) || 0) + 1;
+
+  // Ask Stripe what has already been paid for this challenge, and use THAT as
+  // the double-payment guard. A fixed idempotency key cannot do that job: Stripe
+  // replays the stored response for a key for 24h *including failures*, so a
+  // transfer that failed once (insufficient balance, a blip) would keep
+  // replaying that same error on every retry and the winner could never be paid
+  // until the key aged out. Proven live - a $9 payout stayed "failed" across
+  // retries even with $49.55 available. Keying on the attempt number makes each
+  // retry a real request; this lookup is what keeps it safe.
+  const paidByUid = {};
+  try {
+    const existing = await stripe.listTransfers({ transfer_group: challenge.id, limit: 100 });
+    for (const t of existing.data || []) {
+      if (t.metadata?.uid) paidByUid[t.metadata.uid] = t;
+    }
+  } catch (e) {
+    // Can't confirm what's already out the door - refuse to send anything
+    // rather than risk paying a winner twice.
+    console.error(`Challenge ${challenge.id}: could not list existing transfers (${e.message}) - skipping payouts this sweep.`);
+    return false;
+  }
 
   for (let i = 0; i < Math.min(SPLITS.length, ranked.length); i++) {
     const winner = ranked[i];
     const amountCents = Math.round(netPotCents * SPLITS[i]);
     if (amountCents <= 0) continue;
+
+    const already = paidByUid[winner.uid];
+    if (already) {
+      console.log(`Challenge ${challenge.id}: ${winner.uid} already paid via ${already.id} - not resending.`);
+      payouts.push({ uid: winner.uid, amountCents, returnPct: winner.returnPct, status: 'paid', transferId: already.id });
+      continue;
+    }
 
     const winnerDoc = await firestoreGetDoc(env, `users/${winner.uid}`);
     if (!winnerDoc?.stripeConnectId) {
@@ -532,8 +561,15 @@ async function settleChallenge(env, challenge) {
 
     try {
       const transfer = await stripe.createTransfer(
-        { amount: amountCents, currency: 'usd', destination: winnerDoc.stripeConnectId },
-        `settlement:${challenge.id}:${winner.uid}`
+        {
+          amount: amountCents,
+          currency: 'usd',
+          destination: winnerDoc.stripeConnectId,
+          // transfer_group + uid metadata are what the lookup above reads.
+          transfer_group: challenge.id,
+          metadata: { challengeId: challenge.id, uid: winner.uid },
+        },
+        `settlement:${challenge.id}:${winner.uid}:${attemptNo}`
       );
       payouts.push({ uid: winner.uid, amountCents, returnPct: winner.returnPct, status: 'paid', transferId: transfer.id });
     } catch (e) {
@@ -544,11 +580,11 @@ async function settleChallenge(env, challenge) {
 
   // A failed transfer must NOT close the challenge. Marking it settled while a
   // payout errored means the winner is never paid and the sweep never looks at
-  // it again - the failure just sits in a field nobody reads. Retrying is safe:
-  // each transfer uses a per-(challenge,winner) idempotency key, so a payout
-  // that already succeeded can never be sent twice.
+  // it again - the failure just sits in a field nobody reads. Retrying is safe
+  // because of the transfer_group lookup above, which skips anyone Stripe has
+  // already paid.
   const failed = payouts.filter(p => p.status !== 'paid');
-  const attempts = (Number(challenge.payoutAttempts) || 0) + 1;
+  const attempts = attemptNo;
   const MAX_PAYOUT_ATTEMPTS = 24; // ~1 day at the hourly sweep
 
   if (failed.length && attempts < MAX_PAYOUT_ATTEMPTS) {

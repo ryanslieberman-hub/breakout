@@ -65,6 +65,11 @@ export function stripeClient(secretKey) {
     createAccountLink: (params) => request('POST', '/account_links', params),
     createTransfer: (params, idempotencyKey) =>
       request('POST', '/transfers', params, idempotencyKey),
+    // Used to see what has ALREADY been paid for a challenge before sending
+    // anything - the real guard against double-paying a winner (an idempotency
+    // key can't serve that purpose across retries, see settleChallenge).
+    listTransfers: (params) =>
+      request('GET', `/transfers?${new URLSearchParams(params).toString()}`),
     createVerificationSession: (params, idempotencyKey) =>
       request('POST', '/identity/verification_sessions', params, idempotencyKey),
     // verified_outputs is NOT returned by default - without this expand it is
