@@ -7677,10 +7677,20 @@ async function mlbTick(isFinal=false){
         if (!closes[p.rank]) closes[p.rank] = {};
         if (!(closes[p.rank][yday] > 0)){
           const prior = Object.keys(closes[p.rank]).filter(d => closes[p.rank][d] > 0 && d < yday).sort();
-          const yBase = prior.length ? closes[p.rank][prior[prior.length-1]] : p.statPrice;
-          const clean = Math.min(Math.max(yBase, p.statPrice*0.55), p.statPrice*1.7);
-          const perf = ENGINE.perfFor(p, _statToEngineShape(yst));
-          closes[p.rank][yday] = Math.max(0.01, clean * (1 + perf));
+          // Only trust "no prior close exists" once Firestore's price history has
+          // actually finished loading this session - otherwise a real prior close
+          // might exist but just hasn't arrived yet, and falling back to statPrice
+          // here silently bases a real day's move on the wrong number (this produced
+          // Austin Riley's stored close reading as a -24% "move" from a real -3.9%
+          // game - it chained from statPrice instead of his real prior close because
+          // this ran before that close had loaded). Defer instead; the next tick
+          // retries once history has actually loaded.
+          if (prior.length || window._closesRestoredFromFirestore) {
+            const yBase = prior.length ? closes[p.rank][prior[prior.length-1]] : p.statPrice;
+            const clean = Math.min(Math.max(yBase, p.statPrice*0.55), p.statPrice*1.7);
+            const perf = ENGINE.perfFor(p, _statToEngineShape(yst));
+            closes[p.rank][yday] = Math.max(0.01, clean * (1 + perf));
+          }
         }
         // CRITICAL: invalidate this player's cached base so baseFor() recomputes and
         // picks up the yesterday close we just wrote. Without this, a base cached
@@ -11216,6 +11226,12 @@ async function loadPricesFromFirestore() {
   } catch(e) {
     console.warn('[prices] Firestore load failed:', e.message);
     return false;
+  } finally {
+    // Set once this load attempt has fully settled (success, early-exit, or error) -
+    // this is the signal mlbTick's yesterday-backfill waits on before it's willing to
+    // treat "no prior close found locally" as meaning one doesn't exist anywhere,
+    // instead of it just not having loaded yet. See the backfill's comment for why.
+    window._closesRestoredFromFirestore = true;
   }
 }
 
