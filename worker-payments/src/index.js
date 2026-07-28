@@ -585,7 +585,13 @@ async function settleChallenge(env, challenge) {
   // already paid.
   const failed = payouts.filter(p => p.status !== 'paid');
   const attempts = attemptNo;
-  const MAX_PAYOUT_ATTEMPTS = 24; // ~1 day at the hourly sweep
+  // ~3 days at the hourly sweep. Must comfortably exceed Stripe's payout
+  // availability window: in live mode card funds sit in `pending` for about two
+  // business days, so a challenge that settles right after its entry fees were
+  // collected will legitimately fail "insufficient available funds" for a while.
+  // At 24 (~1 day) those retries ran out before the money became available and
+  // the challenge was flagged payoutsIncomplete for no real reason.
+  const MAX_PAYOUT_ATTEMPTS = 72;
 
   if (failed.length && attempts < MAX_PAYOUT_ATTEMPTS) {
     await firestorePatchDoc(env, `challenges/${challenge.id}`, {
