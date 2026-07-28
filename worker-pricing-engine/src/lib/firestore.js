@@ -91,6 +91,67 @@ export async function firestoreGetDoc(env, path) {
   return fromFirestoreFields(json.fields);
 }
 
+function docNamePrefix(projectId) {
+  return `projects/${projectId}/databases/(default)/documents/`;
+}
+
+// Fetches many docs in ONE HTTP request instead of one-per-doc - this is the
+// difference between a Worker invocation making 2 subrequests or 260 of them
+// (Cloudflare caps subrequests per invocation; processing every player
+// individually blew through that limit in production even though it never
+// showed up locally, since wrangler dev doesn't enforce the same cap).
+// Returns { path -> fields-object | null } (null = doc doesn't exist).
+export async function firestoreBatchGetDocs(env, paths) {
+  if (!paths.length) return {};
+  const token = await getAccessToken(env);
+  const prefix = docNamePrefix(env.FIREBASE_PROJECT_ID);
+  const res = await fetch(`${baseUrl(env.FIREBASE_PROJECT_ID)}:batchGet`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ documents: paths.map(p => prefix + p) }),
+  });
+  if (!res.ok) throw new Error(`Firestore batchGet failed: ${await res.text()}`);
+  const rows = await res.json();
+  const out = {};
+  for (const row of rows) {
+    if (row.found) {
+      const path = row.found.name.slice(prefix.length);
+      out[path] = fromFirestoreFields(row.found.fields);
+    } else if (row.missing) {
+      out[row.missing.slice(prefix.length)] = null;
+    }
+  }
+  return out;
+}
+
+// Merge-patches many docs in one (non-transactional) request. `updates` is
+// [{path, fields}]. Firestore's batchWrite caps at 500 writes/request, so
+// this chunks defensively.
+export async function firestoreBatchWriteDocs(env, updates) {
+  if (!updates.length) return;
+  const token = await getAccessToken(env);
+  const prefix = docNamePrefix(env.FIREBASE_PROJECT_ID);
+  const CHUNK = 500;
+  for (let i = 0; i < updates.length; i += CHUNK) {
+    const chunk = updates.slice(i, i + CHUNK);
+    const writes = chunk.map(({ path, fields }) => {
+      const body = { fields: {} };
+      for (const [k, v] of Object.entries(fields)) body.fields[k] = toFirestoreValue(v);
+      return {
+        update: { name: prefix + path, ...body },
+        updateMask: { fieldPaths: Object.keys(fields) },
+        currentDocument: {}, // no precondition - always upsert
+      };
+    });
+    const res = await fetch(`${baseUrl(env.FIREBASE_PROJECT_ID)}:batchWrite`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ writes }),
+    });
+    if (!res.ok) throw new Error(`Firestore batchWrite failed: ${await res.text()}`);
+  }
+}
+
 // Merge-patches the given top-level fields onto the document (creates it if
 // it doesn't exist). `fields` is a plain JS object of {fieldName: value}.
 export async function firestorePatchDoc(env, path, fields) {

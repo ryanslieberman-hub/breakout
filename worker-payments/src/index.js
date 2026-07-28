@@ -159,7 +159,14 @@ async function handleConnectStatus(request, env) {
 // users/{uid}.portfolioValue) - see tradeReplay.js and the plan addendum for
 // why both of those matter.
 const SPLITS = [0.5, 0.3, 0.2]; // top-3, 50/30/20
-const NBA_RANK_MAX = 1000; // ranks 1-1000 are NBA; only league priced so far
+
+// Rank ranges match RAW/MLB_RAW/GOLF_RAW/NFL_RAW in index.html.
+function leagueForRank(rank) {
+  if (rank <= 1000) return 'nba';
+  if (rank <= 2000) return 'mlb';
+  if (rank <= 3000) return 'golf';
+  return 'nfl';
+}
 
 function easternDateStr(timestampMs) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -208,9 +215,10 @@ async function settleChallenge(env, challenge) {
   const asOfDate = easternDateStr(challenge.endDate);
   const priceCache = {}; // rank -> trusted close, fetched at most once per rank per sweep
 
-  async function trustedNbaPrice(rank) {
+  async function trustedPrice(rank) {
     if (rank in priceCache) return priceCache[rank];
-    const doc = await firestoreGetDoc(env, `priceEngine/nba_${rank}`);
+    const league = leagueForRank(rank);
+    const doc = await firestoreGetDoc(env, `priceEngine/${league}_${rank}`);
     const val = doc ? closeAsOf(doc.closes, asOfDate) : null;
     priceCache[rank] = val;
     return val;
@@ -225,22 +233,13 @@ async function settleChallenge(env, challenge) {
     }
 
     const heldRanks = Object.keys(holdings).map(Number);
-    const nonNbaRanks = heldRanks.filter(r => r > NBA_RANK_MAX);
-    if (nonNbaRanks.length) {
-      console.error(
-        `Challenge ${challenge.id}: participant ${uid} holds non-NBA rank(s) [${nonNbaRanks.join(',')}] - ` +
-        `no trusted pricing engine for those leagues yet. Skipping automatic settlement for this challenge.`
-      );
-      return false; // whole challenge waits - can't fairly rank one NBA-only participant against one holding untracked assets
-    }
-
     const priceByRank = {};
     for (const rank of heldRanks) {
-      const price = await trustedNbaPrice(rank);
+      const price = await trustedPrice(rank);
       if (price == null) {
         console.error(
-          `Challenge ${challenge.id}: no trusted NBA price for rank ${rank} (held by ${uid}) as of ${asOfDate} - ` +
-          `skipping automatic settlement, will retry next sweep.`
+          `Challenge ${challenge.id}: no trusted ${leagueForRank(rank)} price for rank ${rank} (held by ${uid}) ` +
+          `as of ${asOfDate} - skipping automatic settlement, will retry next sweep.`
         );
         return false;
       }
