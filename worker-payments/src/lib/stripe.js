@@ -44,7 +44,14 @@ export function stripeClient(secretKey) {
     const json = await res.json();
     if (!res.ok) {
       const msg = json?.error?.message || JSON.stringify(json);
-      throw new Error(`Stripe ${method} ${path} failed: ${msg}`);
+      const err = new Error(`Stripe ${method} ${path} failed: ${msg}`);
+      // Surface the HTTP status and Stripe's own error code so callers can tell
+      // "this object doesn't exist on this account" (404 / resource_missing -
+      // e.g. an ID stored under a different Stripe account or the other mode)
+      // apart from a transient failure that should NOT be treated as missing.
+      err.status = res.status;
+      err.code = json?.error?.code || null;
+      throw err;
     }
     return json;
   }

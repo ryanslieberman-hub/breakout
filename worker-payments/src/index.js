@@ -149,6 +149,21 @@ async function handleConnectOnboard(request, env) {
   const userDoc = (await firestoreGetDoc(env, `users/${user.uid}`)) || {};
 
   let accountId = userDoc.stripeConnectId;
+  if (accountId) {
+    // Confirm the stored Connect account actually exists on THIS platform
+    // account. A leftover id from a different Stripe account (or the other
+    // mode) can never be onboarded or paid out to, and without this check
+    // createAccountLink below would 404 forever - permanently stranding the
+    // user with no way to reach onboarding.
+    try {
+      await stripe.getAccount(accountId);
+    } catch (e) {
+      if (e.status === 404 || e.code === 'resource_missing') {
+        console.warn(`Connect account ${accountId} unknown on this Stripe account for ${user.uid} - re-creating.`);
+        accountId = null;
+      } else throw e;
+    }
+  }
   if (!accountId) {
     const account = await stripe.createConnectAccount(
       { type: 'express', capabilities: { transfers: { requested: true } } },
@@ -174,7 +189,16 @@ async function handleConnectStatus(request, env) {
   if (!userDoc.stripeConnectId) return json({ connected: false }, 200, env);
 
   const stripe = stripeClient(env.STRIPE_SECRET_KEY);
-  const account = await stripe.getAccount(userDoc.stripeConnectId);
+  let account;
+  try {
+    account = await stripe.getAccount(userDoc.stripeConnectId);
+  } catch (e) {
+    // Unknown to this platform account (left over from a different Stripe
+    // account or mode) - report it as simply not connected so the UI offers
+    // onboarding again rather than erroring out.
+    if (e.status === 404 || e.code === 'resource_missing') return json({ connected: false }, 200, env);
+    throw e;
+  }
   return json(
     { connected: true, payoutsEnabled: !!account.payouts_enabled, chargesEnabled: !!account.charges_enabled },
     200,
@@ -189,7 +213,22 @@ async function handleConnectStatus(request, env) {
 // actually happened rather than waiting forever on a push that isn't coming.
 async function syncIdentitySession(env, uid, sessionId) {
   const stripe = stripeClient(env.STRIPE_SECRET_KEY);
-  const session = await stripe.getVerificationSession(sessionId);
+  let session;
+  try {
+    session = await stripe.getVerificationSession(sessionId);
+  } catch (e) {
+    // A stored session id that THIS Stripe account/mode doesn't know about -
+    // left behind by switching Stripe accounts, or by moving between test and
+    // live. Report it as unusable so the caller starts a fresh session instead
+    // of 500ing and bricking the compliance gate for that user. Anything else
+    // (network blip, auth failure, Stripe outage) must still throw: silently
+    // treating those as "missing" would abandon a real in-flight verification.
+    if (e.status === 404 || e.code === 'resource_missing') {
+      console.warn(`Verification session ${sessionId} not found on this Stripe account for ${uid} - starting fresh.`);
+      return { status: 'unusable' };
+    }
+    throw e;
+  }
 
   if (session.status === 'verified') {
     const dob = session.verified_outputs?.dob;
@@ -252,7 +291,8 @@ async function handleIdentitySession(request, env) {
     if (s.status === 'requires_input' && s.url) {
       return json({ blocked: false, url: s.url, errorCode: s.errorCode, errorReason: s.errorReason, geoState, geoCountry }, 200, env);
     }
-    // canceled, or no resumable url - fall through and start a fresh session.
+    // canceled, unusable (unknown to this account), or no resumable url -
+    // fall through and start a fresh session.
   }
 
   // No idempotency key here on purpose: a fixed per-uid key pins this to the
@@ -283,7 +323,10 @@ async function handleIdentityStatus(request, env) {
     return json({ status: 'verified', adult: userDoc.identityVerifiedAdult === true }, 200, env);
   }
   if (!userDoc.stripeIdentitySessionId) return json({ status: 'none' }, 200, env);
-  return json(await syncIdentitySession(env, user.uid, userDoc.stripeIdentitySessionId), 200, env);
+  const s = await syncIdentitySession(env, user.uid, userDoc.stripeIdentitySessionId);
+  // A session this account can't see is, from the client's point of view, the
+  // same as never having started one - POST /identity/session will mint a new.
+  return json(s.status === 'unusable' ? { status: 'none' } : s, 200, env);
 }
 
 // ── Settlement sweep (Cron Trigger) ──
