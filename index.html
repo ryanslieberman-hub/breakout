@@ -11314,6 +11314,13 @@ function updateMovers(){
         if (cds.length >= 2) {
           const prev = c[cds[cds.length-2]], last = c[cds[cds.length-1]];
           if (prev > 0 && Math.abs(last - prev) / prev < 0.005) return null; // price was flat
+        } else if (p.rank >= 2001) {
+          // Golf only finalizes a close once the whole tournament completes, not per round,
+          // so golfers routinely have 0-1 stored closes - the cross-check above can't run,
+          // which is exactly how the "phantom exact ±15%" movers got through before (an
+          // unguarded getTodayPct value with nothing to verify it against). Safer to exclude
+          // than to trust an unverifiable golf move.
+          return null;
         }
         return { rank: p.rank, name: p.name, pct };
       })
