@@ -4,9 +4,9 @@ import {
   firestorePatchDoc,
   firestoreSetNestedField,
   firestoreQuery,
-  firestoreListCollection,
 } from './lib/firestore.js';
 import { stripeClient, verifyStripeWebhookSignature } from './lib/stripe.js';
+import { replayTrades, portfolioValue, START_VALUE } from './lib/tradeReplay.js';
 
 function corsHeaders(env) {
   return {
@@ -153,10 +153,29 @@ async function handleConnectStatus(request, env) {
 
 // ── Settlement sweep (Cron Trigger) ──
 // Settles any challenge whose endDate has passed and isn't marked `settled`.
-// Reads winner rankings ONLY from challengeSnapshots (never from client-
-// writable users/{uid} fields) - if a challenge has no snapshots yet, it is
-// skipped with a logged error rather than guessed at.
+// Winner rankings come from replaying each participant's own `trades` log
+// (never the client-writable portfolios/{uid} snapshot) valued against
+// worker-pricing-engine's server-computed closes (never config/prices or
+// users/{uid}.portfolioValue) - see tradeReplay.js and the plan addendum for
+// why both of those matter.
 const SPLITS = [0.5, 0.3, 0.2]; // top-3, 50/30/20
+const NBA_RANK_MAX = 1000; // ranks 1-1000 are NBA; only league priced so far
+
+function easternDateStr(timestampMs) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(timestampMs));
+  const get = t => parts.find(p => p.type === t).value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+// Picks the closing price on or before `asOfDateStr` from a priceEngine
+// closes map - never a future close relative to the challenge's own endDate.
+function closeAsOf(closes, asOfDateStr) {
+  const dates = Object.keys(closes || {}).filter(d => d <= asOfDateStr).sort();
+  if (!dates.length) return null;
+  return closes[dates[dates.length - 1]];
+}
 
 export async function runSettlementSweep(env) {
   const ended = await firestoreQuery(env, 'challenges', [
@@ -164,33 +183,76 @@ export async function runSettlementSweep(env) {
   ]);
   const unsettled = ended.filter(c => c.settled !== true);
 
+  let settledCount = 0;
   for (const challenge of unsettled) {
     try {
-      await settleChallenge(env, challenge);
+      if (await settleChallenge(env, challenge)) settledCount++;
     } catch (e) {
       console.error(`Failed to settle challenge ${challenge.id}:`, e.message);
     }
   }
-  return { checked: ended.length, settled: unsettled.length };
+  return { checked: ended.length, attempted: unsettled.length, settled: settledCount };
 }
 
+// Returns true if the challenge was actually marked settled, false if it was
+// safely skipped (missing trusted price data, non-NBA holdings, etc.) - the
+// sweep will simply retry it next time.
 async function settleChallenge(env, challenge) {
   const participants = challenge.participants || {};
   const participantUids = Object.keys(participants);
   if (participantUids.length === 0) {
     await firestorePatchDoc(env, `challenges/${challenge.id}`, { settled: true, settledAt: Date.now(), payouts: [] });
-    return;
+    return true;
   }
 
-  const snapshots = await firestoreListCollection(env, `challengeSnapshots/${challenge.id}/entries`);
-  if (snapshots.length === 0) {
-    console.error(`No trusted snapshots for challenge ${challenge.id} - skipping settlement, will retry next sweep.`);
-    return;
+  const asOfDate = easternDateStr(challenge.endDate);
+  const priceCache = {}; // rank -> trusted close, fetched at most once per rank per sweep
+
+  async function trustedNbaPrice(rank) {
+    if (rank in priceCache) return priceCache[rank];
+    const doc = await firestoreGetDoc(env, `priceEngine/nba_${rank}`);
+    const val = doc ? closeAsOf(doc.closes, asOfDate) : null;
+    priceCache[rank] = val;
+    return val;
   }
 
-  const ranked = snapshots
-    .filter(s => participantUids.includes(s.id))
-    .sort((a, b) => (b.returnPct || 0) - (a.returnPct || 0));
+  const valuations = [];
+  for (const uid of participantUids) {
+    const trades = await firestoreQuery(env, 'trades', [{ field: 'uid', op: 'EQUAL', value: uid }]);
+    const { cash, holdings, rejected } = replayTrades(trades);
+    if (rejected.length) {
+      console.warn(`${rejected.length} rejected (tampered/invalid) trade(s) for ${uid} in challenge ${challenge.id}`);
+    }
+
+    const heldRanks = Object.keys(holdings).map(Number);
+    const nonNbaRanks = heldRanks.filter(r => r > NBA_RANK_MAX);
+    if (nonNbaRanks.length) {
+      console.error(
+        `Challenge ${challenge.id}: participant ${uid} holds non-NBA rank(s) [${nonNbaRanks.join(',')}] - ` +
+        `no trusted pricing engine for those leagues yet. Skipping automatic settlement for this challenge.`
+      );
+      return false; // whole challenge waits - can't fairly rank one NBA-only participant against one holding untracked assets
+    }
+
+    const priceByRank = {};
+    for (const rank of heldRanks) {
+      const price = await trustedNbaPrice(rank);
+      if (price == null) {
+        console.error(
+          `Challenge ${challenge.id}: no trusted NBA price for rank ${rank} (held by ${uid}) as of ${asOfDate} - ` +
+          `skipping automatic settlement, will retry next sweep.`
+        );
+        return false;
+      }
+      priceByRank[rank] = price;
+    }
+
+    const value = portfolioValue({ cash, holdings }, priceByRank);
+    const returnPct = ((value - START_VALUE) / START_VALUE) * 100;
+    valuations.push({ uid, value, returnPct });
+  }
+
+  const ranked = valuations.sort((a, b) => b.returnPct - a.returnPct);
 
   const entryFee = Number(challenge.entryFee) || 0;
   const potCents = Math.round(participantUids.length * entryFee * 100);
@@ -205,22 +267,22 @@ async function settleChallenge(env, challenge) {
     const amountCents = Math.round(netPotCents * SPLITS[i]);
     if (amountCents <= 0) continue;
 
-    const winnerDoc = await firestoreGetDoc(env, `users/${winner.id}`);
+    const winnerDoc = await firestoreGetDoc(env, `users/${winner.uid}`);
     if (!winnerDoc?.stripeConnectId) {
-      console.error(`Winner ${winner.id} in challenge ${challenge.id} has no Connect account - cannot pay out automatically.`);
-      payouts.push({ uid: winner.id, amountCents, status: 'failed_no_connect_account' });
+      console.error(`Winner ${winner.uid} in challenge ${challenge.id} has no Connect account - cannot pay out automatically.`);
+      payouts.push({ uid: winner.uid, amountCents, returnPct: winner.returnPct, status: 'failed_no_connect_account' });
       continue;
     }
 
     try {
       const transfer = await stripe.createTransfer(
         { amount: amountCents, currency: 'usd', destination: winnerDoc.stripeConnectId },
-        `settlement:${challenge.id}:${winner.id}`
+        `settlement:${challenge.id}:${winner.uid}`
       );
-      payouts.push({ uid: winner.id, amountCents, status: 'paid', transferId: transfer.id });
+      payouts.push({ uid: winner.uid, amountCents, returnPct: winner.returnPct, status: 'paid', transferId: transfer.id });
     } catch (e) {
-      console.error(`Transfer failed for ${winner.id} in challenge ${challenge.id}:`, e.message);
-      payouts.push({ uid: winner.id, amountCents, status: 'failed', error: e.message });
+      console.error(`Transfer failed for ${winner.uid} in challenge ${challenge.id}:`, e.message);
+      payouts.push({ uid: winner.uid, amountCents, returnPct: winner.returnPct, status: 'failed', error: e.message });
     }
   }
 
@@ -231,6 +293,7 @@ async function settleChallenge(env, challenge) {
     netPotCents,
     payouts,
   });
+  return true;
 }
 
 // ── Router ──

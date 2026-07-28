@@ -1,0 +1,21 @@
+name = "breakout-worker-pricing-engine"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[rules]
+# Allow importing the static NBA baseline data as JSON
+type = "Data"
+globs = ["**/*.json"]
+fallthrough = true
+
+# Game-day tick every 15 min, plus one daily-refresh run at 11:00 UTC (~6-7am
+# ET depending on DST) - the scheduled() handler in src/index.js branches on
+# event.cron to tell them apart.
+[triggers]
+crons = ["*/15 * * * *", "0 11 * * *"]
+
+# Secrets (set with `wrangler secret put <NAME>`, never in this file):
+#   FIREBASE_SERVICE_ACCOUNT - same Firebase service account JSON as worker-payments
+#   BALLDONTLIE_API_KEY      - optional; balldontlie works unauthenticated at low volume
+[vars]
+FIREBASE_PROJECT_ID = "athletex-ae63d"

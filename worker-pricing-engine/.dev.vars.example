@@ -1,0 +1,10 @@
+## Copy this file to .dev.vars (gitignored) for local `wrangler dev` testing.
+## Never commit the real .dev.vars file.
+
+## Same Firebase service account JSON as worker-payments, full JSON on one line.
+FIREBASE_SERVICE_ACCOUNT={"type":"service_account","project_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"...","...":"..."}
+
+## Optional - balldontlie.io now requires a (free) API key for season_averages.
+## Sign up at https://www.balldontlie.io. Daily baseline refresh silently does
+## nothing useful without this (fetch fails with 401).
+BALLDONTLIE_API_KEY=
