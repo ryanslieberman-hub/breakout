@@ -1,0 +1,15 @@
+{
+  // Deploys index.html as static assets to the "square-block-4d1b" Worker.
+  // Committing this avoids Wrangler's zero-config "set up this project"
+  // wizard running on every Cloudflare build - that wizard was installing
+  // wrangler's own `workerd` runtime (122 MiB) straight into this repo's
+  // node_modules, which then got swept up and uploaded as a "site asset"
+  // (since assets.directory is ".") and rejected for exceeding Cloudflare's
+  // 25 MiB per-file limit. See .assetsignore for the other half of the fix.
+  "name": "square-block-4d1b",
+  "compatibility_date": "2026-07-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "."
+  }
+}

@@ -1,0 +1,22 @@
+# Excludes these from the static-assets upload for the square-block-4d1b
+# Worker (assets.directory is "." in wrangler.jsonc, i.e. the whole repo).
+# Without this, node_modules (created fresh by every build's npm install)
+# gets uploaded as a "site asset" and can blow past Cloudflare's 25 MiB
+# per-file limit - see wrangler.jsonc for the full story. .git is excluded
+# so the repo's internals are never accidentally servable publicly.
+node_modules
+**/node_modules
+.git
+**/.git
+.claude
+.wrangler
+worker-payments
+worker-pricing-engine
+scripts
+package.json
+package-lock.json
+firestore.rules
+firebase.json
+.firebaserc
+.gitignore
+.dev.vars*
