@@ -67,11 +67,17 @@ export function stripeClient(secretKey) {
       request('POST', '/transfers', params, idempotencyKey),
     createVerificationSession: (params, idempotencyKey) =>
       request('POST', '/identity/verification_sessions', params, idempotencyKey),
-    // verified_outputs (which carries the verified date of birth) is NOT
-    // returned by default - without this expand it is always undefined, so any
-    // age check silently reads as "no DOB" no matter what the user submitted.
+    // verified_outputs is NOT returned by default - without this expand it is
+    // always undefined. Note this still does NOT include dob: see below.
     getVerificationSession: (id) =>
       request('GET', `/identity/verification_sessions/${id}?expand[]=verified_outputs`),
+    // Date of birth is classed by Stripe as a sensitive verification result and
+    // is refused outright to a standard secret key ("configure a restricted API
+    // key with appropriate permissions"). It can only be read with a RESTRICTED
+    // key granting "Access recent sensitive verification results", so this call
+    // must be made with that key - not the main STRIPE_SECRET_KEY.
+    getVerificationSessionSensitive: (id) =>
+      request('GET', `/identity/verification_sessions/${id}?expand[]=verified_outputs.dob`),
   };
 }
 

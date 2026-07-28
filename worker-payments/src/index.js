@@ -242,7 +242,21 @@ async function syncIdentitySession(env, uid, sessionId) {
   }
 
   if (session.status === 'verified') {
-    const dob = session.verified_outputs?.dob;
+    let dob = session.verified_outputs?.dob;
+    // dob is a sensitive verification result: Stripe refuses it to the standard
+    // secret key regardless of expand, so it can ONLY arrive via a restricted
+    // key holding "Access recent sensitive verification results". That key is
+    // optional - without it age simply stays unknown rather than the whole
+    // verification failing.
+    if (!dob && env.STRIPE_IDENTITY_RESTRICTED_KEY) {
+      try {
+        const rk = stripeClient(env.STRIPE_IDENTITY_RESTRICTED_KEY);
+        const sensitive = await rk.getVerificationSessionSensitive(sessionId);
+        dob = sensitive.verified_outputs?.dob;
+      } catch (e) {
+        console.warn(`Could not read sensitive verified_outputs for ${sessionId}: ${e.message}`);
+      }
+    }
     // Tri-state on purpose: true / false / null.
     // A missing DOB means "we could not determine an age", NOT "this person is
     // under 18" - not every accepted document carries one (Stripe's test-mode
