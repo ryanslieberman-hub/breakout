@@ -194,11 +194,15 @@ async function handleConnectOnboard(request, env) {
     await firestorePatchDoc(env, `users/${user.uid}`, { stripeConnectId: accountId });
   }
 
+  // Connect gets its own return/refresh URLs. It used to borrow the checkout
+  // ones, so finishing payout onboarding dumped the user on "?challenge_paid=1"
+  // as though they'd just bought something.
+  const connectReturn = env.CONNECT_RETURN_URL || env.CHECKOUT_SUCCESS_URL;
   const link = await stripe.createAccountLink({
     account: accountId,
     type: 'account_onboarding',
-    refresh_url: env.CHECKOUT_CANCEL_URL,
-    return_url: env.CHECKOUT_SUCCESS_URL,
+    refresh_url: connectReturn,
+    return_url: connectReturn,
   });
   return json({ url: link.url }, 200, env);
 }
@@ -355,6 +359,55 @@ async function handleIdentitySession(request, env) {
   });
   await firestorePatchDoc(env, `users/${user.uid}`, { stripeIdentitySessionId: session.id });
   return json({ blocked: false, url: session.url, geoState, geoCountry }, 200, env);
+}
+
+// ── GET /internal/stripe-info ──
+// ADMIN ONLY, read-only. Reports which Stripe account this Worker is actually
+// talking to and whether that key is live. Exists because a mis-set credential
+// is otherwise invisible until money moves: a wrong secret key looks identical
+// to "no data yet", and a wrong webhook secret rejects every delivery while the
+// logs read as healthy. Returns no secret values - only whether each is set.
+async function handleStripeInfo(request, env) {
+  const user = await requireUser(request, env);
+  if (!user.admin) throw new HttpError(403, 'Admin only');
+
+  const stripe = stripeClient(env.STRIPE_SECRET_KEY);
+  const [account, balance] = await Promise.all([stripe.getOwnAccount(), stripe.getBalance()]);
+  const sum = arr => (arr || []).reduce((n, x) => n + x.amount, 0);
+
+  // Probe Identity and Connect separately. "Enabled on the account" and "usable
+  // by this key" are different things, and Stripe reports the difference only
+  // when you actually call the product - which is otherwise not discovered
+  // until a user is standing in front of the verification screen.
+  let identityProbe;
+  try {
+    await stripe.listVerificationSessions({ limit: 1 });
+    identityProbe = { ok: true };
+  } catch (e) {
+    identityProbe = { ok: false, status: e.status, code: e.code, message: e.message };
+  }
+  let connectProbe;
+  try {
+    await stripe.listConnectAccounts({ limit: 1 });
+    connectProbe = { ok: true };
+  } catch (e) {
+    connectProbe = { ok: false, status: e.status, code: e.code, message: e.message };
+  }
+
+  return json({
+    identity: identityProbe,
+    connect: connectProbe,
+    accountId: account.id,
+    livemode: balance.livemode === true,
+    chargesEnabled: !!account.charges_enabled,
+    payoutsEnabled: !!account.payouts_enabled,
+    detailsSubmitted: !!account.details_submitted,
+    availableCents: sum(balance.available),
+    pendingCents: sum(balance.pending),
+    // Presence only - never the values themselves.
+    webhookSecretConfigured: !!env.STRIPE_WEBHOOK_SECRET,
+    identityRestrictedKeyConfigured: !!env.STRIPE_IDENTITY_RESTRICTED_KEY,
+  }, 200, env);
 }
 
 // ── GET /identity/status ──
@@ -652,6 +705,9 @@ export default {
       }
       if (request.method === 'GET' && url.pathname === '/identity/status') {
         return await handleIdentityStatus(request, env);
+      }
+      if (request.method === 'GET' && url.pathname === '/internal/stripe-info') {
+        return await handleStripeInfo(request, env);
       }
       // Manual trigger for the settlement sweep. ADMIN ONLY: this moves real
       // money (it creates Stripe transfers), so it must never be reachable by

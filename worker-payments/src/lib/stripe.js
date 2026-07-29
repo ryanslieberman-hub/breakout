@@ -62,6 +62,10 @@ export function stripeClient(secretKey) {
     createConnectAccount: (params, idempotencyKey) =>
       request('POST', '/accounts', params, idempotencyKey),
     getAccount: (accountId) => request('GET', `/accounts/${accountId}`),
+    // The PLATFORM's own account (not a connected one), and the balance - whose
+    // `livemode` flag is the authoritative answer to "is this key live?".
+    getOwnAccount: () => request('GET', '/account'),
+    getBalance: () => request('GET', '/balance'),
     createAccountLink: (params) => request('POST', '/account_links', params),
     createTransfer: (params, idempotencyKey) =>
       request('POST', '/transfers', params, idempotencyKey),
@@ -83,6 +87,12 @@ export function stripeClient(secretKey) {
     // must be made with that key - not the main STRIPE_SECRET_KEY.
     getVerificationSessionSensitive: (id) =>
       request('GET', `/identity/verification_sessions/${id}?expand[]=verified_outputs.dob`),
+    // Read-only probes used by /internal/stripe-info to tell whether these
+    // products are actually usable by this key, before a user hits them.
+    listVerificationSessions: (params) =>
+      request('GET', `/identity/verification_sessions?${new URLSearchParams(params).toString()}`),
+    listConnectAccounts: (params) =>
+      request('GET', `/accounts?${new URLSearchParams(params).toString()}`),
   };
 }
 

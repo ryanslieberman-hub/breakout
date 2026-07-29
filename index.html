@@ -14040,22 +14040,102 @@ function openProfile() {
   modal.classList.add('open');
 }
 
+// Cached payout-account state, so the challenge tab can show a warning without
+// hitting the worker on every render. null = not checked yet this session.
+let _connectStatus = null;
+let _connectPoll = null;
+
+async function refreshConnectStatus(force = false) {
+  if (_connectStatus && !force) return _connectStatus;
+  if (!currentUser) return null;
+  try {
+    _connectStatus = await paymentsWorkerFetch('/connect/status');
+  } catch (e) { _connectStatus = null; }
+  return _connectStatus;
+}
+
 async function refreshConnectStatusUI() {
   const el = document.getElementById('connect-status-text');
   if (!el) return;
   try {
-    const status = await paymentsWorkerFetch('/connect/status');
-    if (!status.connected) el.textContent = 'Not set up yet.';
-    else if (status.payoutsEnabled) { el.textContent = 'Ready to receive payouts.'; el.style.color = 'var(--green)'; }
-    else el.textContent = 'Onboarding started - a few steps left with Stripe.';
+    const status = await refreshConnectStatus(true);
+    if (!status) { el.textContent = 'Could not check status.'; return; }
+    if (status.payoutsEnabled) {
+      el.textContent = '✓ Ready to receive payouts';
+      el.style.color = 'var(--green)';
+    } else if (status.connected) {
+      el.textContent = '⚠ Onboarding started - a few steps left with Stripe';
+      el.style.color = 'var(--gold)';
+    } else {
+      el.textContent = '⚠ Not set up - you cannot receive winnings yet';
+      el.style.color = 'var(--gold)';
+    }
   } catch (e) { el.textContent = 'Could not check status: ' + e.message; }
+  renderPayoutBanner();
 }
 
 async function startConnectOnboarding() {
   try {
+    showToast('Opening Stripe payout setup…');
     const { url } = await paymentsWorkerFetch('/connect/onboard', { method: 'POST' });
-    window.location.href = url;
+    // Open in a NEW TAB rather than navigating away. The old behaviour replaced
+    // the app with Stripe's flow and returned the user to "?challenge_paid=1",
+    // which reads as "you bought something" - confusing right after they were
+    // trying to set up getting PAID.
+    window.open(url, '_blank');
+    startConnectStatusPolling();
   } catch (e) { showToast('Could not start onboarding: ' + e.message); }
+}
+
+// Watches for onboarding completing in the other tab and updates every place
+// payout state is shown, without the user needing to refresh.
+function startConnectStatusPolling() {
+  if (_connectPoll) return;
+  let ticks = 0;
+  _connectPoll = setInterval(async () => {
+    if (++ticks > 150) return stopConnectStatusPolling(); // ~10 min
+    const before = _connectStatus?.payoutsEnabled === true;
+    const status = await refreshConnectStatus(true);
+    const el = document.getElementById('connect-status-text');
+    if (el && status) {
+      if (status.payoutsEnabled) { el.textContent = '✓ Ready to receive payouts'; el.style.color = 'var(--green)'; }
+      else if (status.connected) { el.textContent = '⚠ Onboarding started - a few steps left with Stripe'; el.style.color = 'var(--gold)'; }
+    }
+    renderPayoutBanner();
+    if (status?.payoutsEnabled) {
+      if (!before) showToast('Payout account ready - you can receive winnings');
+      stopConnectStatusPolling();
+    }
+  }, 4000);
+}
+
+function stopConnectStatusPolling() {
+  if (_connectPoll) { clearInterval(_connectPoll); _connectPoll = null; }
+}
+
+// The prominent, in-context warning. Shown on the challenge tab whenever the
+// user has money riding on a paid challenge but cannot actually be paid. This
+// is the gap that let someone win real cash and silently receive nothing
+// because the only way to set up payouts was buried in the profile modal.
+function renderPayoutBanner() {
+  const host = document.getElementById('payout-banner');
+  if (!host) return;
+  const s = _connectStatus;
+  if (!currentUser || !s || s.payoutsEnabled) { host.innerHTML = ''; return; }
+  const started = !!s.connected;
+  host.innerHTML = `
+    <div style="margin-top:10px;border:1px solid var(--gold);background:rgba(242,184,67,.08);border-radius:8px;padding:12px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        <span style="font-family:var(--font-display);font-size:13px;color:var(--gold);">${started ? 'Finish your payout setup' : 'You can’t be paid yet'}</span>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:10px;">
+        ${started
+          ? 'Stripe still needs a few details before winnings can reach you. If a challenge settles before this is done, your payout will be held.'
+          : 'You’re entered in a paid challenge, but there’s nowhere to send winnings. Set up a payout account so prize money can actually reach you.'}
+      </div>
+      <button class="wc-join-btn" style="margin:0;" onclick="startConnectOnboarding()">${started ? 'Finish payout setup ↗' : 'Set up payout account ↗'}</button>
+    </div>`;
 }
 
 function closeProfile(){ document.getElementById('profile-modal').classList.remove('open'); }
@@ -15197,6 +15277,11 @@ async function renderChallengeTab() {
       html += `<button class="wc-join-btn joined" disabled>You're in - trading ends ${fmtDate(challenge.endDate)}</button>`;
     }
 
+    // Payout-account warning, shown in the one place the user is thinking about
+    // prize money. Filled asynchronously by renderPayoutBanner() so rendering
+    // the tab never waits on a network call.
+    if (entryFee > 0 && currentUser) html += `<div id="payout-banner"></div>`;
+
     html += `</div>`;
 
     // Build participant leaderboard with live portfolio values
@@ -15275,6 +15360,12 @@ async function renderChallengeTab() {
     html += `</div>`;
 
     el.innerHTML = html;
+
+    // Fill the payout warning once we know the account state. Deliberately not
+    // awaited: a slow Stripe round-trip must never delay the challenge tab.
+    if (entryFee > 0 && currentUser) {
+      refreshConnectStatus().then(renderPayoutBanner).catch(() => {});
+    }
 
     // Load chat messages after rendering
     loadChallengeChat(challenge.id);
@@ -16069,6 +16160,18 @@ window.addEventListener('DOMContentLoaded', function() {
   // or abandoned attempt stays on screen with a way back in, since silently
   // closing the tab on a failure is exactly how someone ends up thinking they
   // verified when they didn't.
+  // Return trip from Stripe Connect payout onboarding. Opened in a tab, so
+  // close it and let the original tab's poll pick up the new state.
+  try {
+    if (new URLSearchParams(location.search).get('connect_return') === '1') {
+      history.replaceState(null, '', location.pathname);
+      document.body.insertAdjacentHTML('beforeend',
+        '<div style="position:fixed;inset:0;background:var(--bg,#000);color:var(--text,#fff);display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:var(--font-mono,monospace);font-size:13px;line-height:1.7;z-index:99999;">' +
+        '<div>Payout setup submitted. You can close this tab — Breakout will update on its own.</div>' +
+        '<button onclick="window.close()" style="font-family:var(--font-mono,monospace);font-size:12px;padding:8px 18px;border-radius:8px;border:1px solid var(--hairline,#333);background:transparent;color:var(--green,#12d47e);cursor:pointer;">Close tab</button></div>');
+      setTimeout(() => { try { window.close(); } catch(e){} }, 2000);
+    }
+  } catch(e){}
   try {
     if (new URLSearchParams(location.search).get('identity_return') === '1') {
       history.replaceState(null, '', location.pathname);
