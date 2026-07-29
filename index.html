@@ -1032,6 +1032,63 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .bnum{font-size:var(--fs-micro);}
 .ob-stat-lbl{font-size:var(--fs-micro);}
 .etag{font-size:var(--fs-micro);}
+
+/* ── Mobile scale ────────────────────────────────────────────────────────
+   The block above lands AFTER the @media (max-width:768px) block at line
+   649 and uses the same single-class specificity, so source order decided
+   it: every mobile size in that media query was silently dead. On a phone
+   the hero name rendered at 32px and the price at 56px inside a 245px
+   column, so .hinfo (flex:1;min-width:0) collapsed against
+   .hright (flex-shrink:0) and clientWidth went to 0 - the player's name
+   was measured at 0px wide with 168px of content. You saw a price and an
+   avatar and could not tell whose price it was.
+
+   Fixed at the token level rather than by re-listing selectors, which is
+   why the surface ramp survived this and the type scale did not. The 10px
+   floor still holds; only the steps above it compress. ─────────────────── */
+@media (max-width: 768px) {
+  :root{
+    --fs-micro: 10px;  /* floor is a floor - unchanged */
+    --fs-body:  12px;
+    --fs-med:   14px;
+    --fs-lg:    18px;
+    --fs-xl:    20px;
+    --fs-hero:  30px;  /* still the loudest thing on screen, at 1/8 the width */
+  }
+
+  /* Sizes the pass hard-coded instead of tokenising, so they need naming. */
+  .pprice{font-size:14px;}
+  .hchg{font-size:10px;}
+  .xbtn{font-size:16px;}
+  .nav-tab{font-size:10px;}   /* the 6 tabs still wrap to a second row - that
+                                 is the 146px logo, not the type size */
+  .mover-item{font-size:10px;}
+  .ctab{font-size:10px;}
+  .mt{font-size:10px;}
+  .news-summary{font-size:10px;}
+  .trend-tab{font-size:10px;}
+
+  /* Guard: the name column must never be squeezed out of existence again,
+     whatever the price ends up costing in width. */
+  .hinfo{min-width:96px;}
+  .hprice{letter-spacing:-1px;}
+  /* Name and price stop competing for one 245px line: the price takes its
+     own row underneath. Measured both ways - this also cuts the hero's
+     overflow inside its 160px max-height from 298px to 231px. */
+  .hero{flex-wrap:wrap;}
+  .hright{width:100%; text-align:left;}
+
+  /* The list row had the same failure from a different direction, and the
+     type scale was not the cause - it only made it visible. .prow is 129px
+     wide with 14px side padding, leaving 101px, while the avatar (30) +
+     price (59) + star (17) + three 8px gaps need 130px. .pinfo is the only
+     child that can shrink, so it absorbed the whole 29px deficit and the
+     name rendered at 0px wide. Giving it a floor forces the price onto a
+     second line, which is what a 130px rail wants anyway. */
+  .prow{flex-wrap:wrap; padding:7px 8px; column-gap:6px; row-gap:3px;}
+  .pinfo{flex:1 1 75px; min-width:75px;}
+  .pright{margin-right:auto; text-align:left;}
+}
 </style>
 <style wxt-shadow-root-document-styles="ckuc1f3gvqs">@property --tw-animation-delay{syntax:"*";inherits:false;initial-value:0s}@property --tw-animation-direction{syntax:"*";inherits:false;initial-value:normal}@property --tw-animation-duration{syntax:"*";inherits:false}@property --tw-animation-fill-mode{syntax:"*";inherits:false;initial-value:none}@property --tw-animation-iteration-count{syntax:"*";inherits:false;initial-value:1}@property --tw-enter-blur{syntax:"*";inherits:false;initial-value:0}@property --tw-enter-opacity{syntax:"*";inherits:false;initial-value:1}@property --tw-enter-rotate{syntax:"*";inherits:false;initial-value:0}@property --tw-enter-scale{syntax:"*";inherits:false;initial-value:1}@property --tw-enter-translate-x{syntax:"*";inherits:false;initial-value:0}@property --tw-enter-translate-y{syntax:"*";inherits:false;initial-value:0}@property --tw-exit-blur{syntax:"*";inherits:false;initial-value:0}@property --tw-exit-opacity{syntax:"*";inherits:false;initial-value:1}@property --tw-exit-rotate{syntax:"*";inherits:false;initial-value:0}@property --tw-exit-scale{syntax:"*";inherits:false;initial-value:1}@property --tw-exit-translate-x{syntax:"*";inherits:false;initial-value:0}@property --tw-exit-translate-y{syntax:"*";inherits:false;initial-value:0}@property --tw-translate-x{syntax:"*";inherits:false;initial-value:0}@property --tw-translate-y{syntax:"*";inherits:false;initial-value:0}@property --tw-translate-z{syntax:"*";inherits:false;initial-value:0}@property --tw-scale-x{syntax:"*";inherits:false;initial-value:1}@property --tw-scale-y{syntax:"*";inherits:false;initial-value:1}@property --tw-scale-z{syntax:"*";inherits:false;initial-value:1}@property --tw-rotate-x{syntax:"*";inherits:false}@property --tw-rotate-y{syntax:"*";inherits:false}@property --tw-rotate-z{syntax:"*";inherits:false}@property --tw-skew-x{syntax:"*";inherits:false}@property --tw-skew-y{syntax:"*";inherits:false}@property --tw-space-y-reverse{syntax:"*";inherits:false;initial-value:0}@property --tw-space-x-reverse{syntax:"*";inherits:false;initial-value:0}@property --tw-border-style{syntax:"*";inherits:false;initial-value:solid}@property --tw-gradient-position{syntax:"*";inherits:false}@property --tw-gradient-from{syntax:"<color>";inherits:false;initial-value:#0000}@property --tw-gradient-via{syntax:"<color>";inherits:false;initial-value:#0000}@property --tw-gradient-to{syntax:"<color>";inherits:false;initial-value:#0000}@property --tw-gradient-stops{syntax:"*";inherits:false}@property --tw-gradient-via-stops{syntax:"*";inherits:false}@property --tw-gradient-from-position{syntax:"<length-percentage>";inherits:false;initial-value:0%}@property --tw-gradient-via-position{syntax:"<length-percentage>";inherits:false;initial-value:50%}@property --tw-gradient-to-position{syntax:"<length-percentage>";inherits:false;initial-value:100%}@property --tw-leading{syntax:"*";inherits:false}@property --tw-font-weight{syntax:"*";inherits:false}@property --tw-tracking{syntax:"*";inherits:false}@property --tw-ordinal{syntax:"*";inherits:false}@property --tw-slashed-zero{syntax:"*";inherits:false}@property --tw-numeric-figure{syntax:"*";inherits:false}@property --tw-numeric-spacing{syntax:"*";inherits:false}@property --tw-numeric-fraction{syntax:"*";inherits:false}@property --tw-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-shadow-color{syntax:"*";inherits:false}@property --tw-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-inset-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-inset-shadow-color{syntax:"*";inherits:false}@property --tw-inset-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-ring-color{syntax:"*";inherits:false}@property --tw-ring-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-inset-ring-color{syntax:"*";inherits:false}@property --tw-inset-ring-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-ring-inset{syntax:"*";inherits:false}@property --tw-ring-offset-width{syntax:"<length>";inherits:false;initial-value:0}@property --tw-ring-offset-color{syntax:"*";inherits:false;initial-value:#fff}@property --tw-ring-offset-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-outline-style{syntax:"*";inherits:false;initial-value:solid}@property --tw-blur{syntax:"*";inherits:false}@property --tw-brightness{syntax:"*";inherits:false}@property --tw-contrast{syntax:"*";inherits:false}@property --tw-grayscale{syntax:"*";inherits:false}@property --tw-hue-rotate{syntax:"*";inherits:false}@property --tw-invert{syntax:"*";inherits:false}@property --tw-opacity{syntax:"*";inherits:false}@property --tw-saturate{syntax:"*";inherits:false}@property --tw-sepia{syntax:"*";inherits:false}@property --tw-drop-shadow{syntax:"*";inherits:false}@property --tw-drop-shadow-color{syntax:"*";inherits:false}@property --tw-drop-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-drop-shadow-size{syntax:"*";inherits:false}@property --tw-backdrop-blur{syntax:"*";inherits:false}@property --tw-backdrop-brightness{syntax:"*";inherits:false}@property --tw-backdrop-contrast{syntax:"*";inherits:false}@property --tw-backdrop-grayscale{syntax:"*";inherits:false}@property --tw-backdrop-hue-rotate{syntax:"*";inherits:false}@property --tw-backdrop-invert{syntax:"*";inherits:false}@property --tw-backdrop-opacity{syntax:"*";inherits:false}@property --tw-backdrop-saturate{syntax:"*";inherits:false}@property --tw-backdrop-sepia{syntax:"*";inherits:false}@property --tw-duration{syntax:"*";inherits:false}@property --tw-ease{syntax:"*";inherits:false}@property --tw-text-shadow-color{syntax:"*";inherits:false}@property --tw-text-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-content{syntax:"*";inherits:false;initial-value:""}</style></head>
 <body><bettercanvas-portal style="overflow: visible; position: relative; width: 0px; height: 0px; display: block;"><template shadowrootmode="open">
