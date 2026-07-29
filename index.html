@@ -448,6 +448,8 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .ulb-ret{font-family:var(--font-mono);font-size:16px;font-weight:700;text-align:right;}
 .ulb-ret.pos{color:var(--green);}
 .ulb-ret.neg{color:var(--red);}
+/* No figure for this entrant yet - must not read as a score. */
+.ulb-ret.unknown{color:var(--muted);font-weight:400;}
 .ulb-you{border-color:var(--green) !important;background:#0a1a0a !important;}
 
 
@@ -494,7 +496,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .wc-podium{display:flex;gap:10px;margin-bottom:16px;}
 .wc-podium-card{flex:1;background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:14px 10px;text-align:center;}
 .wc-podium-card.first{border-color:var(--gold);background:#1a1500;}
-.wc-podium-medal{font-size:22px;margin-bottom:4px;}
+/* Was .wc-podium-medal, fed by ['','',''] - three empty strings, so first
+   place rendered a blank div. A number is at least true. */
+.wc-podium-rank{font-family:var(--font-display);font-size:22px;line-height:1;margin-bottom:6px;color:var(--muted);font-variant-numeric:tabular-nums;}
+.wc-podium-card.first .wc-podium-rank{color:var(--gold);}
 .wc-podium-name{font-family:var(--font-body);font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .wc-podium-ret{font-family:var(--font-display);font-size:18px;color:var(--green);}
 .wc-admin-btn{font-family:var(--font-mono);font-size:10px;padding:6px 14px;background:var(--card);border:1px solid var(--hairline);border-radius:6px;color:var(--muted);cursor:pointer;margin-bottom:16px;}
@@ -15403,34 +15408,65 @@ async function renderChallengeTab() {
       if (!currentUser) {
         html += `<div class="g10-loading" style="cursor:pointer;" onclick="openProfile()">Sign in to see standings →</div>`;
       } else {
-        // Fetch current portfolio values for all participants from users collection
-        const userSnap = await window._fbGetDocsFromServer(window._fbQuery(window._fbCollection(db, 'users'), window._fbLimit(100)));
+        // Fetch each participant's doc by id.
+        //
+        // This previously pulled an arbitrary 100 docs off the whole users
+        // collection and matched participants against them. The bug was not
+        // "breaks past 100 entrants" - the query had no orderBy and no filter,
+        // so once the users collection itself exceeded 100 docs, ANY
+        // participant could fall outside the slice regardless of how few had
+        // entered. A missing participant then fell through to `returnPct || 0`
+        // and was ranked at exactly 0.0%, indistinguishable from someone who
+        // genuinely broke even. In a paid challenge that silently mis-ranks
+        // people who put money in.
+        //
+        // Reads are now bounded by participant count instead of collection
+        // size, and from the server for the same reason the old call was:
+        // standings must not come off a stale local cache.
+        const uniqueUids = [...new Set(participantUids)];
+        const snaps = await Promise.all(uniqueUids.map(uid =>
+          window._fbGetDocFromServer(window._fbDoc(db, 'users', uid)).catch(() => null)
+        ));
         const allUsers = {};
-        userSnap.docs.forEach(d => { const u = d.data(); if (u.uid) allUsers[u.uid] = u; });
+        snaps.forEach((snap, i) => {
+          if (snap && snap.exists()) allUsers[uniqueUids[i]] = snap.data();
+        });
 
         const ranked = participantUids.map(uid => {
           const saved = participants[uid];
           const live = allUsers[uid] || {};
+          // null, not 0: "we have no figure for this entrant" is a different
+          // statement from "this entrant is flat", and only one of them is
+          // safe to rank.
+          const ret = typeof live.returnPct === 'number' ? live.returnPct : null;
           return {
             uid,
             displayName: live.displayName || saved.displayName || 'Anonymous',
             photoURL: live.photoURL || saved.photoURL || null,
             avatarColor: live.avatarColor || saved.avatarColor || '#4caf50',
-            portfolioValue: live.portfolioValue || saved.portfolioValueAtJoin || 100000,
-            returnPct: live.returnPct || 0,
+            portfolioValue: live.portfolioValue ?? saved.portfolioValueAtJoin ?? 100000,
+            returnPct: ret,
           };
-        }).sort((a,b) => (b.returnPct||0) - (a.returnPct||0));
+        }).sort((a,b) => {
+          if (a.returnPct === null && b.returnPct === null) return 0;
+          if (a.returnPct === null) return 1;   // unknown sorts last, never onto the podium
+          if (b.returnPct === null) return -1;
+          return b.returnPct - a.returnPct;
+        });
+
+        // "Return unavailable" has to look different from "flat", or the
+        // fallback quietly becomes a score.
+        const fmtRet = (v) => v === null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
 
         // Podium for top 3 if ended
         if (ended && ranked.length >= 1) {
-          const medals = ['','',''];
           const podium = ranked.slice(0,3);
           html += `<div class="wc-podium">`;
           podium.forEach((u,i) => {
             html += `<div class="wc-podium-card ${i===0?'first':''}">
-              <div class="wc-podium-medal">${medals[i]||''}</div>
+              <div class="wc-podium-rank">${i+1}</div>
               <div class="wc-podium-name">${u.displayName}</div>
-              <div class="wc-podium-ret">${u.returnPct>=0?'+':''}${(u.returnPct||0).toFixed(1)}%</div>
+              <div class="wc-podium-ret">${fmtRet(u.returnPct)}</div>
             </div>`;
           });
           html += `</div>`;
@@ -15439,16 +15475,18 @@ async function renderChallengeTab() {
         // Full rankings
         ranked.forEach((u, i) => {
           const isYou = currentUser && u.uid === currentUser.uid;
-          const rankCls = i===0?'gold':i===1?'silver':i===2?'bronze':'';
-          const ret = u.returnPct || 0;
+          const ret = u.returnPct;
+          const unknown = ret === null;
+          const rankCls = unknown ? '' : i===0?'gold':i===1?'silver':i===2?'bronze':'';
+          const retCls = unknown ? 'unknown' : ret >= 0 ? 'pos' : 'neg';
           const avatar = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
           html += `<div class="ulb-card ${isYou?'ulb-you':''}">
-            <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
+            <div class="ulb-rank ${rankCls}">${unknown ? '–' : i+1}</div>${avatar}
             <div class="ulb-info">
-              <div class="ulb-name">${u.displayName} ${isYou?'<span style="color:var(--green);font-size:9px;">(you)</span>':''}</div>
-              <div class="ulb-sub">Portfolio: $${(u.portfolioValue||100000).toLocaleString()}</div>
+              <div class="ulb-name">${u.displayName} ${isYou?'<span style="color:var(--green);font-size:var(--fs-micro);">(you)</span>':''}</div>
+              <div class="ulb-sub">${unknown ? 'Return not available yet' : `Portfolio: $${(u.portfolioValue||100000).toLocaleString()}`}</div>
             </div>
-            <div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>
+            <div class="ulb-ret ${retCls}">${fmtRet(ret)}</div>
           </div>`;
         });
       }
@@ -15983,7 +16021,7 @@ window.addEventListener('appinstalled', () => {
            GoogleAuthProvider, signInWithPopup, signInWithRedirect,
            signOut, getRedirectResult,
            setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-  import { getFirestore, initializeFirestore, serverTimestamp, doc, getDoc, setDoc, updateDoc, collection, getDocs, getDocsFromServer, limit, query, orderBy, where, onSnapshot, addDoc, deleteDoc, increment }  from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+  import { getFirestore, initializeFirestore, serverTimestamp, doc, getDoc, getDocFromServer, setDoc, updateDoc, collection, getDocs, getDocsFromServer, limit, query, orderBy, where, onSnapshot, addDoc, deleteDoc, increment }  from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
   import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-messaging.js";
 
   const firebaseConfig = {
@@ -16023,6 +16061,7 @@ window.addEventListener('appinstalled', () => {
   window._fbServerTimestamp     = serverTimestamp;
   window._fbDoc        = doc;
   window._fbGetDoc     = getDoc;
+  window._fbGetDocFromServer = getDocFromServer;
   window._fbSetDoc     = setDoc;
   window._fbUpdateDoc  = updateDoc;
   window._fbCollection = collection;
