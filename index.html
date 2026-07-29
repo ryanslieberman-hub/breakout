@@ -68,6 +68,13 @@ button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px so
 nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid var(--border);background:var(--surface);gap:0;z-index:50;}
 .logo{font-family:var(--font-display);font-size:20px;letter-spacing:-0.2px;font-weight:800;color:var(--text);margin-right:28px;position:relative;}
 .logo::after{content:'▲';color:var(--green);font-size:8px;position:relative;top:-8px;left:2px;}
+/* Controls that are now real <button>s rather than divs and spans. :where()
+   keeps this at zero specificity so each control's own rules still win - it
+   only strips the browser's default button chrome. */
+:where(button.nav-tab, button.ob-skip){background:none;border:none;font-family:inherit;color:inherit;text-align:inherit;-webkit-appearance:none;appearance:none;}
+/* The wordmark is the document's only h1; the page had no headings at all,
+   so there was no structure to skim by. Inherits the .logo look exactly. */
+.wordmark{font:inherit;letter-spacing:inherit;color:inherit;margin:0;display:inline;}
 .nav-tab{height:48px;padding:0 18px;display:flex;align-items:center;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;}
 .tab-label-mobile{display:none;}
 .tab-label-full{display:inline;}
@@ -576,7 +583,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .wc-create-modal{position:fixed;inset:0;background:#000b;z-index:1100;display:none;align-items:center;justify-content:center;padding:20px;}
 .wc-create-modal.open{display:flex;}
 .wc-create-box{background:var(--surface);border:1px solid var(--hairline);border-radius:14px;padding:28px;width:100%;max-width:440px;}
-.wc-create-title{font-family:var(--font-display);font-size:24px;letter-spacing:1px;margin-bottom:18px;}
+.wc-create-title{font-family:var(--font-display);font-size:24px;letter-spacing:1px;margin:0 0 18px;font-weight:400;}
 .wc-field{margin-bottom:14px;}
 .wc-label{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:5px;}
 .wc-input{width:100%;background:var(--bg);border:1px solid var(--hairline);border-radius:6px;padding:9px 12px;color:var(--fg);font-family:var(--font-mono);font-size:12px;box-sizing:border-box;}
@@ -1175,13 +1182,13 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 
 <!-- NAV -->
 <nav>
-  <div class="logo" style="display:flex;align-items:center;gap:8px;"><span>Breakout</span><button id="league-btn" onclick="openLeagueDrawer()" style="display:inline-flex;align-items:center;gap:4px;"><span id="league-label">NBA</span><span style="display:inline-flex;color:var(--muted)"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></button></div>
-  <div class="nav-tab active" onclick="showView(&#39;market&#39;,this)"><span class="tab-label-full">Market</span><span class="tab-label-mobile">Market</span></div>
-  <div class="nav-tab" id="nav-portfolio-tab" onclick="showView(&#39;portfolio&#39;,this)" style="display:none"><span class="tab-label-full">Portfolio</span><span class="tab-label-mobile">Portfolio</span></div>
-  <div class="nav-tab" onclick="showView(&#39;leaderboard&#39;,this)"><span class="tab-label-full">Leaderboard</span><span class="tab-label-mobile">Leaders</span></div>
-  <div class="nav-tab" id="nav-schedule-tab" onclick="showView(&#39;schedule&#39;,this)"><span class="tab-label-full">Schedule</span><span class="tab-label-mobile">Schedule</span></div>
-  <div class="nav-tab" onclick="showView(&#39;feed&#39;,this)" id="nav-feed-tab"><span class="tab-label-full">Activity</span><span class="tab-label-mobile">Feed</span><span class="feed-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: 4px; vertical-align: middle;"></span></div>
-  <div class="nav-tab" onclick="showView(&#39;trending&#39;,this)" style="color:var(--red);border-bottom:2px solid transparent;" id="nav-trending-tab"><span class="tab-label-full">High Volume</span><span class="tab-label-mobile">Movers</span></div>
+  <div class="logo" style="display:flex;align-items:center;gap:8px;"><h1 class="wordmark">Breakout</h1><button id="league-btn" onclick="openLeagueDrawer()" style="display:inline-flex;align-items:center;gap:4px;"><span id="league-label">NBA</span><span style="display:inline-flex;color:var(--muted)"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></button></div>
+  <button type="button" class="nav-tab active" onclick="showView(&#39;market&#39;,this)"><span class="tab-label-full">Market</span><span class="tab-label-mobile">Market</span></button>
+  <button type="button" class="nav-tab" id="nav-portfolio-tab" onclick="showView(&#39;portfolio&#39;,this)" style="display:none"><span class="tab-label-full">Portfolio</span><span class="tab-label-mobile">Portfolio</span></button>
+  <button type="button" class="nav-tab" onclick="showView(&#39;leaderboard&#39;,this)"><span class="tab-label-full">Leaderboard</span><span class="tab-label-mobile">Leaders</span></button>
+  <button type="button" class="nav-tab" id="nav-schedule-tab" onclick="showView(&#39;schedule&#39;,this)"><span class="tab-label-full">Schedule</span><span class="tab-label-mobile">Schedule</span></button>
+  <button type="button" class="nav-tab" onclick="showView(&#39;feed&#39;,this)" id="nav-feed-tab"><span class="tab-label-full">Activity</span><span class="tab-label-mobile">Feed</span><span class="feed-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: 4px; vertical-align: middle;"></span></button>
+  <button type="button" class="nav-tab" onclick="showView(&#39;trending&#39;,this)" style="color:var(--red);border-bottom:2px solid transparent;" id="nav-trending-tab"><span class="tab-label-full">High Volume</span><span class="tab-label-mobile">Movers</span></button>
   <div class="nav-right">
     <div class="nav-stat">Cash: <span id="nav-cash">$100,000.00</span></div>
     <div class="nav-stat" id="last-updated" style="display: inline;">Updated: <span id="update-time">—</span></div>
@@ -5233,9 +5240,9 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 </div>
 
 <!-- ═══ COMPLIANCE GATE (paid challenges) ═══ -->
-<div class="wc-create-modal" id="compliance-modal">
+<div class="wc-create-modal" id="compliance-modal" role="dialog" aria-modal="true" aria-labelledby="cg-heading">
   <div class="wc-create-box" style="max-width:420px;">
-    <div class="wc-create-title">Before You Enter a Paid Challenge</div>
+    <h2 class="wc-create-title" id="cg-heading">Before You Enter a Paid Challenge</h2>
     <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:16px;">
       Paid challenges involve real money in and real money out. We need to verify your identity and location before your first entry.
     </div>
@@ -5337,7 +5344,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   </div>
 </div>
 
-<div class="toast" id="toast">Live · 45 played · Leonard Miller +10.6%</div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true">Live · 45 played · Leonard Miller +10.6%</div>
 
 
 
@@ -10512,7 +10519,12 @@ function renderList(){
              onerror="this.style.display='none'" alt="">
          </div>`
       : `<div class="pav" style="background:${bg};color:${fg}">${p.initials}</div>`;
-    return`<div class="prow${p.rank===selRank?' active':''}${isInj?' prow-injured':''}" onclick="selectPlayer(${p.rank})">
+    // role/tabindex rather than a <button>: the row already contains the star
+    // button, and a button cannot contain a button. The row is the click
+    // target for the mouse and now a tab stop with a spoken name for everyone
+    // else; activateRow() handles Enter and Space.
+    const a11yName = `${p.name}${isInj?', out injured':''}, ${p.team}, ${fmt(price)}, ${pct>=0?'up':'down'} ${Math.abs(pct).toFixed(1)} percent`;
+    return`<div class="prow${p.rank===selRank?' active':''}${isInj?' prow-injured':''}" onclick="selectPlayer(${p.rank})" role="button" tabindex="0" aria-label="${a11yName}"${p.rank===selRank?' aria-current="true"':''}>
       ${owned?'<div class="owned-dot"></div>':''}
       ${avatarHtml}
       <div class="pinfo">
@@ -12948,7 +12960,7 @@ function showTradeConfirm(mode, shares, cost, player) {
     _pendingTrade = resolve;
     const isBuy = mode === 'buy';
     const html = `
-      <div class="conf-overlay" id="conf-overlay" onclick="if(event.target===this)dismissConfirm(false)">
+      <div class="conf-overlay" id="conf-overlay" role="dialog" aria-modal="true" aria-label="${isBuy ? 'Confirm buy' : 'Confirm sell'}" onclick="if(event.target===this)dismissConfirm(false)">
         <div class="conf-box">
           <div class="conf-title">${isBuy ? 'Confirm Buy' : 'Confirm Sell'}</div>
           <div class="conf-detail">
@@ -12965,13 +12977,29 @@ function showTradeConfirm(mode, shares, cost, player) {
         </div>
       </div>`;
     document.body.insertAdjacentHTML('beforeend', html);
+    const overlay = document.getElementById('conf-overlay');
+    trapFocus(overlay, () => dismissConfirm(false));
+    overlay?.querySelector('.conf-confirm')?.focus();
   });
 }
 
 function dismissConfirm(confirmed) {
-  document.getElementById('conf-overlay')?.remove();
+  const overlay = document.getElementById('conf-overlay');
+  releaseFocus(overlay);
+  overlay?.remove();
   if (_pendingTrade) { _pendingTrade(confirmed); _pendingTrade = null; }
 }
+
+// Enter and Space activate anything carrying role="button" that is not a real
+// <button>. Delegated, so it covers the 285 market rows without binding 285
+// listeners, and survives every re-render of the list.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+  const el = e.target.closest?.('[role="button"][tabindex="0"]');
+  if (!el || el.tagName === 'BUTTON') return;
+  e.preventDefault();
+  el.click();
+});
 
 // A real-money entry cutoff printed as "Aug 3, 8:00 PM" with no timezone
 // costs someone two zones away their entry and their assumption at once.
@@ -15382,7 +15410,12 @@ function requireComplianceGate() {
     document.getElementById('cg-state-warning').style.display = 'none';
     document.getElementById('cg-verify-btn').style.display = 'none';
     document.getElementById('cg-submit').disabled = true;
-    document.getElementById('compliance-modal').classList.add('open');
+    const modal = document.getElementById('compliance-modal');
+    modal.classList.add('open');
+    // This modal decides whether a real charge happens, and it previously had
+    // no dialog role, no focus trap and no Escape - focus stayed on the page
+    // behind it, which is still tabbable.
+    trapFocus(modal, () => closeComplianceGate());
 
     if (db && currentUser && window._fbOnSnapshot && window._fbDoc) {
       _complianceIdentityUnsub = window._fbOnSnapshot(window._fbDoc(db, 'users', currentUser.uid), (snap) => {
@@ -15403,6 +15436,7 @@ function requireComplianceGate() {
 }
 
 function closeComplianceGate() {
+  releaseFocus(document.getElementById('compliance-modal'));
   document.getElementById('compliance-modal').classList.remove('open');
   if (_complianceIdentityUnsub) { _complianceIdentityUnsub(); _complianceIdentityUnsub = null; }
   stopIdentityStatusPolling();
@@ -15418,7 +15452,8 @@ async function submitComplianceGate() {
     await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), { compliance }, { merge: true });
     userProfile = userProfile || {};
     userProfile.compliance = { ...(userProfile.compliance || {}), ...compliance };
-    document.getElementById('compliance-modal').classList.remove('open');
+    releaseFocus(document.getElementById('compliance-modal'));
+  document.getElementById('compliance-modal').classList.remove('open');
     if (_complianceIdentityUnsub) { _complianceIdentityUnsub(); _complianceIdentityUnsub = null; }
     stopIdentityStatusPolling();
     if (_complianceGateResolve) { _complianceGateResolve(true); _complianceGateResolve = null; }
@@ -16413,7 +16448,7 @@ window.addEventListener('appinstalled', () => {
         <div class="ob-dot" id="ob-dot-2"></div>
       </div>
       <div style="display:flex;align-items:center;gap:12px;">
-        <span class="ob-skip" id="ob-skip" onclick="closeOnboarding()">Browse as guest</span>
+        <button type="button" class="ob-skip" id="ob-skip" onclick="closeOnboarding()">Browse as guest</button>
         <button class="ob-btn secondary" id="ob-back" onclick="obBack()" style="display:none;">Back</button>
         <button class="ob-btn primary" id="ob-next" onclick="obNext()">Next →</button>
       </div>
