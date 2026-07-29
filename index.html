@@ -476,8 +476,44 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .share-act-btn.primary{background:var(--green);color:#000;}
 .share-act-btn.secondary{background:var(--card);color:var(--fg);border:1px solid var(--hairline);}
 
+/* ── Money path ──────────────────────────────────────────────────────────
+   Deliberately not the terminal's rules. Everywhere else in this app the
+   job is scanning 285 rows, so 10-13px and tight spacing are correct. Here
+   the job is deciding to spend money once, and the surface inherited that
+   density anyway: the entry fee rendered at 9px in the same treatment as a
+   participant count, and the button that took the charge was 11px.
+
+   Rules for this surface only: the amount is the largest thing on it, one
+   decision per screen, nothing below --fs-body, and space instead of rules
+   to separate. ─────────────────────────────────────────────────────────── */
+.money-label{font-family:var(--font-mono);font-size:var(--fs-micro);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+.money-amount{font-family:var(--font-display);font-size:var(--fs-hero);line-height:1;letter-spacing:-2px;font-variant-numeric:tabular-nums;color:var(--green);}
+.money-amount.debit{color:var(--fg);}
+.money-sub{font-family:var(--font-body);font-size:var(--fs-lg);letter-spacing:-0.2px;margin-top:6px;}
+
+.money-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2400;display:flex;align-items:center;justify-content:center;padding:20px;}
+.money-box{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:30px 28px 24px;width:400px;max-width:100%;}
+.money-head{margin-bottom:22px;}
+.money-rows{display:flex;flex-direction:column;gap:12px;padding:18px 0;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline);}
+.money-row{display:flex;justify-content:space-between;align-items:baseline;gap:16px;font-family:var(--font-mono);font-size:var(--fs-body);}
+.money-row dt{color:var(--muted);}
+.money-row dd{margin:0;color:var(--text);font-weight:700;text-align:right;font-variant-numeric:tabular-nums;}
+.money-note{font-family:var(--font-body);font-size:var(--fs-body);color:var(--muted);line-height:1.6;margin:18px 0 22px;}
+.money-btns{display:flex;gap:12px;}
+.money-btns button{flex:1;min-height:46px;padding:12px 16px;border-radius:8px;border:none;font-family:var(--font-mono);font-size:var(--fs-body);font-weight:700;cursor:pointer;transition:opacity .15s;}
+.money-btns button:hover{opacity:.88;}
+.money-cancel{background:transparent;color:var(--muted);border:1px solid var(--border2) !important;}
+.money-pay{background:var(--green);color:#03130a;}
+.money-pay[disabled]{opacity:.6;cursor:default;}
+
 /* ── Weekly Challenge ── */
 .wc-banner{background:linear-gradient(135deg,#0a1a0a,#0d2a0d);border:1px solid var(--green);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+/* The paid variant leads with the number that costs money. */
+.wc-stake{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin:16px 0 4px;}
+.wc-stake-fee .money-amount{font-size:var(--fs-xl);letter-spacing:-1px;}
+.wc-stake-pool{text-align:right;font-family:var(--font-mono);font-size:var(--fs-body);color:var(--muted);}
+.wc-stake-pool b{display:block;color:var(--text);font-size:var(--fs-med);font-variant-numeric:tabular-nums;}
+.wc-terms{font-family:var(--font-mono);font-size:var(--fs-micro);color:var(--muted);line-height:1.7;margin-top:10px;}
 .wc-banner-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
 .wc-title{font-family:var(--font-display);font-size:22px;letter-spacing:1px;color:var(--green);}
 .wc-badge{font-family:var(--font-mono);font-size:9px;padding:3px 8px;border-radius:4px;font-weight:700;}
@@ -488,7 +524,9 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .wc-meta{display:flex;gap:16px;flex-wrap:wrap;}
 .wc-meta-item{font-family:var(--font-mono);font-size:9px;color:var(--muted);}
 .wc-meta-item span{color:var(--text);font-weight:700;}
-.wc-join-btn{margin-top:14px;padding:9px 22px;background:var(--green);color:#000;font-family:var(--font-mono);font-size:11px;font-weight:700;border:none;border-radius:6px;cursor:pointer;letter-spacing:.5px;}
+/* Was 11px with 9px padding - smaller than the body text on a control that
+   takes a real payment, and under the 44px touch minimum. */
+.wc-join-btn{margin-top:16px;min-height:46px;padding:12px 26px;background:var(--green);color:#000;font-family:var(--font-mono);font-size:var(--fs-body);font-weight:700;border:none;border-radius:8px;cursor:pointer;letter-spacing:.5px;}
 .wc-join-btn:disabled{background:var(--border2);color:var(--muted);cursor:default;}
 .wc-join-btn.joined{background:#1a3a1a;color:var(--green);border:1px solid var(--green);}
 .wc-results-wrap{margin-top:20px;}
@@ -12923,6 +12961,99 @@ function dismissConfirm(confirmed) {
   if (_pendingTrade) { _pendingTrade(confirmed); _pendingTrade = null; }
 }
 
+// A real-money entry cutoff printed as "Aug 3, 8:00 PM" with no timezone
+// costs someone two zones away their entry and their assumption at once.
+// toLocaleString renders in the reader's own zone; timeZoneName says which.
+function fmtStamp(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+  });
+}
+
+// ═══════════════════════════════════════════
+//  FOCUS TRAP
+// ═══════════════════════════════════════════
+// Every overlay in this app was previously escapable only by mouse: no
+// Escape handler existed anywhere, and focus stayed on the page behind the
+// overlay, which is still tabbable. Shared so each modal traps the same way.
+const _focusTraps = new Map();
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+function trapFocus(el, onEscape) {
+  if (!el || _focusTraps.has(el)) return;
+  const prev = document.activeElement;
+  const handler = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); onEscape?.(); return; }
+    if (e.key !== 'Tab') return;
+    const items = [...el.querySelectorAll(FOCUSABLE)].filter(n => n.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
+  document.addEventListener('keydown', handler, true);
+  _focusTraps.set(el, { handler, prev });
+}
+
+function releaseFocus(el) {
+  const t = el && _focusTraps.get(el);
+  if (!t) return;
+  document.removeEventListener('keydown', t.handler, true);
+  _focusTraps.delete(el);
+  if (t.prev && document.contains(t.prev)) { try { t.prev.focus(); } catch {} }
+}
+
+// ═══════════════════════════════════════════
+//  CHARGE CONFIRMATION (real money)
+// ═══════════════════════════════════════════
+// A paper trade got showTradeConfirm() with shares, cost and cash-after.
+// Paying a real entry fee got showToast('Redirecting to checkout…') and an
+// immediate window.location.href to Stripe - no amount, no deadline, no
+// refund policy, no way back. This is the missing half of that pair.
+let _pendingCharge = null;
+
+function showChargeConfirm({ amount, challengeName, deadline, poolNet, splitLabel, feePct }) {
+  return new Promise(resolve => {
+    _pendingCharge = resolve;
+    const money = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const rows = [
+      ['Entry closes', deadline],
+      poolNet != null ? ['Prize pool', money(poolNet)] : null,
+      splitLabel ? ['Top 3 split', splitLabel] : null,
+      feePct != null ? ['Platform fee', feePct + '%'] : null,
+    ].filter(Boolean);
+
+    const html = `
+      <div class="money-overlay" id="charge-overlay" role="dialog" aria-modal="true" aria-labelledby="charge-amount">
+        <div class="money-box">
+          <div class="money-head">
+            <div class="money-label">You are paying</div>
+            <div class="money-amount debit" id="charge-amount">${money(amount)}</div>
+            <div class="money-sub">${challengeName}</div>
+          </div>
+          <dl class="money-rows">
+            ${rows.map(([k, v]) => `<div class="money-row"><dt>${k}</dt><dd>${v}</dd></div>`).join('')}
+          </dl>
+          <p class="money-note">Payment is handled by Stripe on their own page. Entry fees are non-refundable once paid.</p>
+          <div class="money-btns">
+            <button class="money-cancel" onclick="dismissCharge(false)">Cancel</button>
+            <button class="money-pay" id="charge-pay" onclick="dismissCharge(true)">Pay ${money(amount)}</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    trapFocus(document.getElementById('charge-overlay'), () => dismissCharge(false));
+    document.getElementById('charge-pay')?.focus();
+  });
+}
+
+function dismissCharge(confirmed) {
+  releaseFocus(document.getElementById('charge-overlay'));
+  document.getElementById('charge-overlay')?.remove();
+  if (_pendingCharge) { _pendingCharge(confirmed); _pendingCharge = null; }
+}
+
 function showToast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
@@ -15294,9 +15425,23 @@ async function joinChallenge(challengeId) {
 
     const entryFee = Number(data.entryFee) || 0;
     if (entryFee > 0) {
+      // Confirm the charge BEFORE the compliance gate. The gate asks for ID,
+      // location and terms; there is no reason to collect any of that from
+      // someone who has not yet agreed to the amount.
+      const entrants = Object.keys(data.participants || {}).length;
+      const confirmed = await showChargeConfirm({
+        amount: entryFee,
+        challengeName: data.name || 'this challenge',
+        deadline: fmtStamp(data.joinDeadline),
+        poolNet: Math.round((entrants + 1) * entryFee * 0.9 * 100) / 100,
+        splitLabel: '50 / 30 / 20',
+        feePct: 10,
+      });
+      if (!confirmed) return;
+
       const passed = await requireComplianceGate();
       if (!passed) return;
-      showToast('Redirecting to checkout…');
+      showToast('Opening secure checkout…');
       const { url } = await paymentsWorkerFetch(`/challenges/${challengeId}/checkout`, { method: 'POST' });
       window.location.href = url;
       return; // participants.{uid} gets written by worker-payments after Stripe confirms payment
@@ -15351,9 +15496,12 @@ async function renderChallengeTab() {
     const isParticipant = currentUser && participantUids.includes(currentUser.uid);
 
     const status = ended ? 'ended' : joinDeadlinePassed ? 'live' : 'upcoming';
-    const statusLabel = ended ? 'ENDED' : joinDeadlinePassed ? 'LIVE' : 'JOIN NOW';
+    // "LIVE" used to mark the state you can no longer enter, while "JOIN NOW"
+    // marked the one you can - the most inviting word in the set sat on the
+    // closed door.
+    const statusLabel = ended ? 'FINAL' : joinDeadlinePassed ? 'IN PLAY — ENTRY CLOSED' : 'OPEN FOR ENTRY';
 
-    const fmtDate = ts => new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    const fmtDate = fmtStamp;
 
     const entryFee = Number(challenge.entryFee) || 0;
     const potDollars = participantUids.length * entryFee;
@@ -15367,13 +15515,23 @@ async function renderChallengeTab() {
           <div class="wc-badge ${status}">${statusLabel}</div>
         </div>
         ${challenge.desc ? `<div class="wc-desc">${challenge.desc}</div>` : ''}
+        ${entryFee > 0 ? `
+        <div class="wc-stake">
+          <div class="wc-stake-fee">
+            <div class="money-label">Entry</div>
+            <div class="money-amount">$${entryFee}</div>
+          </div>
+          <div class="wc-stake-pool">
+            Prize pool
+            <b>$${netPotDollars.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b>
+          </div>
+        </div>` : ''}
         <div class="wc-meta">
-          <div class="wc-meta-item">Join by: <span>${fmtDate(challenge.joinDeadline)}</span></div>
+          <div class="wc-meta-item">Entry closes: <span>${fmtDate(challenge.joinDeadline)}</span></div>
           <div class="wc-meta-item">Ends: <span>${fmtDate(challenge.endDate)}</span></div>
-          <div class="wc-meta-item">Participants: <span>${participantUids.length}</span></div>
-          ${entryFee > 0 ? `<div class="wc-meta-item">Entry: <span>$${entryFee}</span></div>` : ''}
+          <div class="wc-meta-item">Entrants: <span>${participantUids.length}</span></div>
         </div>
-        ${entryFee > 0 ? `<div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-top:6px;line-height:1.6;">Pool: $${potDollars.toLocaleString()} · Platform fee 10% · Payout pool: $${netPotDollars.toLocaleString()}<br>Split 50/30/20 across the top 3 finishers.</div>` : ''}`;
+        ${entryFee > 0 ? `<div class="wc-terms">${participantUids.length} × $${entryFee} = $${potDollars.toLocaleString()} collected, less a 10% platform fee. Top 3 split 50 / 30 / 20. Entry fees are non-refundable once paid.</div>` : ''}`;
 
     if (!ended && !joinDeadlinePassed) {
       if (!currentUser) {
