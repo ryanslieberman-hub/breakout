@@ -75,6 +75,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 /* The wordmark is the document's only h1; the page had no headings at all,
    so there was no structure to skim by. Inherits the .logo look exactly. */
 .wordmark{font:inherit;letter-spacing:inherit;color:inherit;margin:0;display:inline;}
+.nav-tabs{display:flex;align-items:center;min-width:0;}
+/* Mobile-only: above 768px the list and the detail are both on screen, so
+   there is nothing to go back to. The mobile block re-shows it. */
+.mobile-back{display:none;}
 .nav-tab{height:48px;padding:0 18px;display:flex;align-items:center;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;}
 .tab-label-mobile{display:none;}
 .tab-label-full{display:inline;}
@@ -1134,22 +1138,61 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
      whatever the price ends up costing in width. */
   .hinfo{min-width:96px;}
   .hprice{letter-spacing:-1px;}
-  /* Name and price stop competing for one 245px line: the price takes its
-     own row underneath. Measured both ways - this also cuts the hero's
-     overflow inside its 160px max-height from 298px to 231px. */
-  .hero{flex-wrap:wrap;}
+  /* Name and price stop competing for one line: the price takes its own row
+     underneath, which at full width reads as the hero number it is. The
+     160px cap existed to protect the chart back when the hero shared a
+     245px column; at full width the content fits in 176px, so the cap was
+     just introducing a scrollbar inside the hero. */
+  .hero{flex-wrap:wrap; max-height:none;}
   .hright{width:100%; text-align:left;}
 
-  /* The list row had the same failure from a different direction, and the
-     type scale was not the cause - it only made it visible. .prow is 129px
-     wide with 14px side padding, leaving 101px, while the avatar (30) +
-     price (59) + star (17) + three 8px gaps need 130px. .pinfo is the only
-     child that can shrink, so it absorbed the whole 29px deficit and the
-     name rendered at 0px wide. Giving it a floor forces the price onto a
-     second line, which is what a 130px rail wants anyway. */
-  .prow{flex-wrap:wrap; padding:7px 8px; column-gap:6px; row-gap:3px;}
-  .pinfo{flex:1 1 75px; min-width:75px;}
-  .pright{margin-right:auto; text-align:left;}
+  /* ── One column, not three ────────────────────────────────────────────
+     Below 768px this was still the desktop three-pane layout, only smaller:
+     a 130px player rail beside a 245px column holding the hero, the chart
+     and the trade bar. Six players fit per screen across 285 of them, and
+     every control in the centre column fought for a third of the width.
+
+     A phone gets one thing at a time. The list is the view; picking a player
+     pushes the detail over it, and .mobile-back returns. Nothing here runs
+     above 768px, where seeing both at once is the point. */
+  .market-layout{flex-direction:column;}
+  .lsidebar{width:100% !important; border-right:none; border-bottom:1px solid var(--border); flex:1; min-height:0;}
+  .center{display:none; width:100%; flex:1; min-height:0;}
+  .market-layout.show-detail .lsidebar{display:none;}
+  .market-layout.show-detail .center{display:flex;}
+
+  /* Nav was 106px - 13% of the viewport - because six tabs plus a 146px
+     wordmark wrapped onto a second row, above the stats row. The tabs now
+     scroll sideways instead of wrapping, so the height is fixed no matter
+     how many tabs a signed-in user has. The wordmark goes visually hidden
+     rather than display:none, so it stays the document's h1. */
+  .wordmark{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
+  .nav-tabs{flex:1; overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; -webkit-overflow-scrolling:touch;}
+  .nav-tabs::-webkit-scrollbar{display:none;}
+  .nav-tab{flex-shrink:0;}
+
+  .mobile-back{display:flex; align-items:center; gap:6px; width:100%; min-height:44px;
+    padding:10px 14px; background:var(--surface); border:none; border-bottom:1px solid var(--border);
+    color:var(--muted); font-family:var(--font-mono); font-size:var(--fs-body); cursor:pointer; flex-shrink:0;}
+
+  /* The rail was 130px wide, so the row had to stack. At full width it
+     doesn't - put the name and the price back on one line. */
+  .prow{flex-wrap:nowrap; padding:10px 14px; column-gap:10px;}
+  .pinfo{flex:1 1 auto; min-width:0;}
+  .pright{margin-right:0; text-align:right;}
+  .pos-filters{display:flex;}   /* room for these again */
+
+  /* Touch targets. These were 13-34px against a 44px minimum, and the worst
+     of them - the watchlist star - appears 285 times. The icons keep their
+     size; only the hit area grows, via padding rather than dimensions. */
+  .star-btn{min-width:44px; min-height:44px; padding:12px; margin:-6px;}
+  .nav-tab{height:44px;}
+  .auth-btn{min-height:44px; padding:0 12px;}
+  .search-bar{min-height:44px;}
+  .drawer-close{min-width:44px; min-height:44px;}
+  .sinp{min-height:40px;}
+  .xbtn{min-height:48px;}
+
 }
 </style>
 </head>
@@ -1183,12 +1226,14 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 <!-- NAV -->
 <nav>
   <div class="logo" style="display:flex;align-items:center;gap:8px;"><h1 class="wordmark">Breakout</h1><button id="league-btn" onclick="openLeagueDrawer()" style="display:inline-flex;align-items:center;gap:4px;"><span id="league-label">NBA</span><span style="display:inline-flex;color:var(--muted)"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></button></div>
+  <div class="nav-tabs" role="tablist" aria-label="Views">
   <button type="button" class="nav-tab active" onclick="showView(&#39;market&#39;,this)"><span class="tab-label-full">Market</span><span class="tab-label-mobile">Market</span></button>
   <button type="button" class="nav-tab" id="nav-portfolio-tab" onclick="showView(&#39;portfolio&#39;,this)" style="display:none"><span class="tab-label-full">Portfolio</span><span class="tab-label-mobile">Portfolio</span></button>
   <button type="button" class="nav-tab" onclick="showView(&#39;leaderboard&#39;,this)"><span class="tab-label-full">Leaderboard</span><span class="tab-label-mobile">Leaders</span></button>
   <button type="button" class="nav-tab" id="nav-schedule-tab" onclick="showView(&#39;schedule&#39;,this)"><span class="tab-label-full">Schedule</span><span class="tab-label-mobile">Schedule</span></button>
   <button type="button" class="nav-tab" onclick="showView(&#39;feed&#39;,this)" id="nav-feed-tab"><span class="tab-label-full">Activity</span><span class="tab-label-mobile">Feed</span><span class="feed-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: 4px; vertical-align: middle;"></span></button>
   <button type="button" class="nav-tab" onclick="showView(&#39;trending&#39;,this)" style="color:var(--red);border-bottom:2px solid transparent;" id="nav-trending-tab"><span class="tab-label-full">High Volume</span><span class="tab-label-mobile">Movers</span></button>
+  </div>
   <div class="nav-right">
     <div class="nav-stat">Cash: <span id="nav-cash">$100,000.00</span></div>
     <div class="nav-stat" id="last-updated" style="display: inline;">Updated: <span id="update-time">—</span></div>
@@ -1209,52 +1254,52 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 <div class="movers-bar">
   <div class="movers-label" id="movers-header">Today</div>
   <div class="movers-scroll" id="movers-scroll">
-    <div class="mover-item" onclick="selectPlayer(85)" style="cursor:pointer">
+    <div class="mover-item" onclick="selectPlayerFromList(85)" style="cursor:pointer">
       <span class="mover-name">Miller</span>
       <span class="mover-price">$2.20</span>
       <span class="mover-pct up">+10.6%</span>
     </div>
-    <div class="mover-item" onclick="selectPlayer(89)" style="cursor:pointer">
+    <div class="mover-item" onclick="selectPlayerFromList(89)" style="cursor:pointer">
       <span class="mover-name">Walker</span>
       <span class="mover-price">$2.35</span>
       <span class="mover-pct up">+7.4%</span>
     </div>
-    <div class="mover-item" onclick="selectPlayer(35)" style="cursor:pointer">
+    <div class="mover-item" onclick="selectPlayerFromList(35)" style="cursor:pointer">
       <span class="mover-name">Ingram</span>
       <span class="mover-price">$28.91</span>
       <span class="mover-pct up">+6.3%</span>
     </div>
-    <div class="mover-item" onclick="selectPlayer(199)" style="cursor:pointer">
+    <div class="mover-item" onclick="selectPlayerFromList(199)" style="cursor:pointer">
       <span class="mover-name">Sexton</span>
       <span class="mover-price">$3.46</span>
       <span class="mover-pct up">+5.5%</span>
     </div>
-    <div class="mover-item" onclick="selectPlayer(113)" style="cursor:pointer">
+    <div class="mover-item" onclick="selectPlayerFromList(113)" style="cursor:pointer">
       <span class="mover-name">Eason</span>
       <span class="mover-price">$6.25</span>
       <span class="mover-pct up">+5.4%</span>
     </div>
-    <div class="mover-item" onclick="selectPlayer(7)" style="cursor:pointer">
+    <div class="mover-item" onclick="selectPlayerFromList(7)" style="cursor:pointer">
       <span class="mover-name">James</span>
       <span class="mover-price">$412.86</span>
       <span class="mover-pct up">+5.1%</span>
     </div>
-    <div class="mover-item" onclick="selectPlayer(21)" style="cursor:pointer">
+    <div class="mover-item" onclick="selectPlayerFromList(21)" style="cursor:pointer">
       <span class="mover-name">Adebayo</span>
       <span class="mover-price">$124.96</span>
       <span class="mover-pct up">+4.9%</span>
     </div>
-    <div class="mover-item" onclick="selectPlayer(211)" style="cursor:pointer">
+    <div class="mover-item" onclick="selectPlayerFromList(211)" style="cursor:pointer">
       <span class="mover-name">Hachimura</span>
       <span class="mover-price">$5.65</span>
       <span class="mover-pct up">+4.9%</span>
     </div>
-    <div class="mover-item" onclick="selectPlayer(246)" style="cursor:pointer">
+    <div class="mover-item" onclick="selectPlayerFromList(246)" style="cursor:pointer">
       <span class="mover-name">Huff</span>
       <span class="mover-price">$2.89</span>
       <span class="mover-pct up">+4.9%</span>
     </div>
-    <div class="mover-item" onclick="selectPlayer(194)" style="cursor:pointer">
+    <div class="mover-item" onclick="selectPlayerFromList(194)" style="cursor:pointer">
       <span class="mover-name">Edgecombe</span>
       <span class="mover-price">$8.85</span>
       <span class="mover-pct up">+4.3%</span>
@@ -1290,7 +1335,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
           <div class="tf" id="pf-5" onclick="setPos(getPosLabels()[4],this)">C</div>
         </div>
       </div>
-      <div class="plist" id="plist"><div class="prow" onclick="selectPlayer(2)">
+      <div class="plist" id="plist"><div class="prow" onclick="selectPlayerFromList(2)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">NJ</div>
@@ -1305,7 +1350,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(2,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(6)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(6)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">LD</div>
@@ -1320,7 +1365,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(6,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(1)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(1)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">SG</div>
@@ -1335,7 +1380,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(1,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(3)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(3)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">GA</div>
@@ -1350,7 +1395,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(3,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(5)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(5)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">AE</div>
@@ -1365,7 +1410,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(5,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(8)">
+    </div><div class="prow" onclick="selectPlayerFromList(8)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">JT</div>
@@ -1380,7 +1425,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.7%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(8,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(9)">
+    </div><div class="prow" onclick="selectPlayerFromList(9)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">SC</div>
@@ -1395,7 +1440,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(9,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(10)">
+    </div><div class="prow" onclick="selectPlayerFromList(10)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">KD</div>
@@ -1410,7 +1455,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.9%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(10,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(4)">
+    </div><div class="prow" onclick="selectPlayerFromList(4)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">VW</div>
@@ -1425,7 +1470,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(4,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(7)">
+    </div><div class="prow" onclick="selectPlayerFromList(7)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">LJ</div>
@@ -1440,7 +1485,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+5.1%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(7,this)" title="Watchlist">☆</button>
-    </div><div class="prow active" onclick="selectPlayer(23)">
+    </div><div class="prow active" onclick="selectPlayerFromList(23)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">JB</div>
@@ -1455,7 +1500,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(23,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(13)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(13)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">DM</div>
@@ -1470,7 +1515,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(13,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(11)">
+    </div><div class="prow" onclick="selectPlayerFromList(11)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">CC</div>
@@ -1485,7 +1530,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(11,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(170)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(170)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JJ</div>
@@ -1500,7 +1545,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(170,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(15)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(15)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JE</div>
@@ -1515,7 +1560,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(15,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(20)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(20)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">DS</div>
@@ -1530,7 +1575,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(20,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(18)">
+    </div><div class="prow" onclick="selectPlayerFromList(18)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">JB</div>
@@ -1545,7 +1590,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-0.4%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(18,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(14)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(14)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">DB</div>
@@ -1560,7 +1605,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(14,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(21)">
+    </div><div class="prow" onclick="selectPlayerFromList(21)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">BA</div>
@@ -1575,7 +1620,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+4.9%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(21,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(16)">
+    </div><div class="prow" onclick="selectPlayerFromList(16)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">KT</div>
@@ -1590,7 +1635,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.7%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(16,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(24)">
+    </div><div class="prow" onclick="selectPlayerFromList(24)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">DG</div>
@@ -1605,7 +1650,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(24,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(17)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(17)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JM</div>
@@ -1620,7 +1665,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(17,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(22)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(22)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">TH</div>
@@ -1635,7 +1680,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(22,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(19)">
+    </div><div class="prow" onclick="selectPlayerFromList(19)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">CF</div>
@@ -1650,7 +1695,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(19,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(25)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(25)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">ZW</div>
@@ -1665,7 +1710,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(25,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(12)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(12)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">TY</div>
@@ -1680,7 +1725,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(12,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(108)">
+    </div><div class="prow" onclick="selectPlayerFromList(108)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">TM</div>
@@ -1695,7 +1740,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-2.1%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(108,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(201)">
+    </div><div class="prow" onclick="selectPlayerFromList(201)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">KL</div>
@@ -1710,7 +1755,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(201,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(45)">
+    </div><div class="prow" onclick="selectPlayerFromList(45)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">JH</div>
@@ -1725,7 +1770,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(45,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(37)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(37)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JM</div>
@@ -1740,7 +1785,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(37,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(68)">
+    </div><div class="prow" onclick="selectPlayerFromList(68)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">DA</div>
@@ -1755,7 +1800,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(68,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(48)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(48)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">LM</div>
@@ -1770,7 +1815,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(48,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(26)">
+    </div><div class="prow" onclick="selectPlayerFromList(26)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">PB</div>
@@ -1785,7 +1830,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(26,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(50)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(50)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">KI</div>
@@ -1800,7 +1845,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(50,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(203)">
+    </div><div class="prow" onclick="selectPlayerFromList(203)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">MP</div>
@@ -1815,7 +1860,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(203,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(41)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(41)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">PS</div>
@@ -1830,7 +1875,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(41,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(44)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(44)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">AR</div>
@@ -1845,7 +1890,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(44,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(72)">
+    </div><div class="prow" onclick="selectPlayerFromList(72)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">KG</div>
@@ -1860,7 +1905,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(72,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(35)">
+    </div><div class="prow" onclick="selectPlayerFromList(35)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">BI</div>
@@ -1875,7 +1920,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+6.3%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(35,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(47)">
+    </div><div class="prow" onclick="selectPlayerFromList(47)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">JR</div>
@@ -1890,7 +1935,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(47,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(27)">
+    </div><div class="prow" onclick="selectPlayerFromList(27)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">AS</div>
@@ -1905,7 +1950,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-2.9%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(27,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(69)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(69)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JG</div>
@@ -1920,7 +1965,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(69,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(102)">
+    </div><div class="prow" onclick="selectPlayerFromList(102)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">TM</div>
@@ -1935,7 +1980,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(102,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(36)">
+    </div><div class="prow" onclick="selectPlayerFromList(36)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">LB</div>
@@ -1950,7 +1995,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(36,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(39)">
+    </div><div class="prow" onclick="selectPlayerFromList(39)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">DF</div>
@@ -1965,7 +2010,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(39,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(28)">
+    </div><div class="prow" onclick="selectPlayerFromList(28)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">FW</div>
@@ -1980,7 +2025,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(28,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(42)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(42)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JB</div>
@@ -1995,7 +2040,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(42,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(204)">
+    </div><div class="prow" onclick="selectPlayerFromList(204)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">AG</div>
@@ -2010,7 +2055,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(204,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(73)">
+    </div><div class="prow" onclick="selectPlayerFromList(73)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">AT</div>
@@ -2025,7 +2070,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.8%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(73,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(29)">
+    </div><div class="prow" onclick="selectPlayerFromList(29)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">SB</div>
@@ -2040,7 +2085,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-2.6%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(29,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(30)">
+    </div><div class="prow" onclick="selectPlayerFromList(30)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">EM</div>
@@ -2055,7 +2100,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(30,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(202)">
+    </div><div class="prow" onclick="selectPlayerFromList(202)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">NP</div>
@@ -2070,7 +2115,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-2.9%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(202,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(231)">
+    </div><div class="prow" onclick="selectPlayerFromList(231)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">KK</div>
@@ -2085,7 +2130,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(231,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(51)">
+    </div><div class="prow" onclick="selectPlayerFromList(51)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">SC</div>
@@ -2100,7 +2145,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(51,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(32)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(32)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JJ</div>
@@ -2115,7 +2160,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(32,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(53)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(53)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JW</div>
@@ -2130,7 +2175,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(53,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(31)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(31)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">CH</div>
@@ -2145,7 +2190,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(31,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(33)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(33)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">DD</div>
@@ -2160,7 +2205,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(33,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(43)">
+    </div><div class="prow" onclick="selectPlayerFromList(43)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">DW</div>
@@ -2175,7 +2220,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-3.1%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(43,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(206)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(206)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">FV</div>
@@ -2190,7 +2235,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(206,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(34)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(34)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">ZL</div>
@@ -2205,7 +2250,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(34,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(46)">
+    </div><div class="prow" onclick="selectPlayerFromList(46)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">KP</div>
@@ -2220,7 +2265,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(46,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(49)">
+    </div><div class="prow" onclick="selectPlayerFromList(49)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">PG</div>
@@ -2235,7 +2280,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-3.7%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(49,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(38)">
+    </div><div class="prow" onclick="selectPlayerFromList(38)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">MB</div>
@@ -2250,7 +2295,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-1.7%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(38,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(205)">
+    </div><div class="prow" onclick="selectPlayerFromList(205)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">JM</div>
@@ -2265,7 +2310,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(205,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(40)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(40)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">RG</div>
@@ -2280,7 +2325,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(40,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(101)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(101)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">AD</div>
@@ -2295,7 +2340,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(101,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(55)">
+    </div><div class="prow" onclick="selectPlayerFromList(55)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">TH</div>
@@ -2310,7 +2355,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-2.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(55,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(64)">
+    </div><div class="prow" onclick="selectPlayerFromList(64)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">DB</div>
@@ -2325,7 +2370,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(64,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(153)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(153)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">SS</div>
@@ -2340,7 +2385,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(153,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(62)">
+    </div><div class="prow" onclick="selectPlayerFromList(62)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">CW</div>
@@ -2355,7 +2400,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(62,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(234)">
+    </div><div class="prow" onclick="selectPlayerFromList(234)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">NA</div>
@@ -2370,7 +2415,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(234,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(110)">
+    </div><div class="prow" onclick="selectPlayerFromList(110)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">RB</div>
@@ -2385,7 +2430,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+3.1%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(110,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(124)">
+    </div><div class="prow" onclick="selectPlayerFromList(124)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">DB</div>
@@ -2400,7 +2445,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(124,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(182)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(182)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">AN</div>
@@ -2415,7 +2460,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(182,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(54)">
+    </div><div class="prow" onclick="selectPlayerFromList(54)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">NV</div>
@@ -2430,7 +2475,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-3.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(54,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(63)">
+    </div><div class="prow" onclick="selectPlayerFromList(63)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">IQ</div>
@@ -2445,7 +2490,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-1.7%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(63,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(121)">
+    </div><div class="prow" onclick="selectPlayerFromList(121)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">PP</div>
@@ -2460,7 +2505,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+1.9%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(121,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(221)">
+    </div><div class="prow" onclick="selectPlayerFromList(221)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">JH</div>
@@ -2475,7 +2520,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(221,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(57)">
+    </div><div class="prow" onclick="selectPlayerFromList(57)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">MB</div>
@@ -2490,7 +2535,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(57,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(236)">
+    </div><div class="prow" onclick="selectPlayerFromList(236)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">RW</div>
@@ -2505,7 +2550,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(236,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(111)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(111)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">BB</div>
@@ -2520,7 +2565,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(111,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(118)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(118)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JN</div>
@@ -2535,7 +2580,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(118,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(194)">
+    </div><div class="prow" onclick="selectPlayerFromList(194)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">VE</div>
@@ -2550,7 +2595,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+4.3%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(194,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(212)">
+    </div><div class="prow" onclick="selectPlayerFromList(212)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">SB</div>
@@ -2565,7 +2610,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(212,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(225)">
+    </div><div class="prow" onclick="selectPlayerFromList(225)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">OO</div>
@@ -2580,7 +2625,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(225,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(128)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(128)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">DR</div>
@@ -2595,7 +2640,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(128,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(67)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(67)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">IZ</div>
@@ -2610,7 +2655,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(67,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(56)">
+    </div><div class="prow" onclick="selectPlayerFromList(56)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">JP</div>
@@ -2625,7 +2670,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(56,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(125)">
+    </div><div class="prow" onclick="selectPlayerFromList(125)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">JI</div>
@@ -2640,7 +2685,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(125,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(115)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(115)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JA</div>
@@ -2655,7 +2700,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(115,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(60)">
+    </div><div class="prow" onclick="selectPlayerFromList(60)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">OA</div>
@@ -2670,7 +2715,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-0.6%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(60,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(75)">
+    </div><div class="prow" onclick="selectPlayerFromList(75)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">JS</div>
@@ -2685,7 +2730,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.5%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(75,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(109)">
+    </div><div class="prow" onclick="selectPlayerFromList(109)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">JH</div>
@@ -2700,7 +2745,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+3.6%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(109,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(215)">
+    </div><div class="prow" onclick="selectPlayerFromList(215)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">KM</div>
@@ -2715,7 +2760,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(215,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(122)">
+    </div><div class="prow" onclick="selectPlayerFromList(122)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">KO</div>
@@ -2730,7 +2775,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+3.3%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(122,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(52)">
+    </div><div class="prow" onclick="selectPlayerFromList(52)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">AB</div>
@@ -2745,7 +2790,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(52,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(209)">
+    </div><div class="prow" onclick="selectPlayerFromList(209)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">AW</div>
@@ -2760,7 +2805,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-3.3%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(209,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(127)">
+    </div><div class="prow" onclick="selectPlayerFromList(127)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">MW</div>
@@ -2775,7 +2820,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(127,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(61)">
+    </div><div class="prow" onclick="selectPlayerFromList(61)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">JS</div>
@@ -2790,7 +2835,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(61,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(208)">
+    </div><div class="prow" onclick="selectPlayerFromList(208)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">KW</div>
@@ -2805,7 +2850,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(208,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(213)">
+    </div><div class="prow" onclick="selectPlayerFromList(213)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">PW</div>
@@ -2820,7 +2865,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(213,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(70)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(70)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">CA</div>
@@ -2835,7 +2880,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(70,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(71)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(71)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">CT</div>
@@ -2850,7 +2895,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(71,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(129)">
+    </div><div class="prow" onclick="selectPlayerFromList(129)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">PW</div>
@@ -2865,7 +2910,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+3.7%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(129,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(224)">
+    </div><div class="prow" onclick="selectPlayerFromList(224)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">CJ</div>
@@ -2880,7 +2925,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(224,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(103)">
+    </div><div class="prow" onclick="selectPlayerFromList(103)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">NR</div>
@@ -2895,7 +2940,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(103,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(237)">
+    </div><div class="prow" onclick="selectPlayerFromList(237)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">AM</div>
@@ -2910,7 +2955,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(237,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(114)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(114)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">TJ</div>
@@ -2925,7 +2970,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(114,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(66)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(66)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">BP</div>
@@ -2940,7 +2985,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(66,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(106)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(106)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">NC</div>
@@ -2955,7 +3000,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(106,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(107)">
+    </div><div class="prow" onclick="selectPlayerFromList(107)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">DV</div>
@@ -2970,7 +3015,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(107,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(117)">
+    </div><div class="prow" onclick="selectPlayerFromList(117)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">MS</div>
@@ -2985,7 +3030,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(117,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(162)">
+    </div><div class="prow" onclick="selectPlayerFromList(162)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">DQ</div>
@@ -3000,7 +3045,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(162,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(217)">
+    </div><div class="prow" onclick="selectPlayerFromList(217)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">BB</div>
@@ -3015,7 +3060,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(217,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(216)">
+    </div><div class="prow" onclick="selectPlayerFromList(216)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">RD</div>
@@ -3030,7 +3075,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-2.8%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(216,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(58)">
+    </div><div class="prow" onclick="selectPlayerFromList(58)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">TH</div>
@@ -3045,7 +3090,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(58,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(210)">
+    </div><div class="prow" onclick="selectPlayerFromList(210)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">DD</div>
@@ -3060,7 +3105,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(210,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(65)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(65)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">WK</div>
@@ -3075,7 +3120,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(65,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(112)">
+    </div><div class="prow" onclick="selectPlayerFromList(112)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">KK</div>
@@ -3090,7 +3135,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(112,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(59)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(59)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">AS</div>
@@ -3105,7 +3150,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(59,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(116)">
+    </div><div class="prow" onclick="selectPlayerFromList(116)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">IH</div>
@@ -3120,7 +3165,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(116,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(126)">
+    </div><div class="prow" onclick="selectPlayerFromList(126)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">JK</div>
@@ -3135,7 +3180,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(126,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(104)">
+    </div><div class="prow" onclick="selectPlayerFromList(104)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">JG</div>
@@ -3150,7 +3195,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(104,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(220)">
+    </div><div class="prow" onclick="selectPlayerFromList(220)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">KJ</div>
@@ -3165,7 +3210,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(220,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(218)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(218)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JI</div>
@@ -3180,7 +3225,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(218,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(207)">
+    </div><div class="prow" onclick="selectPlayerFromList(207)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">NQ</div>
@@ -3195,7 +3240,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+3.6%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(207,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(113)">
+    </div><div class="prow" onclick="selectPlayerFromList(113)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">TE</div>
@@ -3210,7 +3255,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+5.4%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(113,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(232)">
+    </div><div class="prow" onclick="selectPlayerFromList(232)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">DH</div>
@@ -3225,7 +3270,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(232,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(74)">
+    </div><div class="prow" onclick="selectPlayerFromList(74)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">AT</div>
@@ -3240,7 +3285,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(74,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(120)">
+    </div><div class="prow" onclick="selectPlayerFromList(120)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">DG</div>
@@ -3255,7 +3300,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-3.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(120,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(214)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(214)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">KC</div>
@@ -3270,7 +3315,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(214,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(211)">
+    </div><div class="prow" onclick="selectPlayerFromList(211)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">RH</div>
@@ -3285,7 +3330,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+4.9%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(211,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(119)">
+    </div><div class="prow" onclick="selectPlayerFromList(119)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">KT</div>
@@ -3300,7 +3345,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(119,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(219)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(219)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">MS</div>
@@ -3315,7 +3360,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(219,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(185)">
+    </div><div class="prow" onclick="selectPlayerFromList(185)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">JD</div>
@@ -3330,7 +3375,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(185,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(167)">
+    </div><div class="prow" onclick="selectPlayerFromList(167)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">BM</div>
@@ -3345,7 +3390,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(167,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(130)">
+    </div><div class="prow" onclick="selectPlayerFromList(130)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">LD</div>
@@ -3360,7 +3405,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(130,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(163)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(163)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">AS</div>
@@ -3375,7 +3420,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(163,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(152)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(152)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JG</div>
@@ -3390,7 +3435,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(152,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(175)">
+    </div><div class="prow" onclick="selectPlayerFromList(175)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">GA</div>
@@ -3405,7 +3450,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(175,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(79)">
+    </div><div class="prow" onclick="selectPlayerFromList(79)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">JJ</div>
@@ -3420,7 +3465,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-1.2%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(79,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(100)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(100)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">MB</div>
@@ -3435,7 +3480,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(100,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(154)">
+    </div><div class="prow" onclick="selectPlayerFromList(154)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">DC</div>
@@ -3450,7 +3495,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(154,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(123)">
+    </div><div class="prow" onclick="selectPlayerFromList(123)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">GT</div>
@@ -3465,7 +3510,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(123,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(135)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(135)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">SA</div>
@@ -3480,7 +3525,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(135,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(199)">
+    </div><div class="prow" onclick="selectPlayerFromList(199)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">CS</div>
@@ -3495,7 +3540,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+5.5%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(199,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(76)">
+    </div><div class="prow" onclick="selectPlayerFromList(76)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">SH</div>
@@ -3510,7 +3555,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(76,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(169)">
+    </div><div class="prow" onclick="selectPlayerFromList(169)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">DD</div>
@@ -3525,7 +3570,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(169,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(99)">
+    </div><div class="prow" onclick="selectPlayerFromList(99)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">ZR</div>
@@ -3540,7 +3585,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(99,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(131)">
+    </div><div class="prow" onclick="selectPlayerFromList(131)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">MB</div>
@@ -3555,7 +3600,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(131,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(247)">
+    </div><div class="prow" onclick="selectPlayerFromList(247)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">AD</div>
@@ -3570,7 +3615,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(247,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(228)">
+    </div><div class="prow" onclick="selectPlayerFromList(228)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">QG</div>
@@ -3585,7 +3630,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+2.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(228,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(80)">
+    </div><div class="prow" onclick="selectPlayerFromList(80)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">BP</div>
@@ -3600,7 +3645,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-0.1%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(80,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(248)">
+    </div><div class="prow" onclick="selectPlayerFromList(248)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">SD</div>
@@ -3615,7 +3660,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(248,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(200)">
+    </div><div class="prow" onclick="selectPlayerFromList(200)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">DA</div>
@@ -3630,7 +3675,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+3.8%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(200,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(181)">
+    </div><div class="prow" onclick="selectPlayerFromList(181)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">BM</div>
@@ -3645,7 +3690,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(181,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(190)">
+    </div><div class="prow" onclick="selectPlayerFromList(190)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">TJ</div>
@@ -3660,7 +3705,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(190,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(158)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(158)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">IC</div>
@@ -3675,7 +3720,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(158,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(178)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(178)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">ZE</div>
@@ -3690,7 +3735,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(178,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(241)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(241)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JT</div>
@@ -3705,7 +3750,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(241,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(173)">
+    </div><div class="prow" onclick="selectPlayerFromList(173)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">KM</div>
@@ -3720,7 +3765,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(173,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(180)">
+    </div><div class="prow" onclick="selectPlayerFromList(180)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">AN</div>
@@ -3735,7 +3780,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(180,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(155)">
+    </div><div class="prow" onclick="selectPlayerFromList(155)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">TC</div>
@@ -3750,7 +3795,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(155,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(141)">
+    </div><div class="prow" onclick="selectPlayerFromList(141)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">WC</div>
@@ -3765,7 +3810,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(141,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(177)">
+    </div><div class="prow" onclick="selectPlayerFromList(177)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">RS</div>
@@ -3780,7 +3825,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-1.4%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(177,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(166)">
+    </div><div class="prow" onclick="selectPlayerFromList(166)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">NS</div>
@@ -3795,7 +3840,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(166,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(142)">
+    </div><div class="prow" onclick="selectPlayerFromList(142)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">PA</div>
@@ -3810,7 +3855,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(142,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(168)">
+    </div><div class="prow" onclick="selectPlayerFromList(168)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">MW</div>
@@ -3825,7 +3870,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(168,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(171)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(171)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">DH</div>
@@ -3840,7 +3885,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(171,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(179)">
+    </div><div class="prow" onclick="selectPlayerFromList(179)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">GJ</div>
@@ -3855,7 +3900,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(179,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(246)">
+    </div><div class="prow" onclick="selectPlayerFromList(246)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">JH</div>
@@ -3870,7 +3915,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+4.9%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(246,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(186)">
+    </div><div class="prow" onclick="selectPlayerFromList(186)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">TH</div>
@@ -3885,7 +3930,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(186,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(238)">
+    </div><div class="prow" onclick="selectPlayerFromList(238)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">MC</div>
@@ -3900,7 +3945,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(238,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(156)">
+    </div><div class="prow" onclick="selectPlayerFromList(156)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">JW</div>
@@ -3915,7 +3960,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(156,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(183)">
+    </div><div class="prow" onclick="selectPlayerFromList(183)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">MT</div>
@@ -3930,7 +3975,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(183,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(87)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(87)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">NC</div>
@@ -3945,7 +3990,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(87,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(96)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(96)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">KF</div>
@@ -3960,7 +4005,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(96,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(91)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(91)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">CW</div>
@@ -3975,7 +4020,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(91,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(145)">
+    </div><div class="prow" onclick="selectPlayerFromList(145)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">GB</div>
@@ -3990,7 +4035,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(145,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(159)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(159)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">TH</div>
@@ -4005,7 +4050,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(159,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(98)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(98)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JW</div>
@@ -4020,7 +4065,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(98,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(244)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(244)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">TM</div>
@@ -4035,7 +4080,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(244,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(88)">
+    </div><div class="prow" onclick="selectPlayerFromList(88)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">BC</div>
@@ -4050,7 +4095,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(88,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(188)">
+    </div><div class="prow" onclick="selectPlayerFromList(188)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">RH</div>
@@ -4065,7 +4110,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(188,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(165)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(165)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">TM</div>
@@ -4080,7 +4125,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(165,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(250)">
+    </div><div class="prow" onclick="selectPlayerFromList(250)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">BB</div>
@@ -4095,7 +4140,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(250,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(132)">
+    </div><div class="prow" onclick="selectPlayerFromList(132)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">HJ</div>
@@ -4110,7 +4155,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(132,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(138)">
+    </div><div class="prow" onclick="selectPlayerFromList(138)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">RD</div>
@@ -4125,7 +4170,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(138,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(240)">
+    </div><div class="prow" onclick="selectPlayerFromList(240)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">IJ</div>
@@ -4140,7 +4185,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(240,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(230)">
+    </div><div class="prow" onclick="selectPlayerFromList(230)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">AG</div>
@@ -4155,7 +4200,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(230,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(176)">
+    </div><div class="prow" onclick="selectPlayerFromList(176)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">RO</div>
@@ -4170,7 +4215,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(176,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(78)">
+    </div><div class="prow" onclick="selectPlayerFromList(78)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">GD</div>
@@ -4185,7 +4230,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(78,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(226)">
+    </div><div class="prow" onclick="selectPlayerFromList(226)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">JH</div>
@@ -4200,7 +4245,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(226,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(233)">
+    </div><div class="prow" onclick="selectPlayerFromList(233)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">KE</div>
@@ -4215,7 +4260,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(233,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(249)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(249)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">RJ</div>
@@ -4230,7 +4275,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(249,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(81)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(81)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">DL</div>
@@ -4245,7 +4290,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(81,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(164)">
+    </div><div class="prow" onclick="selectPlayerFromList(164)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">CC</div>
@@ -4260,7 +4305,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-1.1%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(164,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(174)">
+    </div><div class="prow" onclick="selectPlayerFromList(174)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">KH</div>
@@ -4275,7 +4320,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(174,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(222)">
+    </div><div class="prow" onclick="selectPlayerFromList(222)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">KA</div>
@@ -4290,7 +4335,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(222,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(147)">
+    </div><div class="prow" onclick="selectPlayerFromList(147)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">TJ</div>
@@ -4305,7 +4350,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(147,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(149)">
+    </div><div class="prow" onclick="selectPlayerFromList(149)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">DT</div>
@@ -4320,7 +4365,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(149,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(227)">
+    </div><div class="prow" onclick="selectPlayerFromList(227)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">AJ</div>
@@ -4335,7 +4380,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(227,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(139)">
+    </div><div class="prow" onclick="selectPlayerFromList(139)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">OI</div>
@@ -4350,7 +4395,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(139,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(184)">
+    </div><div class="prow" onclick="selectPlayerFromList(184)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">NT</div>
@@ -4365,7 +4410,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(184,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(187)">
+    </div><div class="prow" onclick="selectPlayerFromList(187)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">IS</div>
@@ -4380,7 +4425,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(187,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(239)">
+    </div><div class="prow" onclick="selectPlayerFromList(239)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">AN</div>
@@ -4395,7 +4440,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(239,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(245)">
+    </div><div class="prow" onclick="selectPlayerFromList(245)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">LK</div>
@@ -4410,7 +4455,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(245,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(198)">
+    </div><div class="prow" onclick="selectPlayerFromList(198)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">MS</div>
@@ -4425,7 +4470,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(198,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(223)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(223)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">CM</div>
@@ -4440,7 +4485,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(223,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(157)">
+    </div><div class="prow" onclick="selectPlayerFromList(157)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">RR</div>
@@ -4455,7 +4500,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(157,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(161)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(161)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">BS</div>
@@ -4470,7 +4515,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(161,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(89)">
+    </div><div class="prow" onclick="selectPlayerFromList(89)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">JW</div>
@@ -4485,7 +4530,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+7.4%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(89,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(143)">
+    </div><div class="prow" onclick="selectPlayerFromList(143)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">BB</div>
@@ -4500,7 +4545,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(143,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(195)">
+    </div><div class="prow" onclick="selectPlayerFromList(195)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">DF</div>
@@ -4515,7 +4560,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(195,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(229)">
+    </div><div class="prow" onclick="selectPlayerFromList(229)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">OD</div>
@@ -4530,7 +4575,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(229,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(196)">
+    </div><div class="prow" onclick="selectPlayerFromList(196)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">DW</div>
@@ -4545,7 +4590,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(196,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(90)">
+    </div><div class="prow" onclick="selectPlayerFromList(90)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">KM</div>
@@ -4560,7 +4605,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(90,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(150)">
+    </div><div class="prow" onclick="selectPlayerFromList(150)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">JN</div>
@@ -4575,7 +4620,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(150,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(193)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(193)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JL</div>
@@ -4590,7 +4635,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(193,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(140)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(140)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">MM</div>
@@ -4605,7 +4650,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(140,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(144)">
+    </div><div class="prow" onclick="selectPlayerFromList(144)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">OA</div>
@@ -4620,7 +4665,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(144,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(85)">
+    </div><div class="prow" onclick="selectPlayerFromList(85)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">LM</div>
@@ -4635,7 +4680,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+10.6%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(85,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(77)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(77)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">CW</div>
@@ -4650,7 +4695,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(77,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(97)">
+    </div><div class="prow" onclick="selectPlayerFromList(97)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">TD</div>
@@ -4665,7 +4710,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(97,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(160)">
+    </div><div class="prow" onclick="selectPlayerFromList(160)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">CW</div>
@@ -4680,7 +4725,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(160,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(94)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(94)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">BS</div>
@@ -4695,7 +4740,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(94,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(136)">
+    </div><div class="prow" onclick="selectPlayerFromList(136)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">AW</div>
@@ -4710,7 +4755,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(136,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(134)">
+    </div><div class="prow" onclick="selectPlayerFromList(134)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">JL</div>
@@ -4725,7 +4770,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(134,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(83)">
+    </div><div class="prow" onclick="selectPlayerFromList(83)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">JH</div>
@@ -4740,7 +4785,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(83,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(92)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(92)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">JH</div>
@@ -4755,7 +4800,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(92,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(242)">
+    </div><div class="prow" onclick="selectPlayerFromList(242)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">ZW</div>
@@ -4770,7 +4815,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(242,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(146)">
+    </div><div class="prow" onclick="selectPlayerFromList(146)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">NB</div>
@@ -4785,7 +4830,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(146,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(95)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(95)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">TS</div>
@@ -4800,7 +4845,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(95,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(137)">
+    </div><div class="prow" onclick="selectPlayerFromList(137)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">KW</div>
@@ -4815,7 +4860,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(137,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(148)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(148)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">IJ</div>
@@ -4830,7 +4875,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(148,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(151)">
+    </div><div class="prow" onclick="selectPlayerFromList(151)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">MT</div>
@@ -4845,7 +4890,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(151,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(189)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(189)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">QP</div>
@@ -4860,7 +4905,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(189,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(197)">
+    </div><div class="prow" onclick="selectPlayerFromList(197)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">LW</div>
@@ -4875,7 +4920,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(197,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(172)">
+    </div><div class="prow" onclick="selectPlayerFromList(172)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">BH</div>
@@ -4890,7 +4935,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(172,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(84)">
+    </div><div class="prow" onclick="selectPlayerFromList(84)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">DW</div>
@@ -4905,7 +4950,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(84,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(105)">
+    </div><div class="prow" onclick="selectPlayerFromList(105)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">BL</div>
@@ -4920,7 +4965,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(105,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(82)">
+    </div><div class="prow" onclick="selectPlayerFromList(82)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#150a1f;color:#9d6fff">JM</div>
@@ -4935,7 +4980,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(82,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(235)">
+    </div><div class="prow" onclick="selectPlayerFromList(235)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f14;color:#12d47e">JH</div>
@@ -4950,7 +4995,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(235,this)" title="Watchlist">☆</button>
-    </div><div class="prow prow-injured" onclick="selectPlayer(133)">
+    </div><div class="prow prow-injured" onclick="selectPlayerFromList(133)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#555;color:#aaa">AC</div>
@@ -4965,7 +5010,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(133,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(191)">
+    </div><div class="prow" onclick="selectPlayerFromList(191)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1835;color:#3d9bff">GP</div>
@@ -4980,7 +5025,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+3.4%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(191,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(86)">
+    </div><div class="prow" onclick="selectPlayerFromList(86)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f0a0a;color:#f5445f">JH</div>
@@ -4995,7 +5040,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(86,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(243)">
+    </div><div class="prow" onclick="selectPlayerFromList(243)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">KM</div>
@@ -5010,7 +5055,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg up">+0.0%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(243,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(93)">
+    </div><div class="prow" onclick="selectPlayerFromList(93)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#1f1a0a;color:#f2b843">JW</div>
@@ -5025,7 +5070,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="pchg down">-0.6%</div>
       </div>
       <button class="star-btn" onclick="event.stopPropagation();toggleStar(93,this)" title="Watchlist">☆</button>
-    </div><div class="prow" onclick="selectPlayer(192)">
+    </div><div class="prow" onclick="selectPlayerFromList(192)">
       
       <div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <div class="pav" style="background:#0a1f35;color:#4da6ff">DS</div>
@@ -5045,6 +5090,13 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 
     <!-- Center -->
     <div class="center">
+
+      <!-- Back to the list. Mobile only: on desktop both panes are visible at
+           once, so there is nothing to go back to. -->
+      <button type="button" class="mobile-back" id="mobile-back" onclick="closePlayerDetail()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        All players
+      </button>
 
       <!-- Hero -->
       <div class="hero" id="hero-block">
@@ -10524,7 +10576,7 @@ function renderList(){
     // target for the mouse and now a tab stop with a spoken name for everyone
     // else; activateRow() handles Enter and Space.
     const a11yName = `${p.name}${isInj?', out injured':''}, ${p.team}, ${fmt(price)}, ${pct>=0?'up':'down'} ${Math.abs(pct).toFixed(1)} percent`;
-    return`<div class="prow${p.rank===selRank?' active':''}${isInj?' prow-injured':''}" onclick="selectPlayer(${p.rank})" role="button" tabindex="0" aria-label="${a11yName}"${p.rank===selRank?' aria-current="true"':''}>
+    return`<div class="prow${p.rank===selRank?' active':''}${isInj?' prow-injured':''}" onclick="selectPlayerFromList(${p.rank})" role="button" tabindex="0" aria-label="${a11yName}"${p.rank===selRank?' aria-current="true"':''}>
       ${owned?'<div class="owned-dot"></div>':''}
       ${avatarHtml}
       <div class="pinfo">
@@ -11562,7 +11614,7 @@ function updateMovers(){
   if (moversHeader) moversHeader.textContent = label;
 
   const moversHtml = sorted.map(p=>`
-    <div class="mover-item" onclick="selectPlayer(${p.rank})" style="cursor:pointer">
+    <div class="mover-item" onclick="selectPlayerFromList(${p.rank})" style="cursor:pointer">
       <span class="mover-name">${p.name.split(' ').pop()}</span>
       <span class="mover-price">${fmt(liveP[p.rank])}</span>
       <span class="mover-pct ${p.pct>=0?'up':'down'}">${fmtP(p.pct)}</span>
@@ -12079,6 +12131,35 @@ function _setPchartHead(value, baseValue, scrubTs){
 // ═══════════════════════════════════════════
 //  CONTROLS
 // ═══════════════════════════════════════════
+// Below 768px the list and the detail are the same column, so picking a
+// player pushes the detail over the list instead of sitting beside it.
+const MOBILE_Q = '(max-width: 768px)';
+function isMobileLayout(){ return window.matchMedia(MOBILE_Q).matches; }
+
+// selectPlayer() also runs during init and on league switches, which must not
+// push the phone into the detail view before the user has picked anything.
+// This is the user-gesture entry point; selectPlayer() stays programmatic.
+function selectPlayerFromList(rank){
+  selectPlayer(rank);
+  openPlayerDetail();
+}
+
+function openPlayerDetail(){
+  if (!isMobileLayout()) return;
+  document.querySelector('.market-layout')?.classList.add('show-detail');
+  // The chart canvas was display:none while the detail was hidden, so it had
+  // no measurable size to draw into. Redraw now that it does.
+  requestAnimationFrame(() => { drawMain(); initChartHover(); });
+  document.getElementById('mobile-back')?.focus();
+}
+
+function closePlayerDetail(){
+  document.querySelector('.market-layout')?.classList.remove('show-detail');
+  // Send focus back to the row the user came from, not to the top of the list.
+  const row = document.querySelector(`.prow.active`);
+  if (row) { row.scrollIntoView({block:'center'}); row.focus(); }
+}
+
 function selectPlayer(rank){
   selRank=rank;
   _chartHover=null;
@@ -12254,7 +12335,7 @@ function goMarket(rank){
   }
   if (rank) selRank = rank;
   showView('market', document.querySelectorAll('.nav-tab')[0]);
-  if (rank) selectPlayer(rank);
+  if (rank) selectPlayerFromList(rank);
 }
 
 // ═══════════════════════════════════════════
@@ -12560,7 +12641,7 @@ function renderTrending(){
 
 function goToTrendingPlayer(rank){
   showView('market', document.querySelector('.nav-tab'));
-  selectPlayer(rank);
+  selectPlayerFromList(rank);
 }
 
 function buildLeaderboard(){
