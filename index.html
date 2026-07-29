@@ -931,6 +931,107 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 }
 #league-btn:hover { background: #1a3a6a; }
 
+/* ════════════════════════════════════════════════════════════════════════
+   VISUAL PASS - type scale + surface ramp
+   ────────────────────────────────────────────────────────────────────────
+   Measured before writing this: ~95% of rendered text sat between 8px and
+   11px, spread across 22 distinct sizes mostly 1px apart, with only nine
+   elements on the page larger than 18px. Every surface was within ~6%
+   luminance of the next and borders were 4% white.
+
+   Net effect: no hierarchy and no depth. The eye had nowhere to land,
+   which is the actual mechanism behind "it looks generic / doesn't pop" -
+   uniformity reads as machine-made, regardless of taste in colour.
+
+   Fix is a six-step scale with WIDE gaps (10/13/16/22/32/56) - big jumps
+   are what create hierarchy; 1px steps just look inconsistent - plus a
+   surface ramp with real separation between levels.
+
+   Kept as one contiguous appended block, overriding by source order rather
+   than by editing the rules above, so the entire pass can be reverted by
+   deleting from this banner to the end of the stylesheet.
+   ════════════════════════════════════════════════════════════════════════ */
+:root {
+  --fs-micro: 10px;   /* labels + meta. the floor - nothing smaller. */
+  --fs-body:  13px;   /* default reading size */
+  --fs-med:   16px;   /* list prices, emphasis */
+  --fs-lg:    22px;   /* section titles */
+  --fs-xl:    32px;   /* view headers, selected player */
+  --fs-hero:  56px;   /* the price. it's the product - let it be the product. */
+
+  /* Surfaces: was #06070a→#0d0f14→#101318→#171b22, i.e. four near-identical
+     greys. Widened so cards actually read as sitting above the background. */
+  --surface:#0f1218; --card:#161a22; --card2:#1e242e;
+  --border:#232936; --border2:#2f3644;
+  /* Was #ffffff0a (4% white) - effectively invisible, so nothing grouped. */
+  --hairline:#ffffff14;
+}
+
+/* ── Hero: the one thing that should dominate ───────────────────────── */
+.hprice{font-size:var(--fs-hero);letter-spacing:-2px;font-variant-numeric:tabular-nums;}
+.hname{font-size:var(--fs-xl);letter-spacing:-0.5px;}
+.hsub{font-size:var(--fs-micro);}
+.hs-v{font-size:var(--fs-med);font-variant-numeric:tabular-nums;}
+.hs-l{font-size:var(--fs-micro);}
+.hchg{font-size:12px;font-variant-numeric:tabular-nums;}
+
+/* ── Player list: was 11px name / 9px sub / 16px price, all mushed ──── */
+.pname{font-size:var(--fs-body);}
+.psub{font-size:var(--fs-micro);}
+.pprice{font-size:20px;font-variant-numeric:tabular-nums;}
+.pchg{font-size:var(--fs-micro);font-variant-numeric:tabular-nums;}
+
+/* ── Chrome: lifted off the 8-9px floor so labels are readable ──────── */
+.nav-tab{font-size:12px;}
+.nav-stat{font-size:12px;font-variant-numeric:tabular-nums;}
+.nbtn{font-size:var(--fs-micro);}
+.ls-title{font-size:var(--fs-micro);}
+.search-bar{font-size:var(--fs-body);}
+.tf{font-size:var(--fs-micro);}
+.wl-toggle{font-size:var(--fs-micro);}
+.movers-label{font-size:var(--fs-micro);}
+.mover-item{font-size:11px;font-variant-numeric:tabular-nums;}
+.ctab{font-size:11px;}
+.chart-lbl{font-size:var(--fs-micro);}
+.rb{font-size:var(--fs-micro);}
+.rb-pct{font-size:var(--fs-micro);}
+
+/* ── Trade bar: this is where money is committed, so it should read ─── */
+.inp-lbl{font-size:var(--fs-micro);}
+.sinp{font-size:var(--fs-med);font-variant-numeric:tabular-nums;}
+.qc{font-size:var(--fs-micro);}
+.mt{font-size:11px;}
+.pvl{font-size:var(--fs-micro);}
+.pvv{font-size:var(--fs-body);font-variant-numeric:tabular-nums;}
+.pvv.gold{font-size:var(--fs-med);}
+.xbtn{font-size:18px;}
+
+/* ── Confirm dialog + news ──────────────────────────────────────────── */
+.conf-title{font-size:var(--fs-lg);}
+.conf-detail{font-size:var(--fs-body);}
+.conf-btns button{font-size:var(--fs-body);}
+.news-headline{font-size:var(--fs-body);}
+.news-meta{font-size:var(--fs-micro);}
+.news-summary{font-size:11px;}
+.news-sentiment{font-size:var(--fs-micro);}
+
+/* ── Stragglers still under the 10px floor ──────────────────────────────
+   Found by measuring again after the pass above: avatar initials were 8px
+   in a 30px circle, and the last-night stat labels were 6px, which is not
+   a size anyone can actually read. ─────────────────────────────────────── */
+.pav{font-size:var(--fs-micro);}
+.ln-l{font-size:var(--fs-micro);}
+.ln-v{font-variant-numeric:tabular-nums;}
+.inj-badge{font-size:var(--fs-micro);}
+.lo-icon{font-size:var(--fs-micro);}
+.modal-label{font-size:var(--fs-micro);}
+.modal-hint{font-size:var(--fs-micro);}
+.drawer-section-label{font-size:var(--fs-micro);}
+.trend-tab{font-size:11px;}
+.blbl{font-size:var(--fs-micro);}
+.bnum{font-size:var(--fs-micro);}
+.ob-stat-lbl{font-size:var(--fs-micro);}
+.etag{font-size:var(--fs-micro);}
 </style>
 <style wxt-shadow-root-document-styles="ckuc1f3gvqs">@property --tw-animation-delay{syntax:"*";inherits:false;initial-value:0s}@property --tw-animation-direction{syntax:"*";inherits:false;initial-value:normal}@property --tw-animation-duration{syntax:"*";inherits:false}@property --tw-animation-fill-mode{syntax:"*";inherits:false;initial-value:none}@property --tw-animation-iteration-count{syntax:"*";inherits:false;initial-value:1}@property --tw-enter-blur{syntax:"*";inherits:false;initial-value:0}@property --tw-enter-opacity{syntax:"*";inherits:false;initial-value:1}@property --tw-enter-rotate{syntax:"*";inherits:false;initial-value:0}@property --tw-enter-scale{syntax:"*";inherits:false;initial-value:1}@property --tw-enter-translate-x{syntax:"*";inherits:false;initial-value:0}@property --tw-enter-translate-y{syntax:"*";inherits:false;initial-value:0}@property --tw-exit-blur{syntax:"*";inherits:false;initial-value:0}@property --tw-exit-opacity{syntax:"*";inherits:false;initial-value:1}@property --tw-exit-rotate{syntax:"*";inherits:false;initial-value:0}@property --tw-exit-scale{syntax:"*";inherits:false;initial-value:1}@property --tw-exit-translate-x{syntax:"*";inherits:false;initial-value:0}@property --tw-exit-translate-y{syntax:"*";inherits:false;initial-value:0}@property --tw-translate-x{syntax:"*";inherits:false;initial-value:0}@property --tw-translate-y{syntax:"*";inherits:false;initial-value:0}@property --tw-translate-z{syntax:"*";inherits:false;initial-value:0}@property --tw-scale-x{syntax:"*";inherits:false;initial-value:1}@property --tw-scale-y{syntax:"*";inherits:false;initial-value:1}@property --tw-scale-z{syntax:"*";inherits:false;initial-value:1}@property --tw-rotate-x{syntax:"*";inherits:false}@property --tw-rotate-y{syntax:"*";inherits:false}@property --tw-rotate-z{syntax:"*";inherits:false}@property --tw-skew-x{syntax:"*";inherits:false}@property --tw-skew-y{syntax:"*";inherits:false}@property --tw-space-y-reverse{syntax:"*";inherits:false;initial-value:0}@property --tw-space-x-reverse{syntax:"*";inherits:false;initial-value:0}@property --tw-border-style{syntax:"*";inherits:false;initial-value:solid}@property --tw-gradient-position{syntax:"*";inherits:false}@property --tw-gradient-from{syntax:"<color>";inherits:false;initial-value:#0000}@property --tw-gradient-via{syntax:"<color>";inherits:false;initial-value:#0000}@property --tw-gradient-to{syntax:"<color>";inherits:false;initial-value:#0000}@property --tw-gradient-stops{syntax:"*";inherits:false}@property --tw-gradient-via-stops{syntax:"*";inherits:false}@property --tw-gradient-from-position{syntax:"<length-percentage>";inherits:false;initial-value:0%}@property --tw-gradient-via-position{syntax:"<length-percentage>";inherits:false;initial-value:50%}@property --tw-gradient-to-position{syntax:"<length-percentage>";inherits:false;initial-value:100%}@property --tw-leading{syntax:"*";inherits:false}@property --tw-font-weight{syntax:"*";inherits:false}@property --tw-tracking{syntax:"*";inherits:false}@property --tw-ordinal{syntax:"*";inherits:false}@property --tw-slashed-zero{syntax:"*";inherits:false}@property --tw-numeric-figure{syntax:"*";inherits:false}@property --tw-numeric-spacing{syntax:"*";inherits:false}@property --tw-numeric-fraction{syntax:"*";inherits:false}@property --tw-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-shadow-color{syntax:"*";inherits:false}@property --tw-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-inset-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-inset-shadow-color{syntax:"*";inherits:false}@property --tw-inset-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-ring-color{syntax:"*";inherits:false}@property --tw-ring-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-inset-ring-color{syntax:"*";inherits:false}@property --tw-inset-ring-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-ring-inset{syntax:"*";inherits:false}@property --tw-ring-offset-width{syntax:"<length>";inherits:false;initial-value:0}@property --tw-ring-offset-color{syntax:"*";inherits:false;initial-value:#fff}@property --tw-ring-offset-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-outline-style{syntax:"*";inherits:false;initial-value:solid}@property --tw-blur{syntax:"*";inherits:false}@property --tw-brightness{syntax:"*";inherits:false}@property --tw-contrast{syntax:"*";inherits:false}@property --tw-grayscale{syntax:"*";inherits:false}@property --tw-hue-rotate{syntax:"*";inherits:false}@property --tw-invert{syntax:"*";inherits:false}@property --tw-opacity{syntax:"*";inherits:false}@property --tw-saturate{syntax:"*";inherits:false}@property --tw-sepia{syntax:"*";inherits:false}@property --tw-drop-shadow{syntax:"*";inherits:false}@property --tw-drop-shadow-color{syntax:"*";inherits:false}@property --tw-drop-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-drop-shadow-size{syntax:"*";inherits:false}@property --tw-backdrop-blur{syntax:"*";inherits:false}@property --tw-backdrop-brightness{syntax:"*";inherits:false}@property --tw-backdrop-contrast{syntax:"*";inherits:false}@property --tw-backdrop-grayscale{syntax:"*";inherits:false}@property --tw-backdrop-hue-rotate{syntax:"*";inherits:false}@property --tw-backdrop-invert{syntax:"*";inherits:false}@property --tw-backdrop-opacity{syntax:"*";inherits:false}@property --tw-backdrop-saturate{syntax:"*";inherits:false}@property --tw-backdrop-sepia{syntax:"*";inherits:false}@property --tw-duration{syntax:"*";inherits:false}@property --tw-ease{syntax:"*";inherits:false}@property --tw-text-shadow-color{syntax:"*";inherits:false}@property --tw-text-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-content{syntax:"*";inherits:false;initial-value:""}</style></head>
 <body><bettercanvas-portal style="overflow: visible; position: relative; width: 0px; height: 0px; display: block;"><template shadowrootmode="open">
