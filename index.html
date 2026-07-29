@@ -514,6 +514,18 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .wc-stake-pool{text-align:right;font-family:var(--font-mono);font-size:var(--fs-body);color:var(--muted);}
 .wc-stake-pool b{display:block;color:var(--text);font-size:var(--fs-med);font-variant-numeric:tabular-nums;}
 .wc-terms{font-family:var(--font-mono);font-size:var(--fs-micro);color:var(--muted);line-height:1.7;margin-top:10px;}
+
+/* The user's own outcome. Peak-end: this is the screen that colours the
+   memory of the whole product, and it used to be a row in a list. */
+.wc-outcome{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:26px 24px;margin-bottom:18px;}
+.wc-outcome.won{border-color:var(--gold);background:linear-gradient(160deg,#1a1500,var(--card) 70%);}
+.wc-outcome.pending{border-style:dashed;}
+.wc-outcome-rank{font-family:var(--font-mono);font-size:var(--fs-body);color:var(--muted);margin-top:10px;}
+.wc-outcome-rank b{color:var(--text);}
+.wc-outcome .money-amount.gold{color:var(--gold);}
+.wc-payout-status{display:flex;align-items:baseline;gap:8px;font-family:var(--font-mono);font-size:var(--fs-body);margin-top:16px;padding-top:16px;border-top:1px solid var(--hairline);color:var(--muted);line-height:1.6;}
+.wc-payout-status.warn{color:var(--gold);}
+.wc-outcome-next{margin-top:16px;font-family:var(--font-body);font-size:var(--fs-body);color:var(--muted);line-height:1.6;}
 .wc-banner-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
 .wc-title{font-family:var(--font-display);font-size:22px;letter-spacing:1px;color:var(--green);}
 .wc-badge{font-family:var(--font-mono);font-size:9px;padding:3px 8px;border-radius:4px;font-weight:700;}
@@ -15466,6 +15478,70 @@ async function joinChallenge(challengeId) {
   } catch(e) { showToast('Failed to join: ' + e.message); }
 }
 
+// The entrant's own outcome, for a challenge that has ended.
+//
+// Winning used to be an 18px percentage under a blank medal div, with the
+// dollar figure shown nowhere and no payout status at all; losing was an
+// identical red row further down the same list. Both get a dedicated state.
+//
+// Reads the fields worker-payments actually writes at settlement rather than
+// guessing at them: settled, settledAt, payouts[{uid,amountCents,status}],
+// payoutsIncomplete, settlementBlocked. Every branch has to be honest about
+// whether money has moved, because "ended" and "paid" are not the same event.
+function renderOutcomePanel(challenge, ranked, uid) {
+  const fmtRet = (v) => v === null || v === undefined ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+  const money = c => '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const myIndex = ranked.findIndex(u => u.uid === uid);
+  const myRank = myIndex >= 0 ? myIndex + 1 : null;
+  const myRet = myIndex >= 0 ? ranked[myIndex].returnPct : null;
+  const myPayout = (Array.isArray(challenge.payouts) ? challenge.payouts : []).find(p => p.uid === uid) || null;
+
+  const rankLine = myRank
+    ? `<div class="wc-outcome-rank">Finished <b>#${myRank}</b> of ${ranked.length}${myRet !== null ? ` at <b>${fmtRet(myRet)}</b>` : ''}</div>`
+    : '';
+
+  if (challenge.settlementBlocked) {
+    return `<div class="wc-outcome pending">
+      <div class="money-label">Results under review</div>
+      <div class="money-sub">This challenge couldn't be scored automatically, and a person is checking it.</div>
+      ${rankLine}
+      <div class="wc-payout-status warn">Nothing has paid out yet, and your entry is not lost.</div>
+    </div>`;
+  }
+
+  if (!challenge.settled) {
+    return `<div class="wc-outcome pending">
+      <div class="money-label">Settling</div>
+      <div class="money-sub">Trading is closed. Final standings and payouts are still being processed.</div>
+      ${rankLine}
+      <div class="wc-payout-status">Entry fees have to clear before prizes can be sent, which usually takes a couple of business days after the end date.</div>
+    </div>`;
+  }
+
+  if (myPayout && myPayout.amountCents > 0) {
+    const paid = myPayout.status === 'paid';
+    const note = paid
+      ? 'Sent to your bank through Stripe. Most transfers arrive within 2–5 business days.'
+      : myPayout.status === 'failed_no_connect_account'
+        ? "We can't send this yet because your payout account isn't set up. Add it in your profile and it goes out on the next run."
+        : "This payout hasn't gone through yet. It retries automatically, and nothing is lost while it does.";
+    return `<div class="wc-outcome won">
+      <div class="money-label">You won</div>
+      <div class="money-amount gold">${money(myPayout.amountCents)}</div>
+      ${rankLine}
+      <div class="wc-payout-status${paid ? '' : ' warn'}">${note}</div>
+    </div>`;
+  }
+
+  return `<div class="wc-outcome">
+    <div class="money-label">Challenge complete</div>
+    <div class="money-sub">You didn't finish in the top 3 this time.</div>
+    ${rankLine}
+    <div class="wc-outcome-next">The pool goes to the top 3, split 50 / 30 / 20. A new challenge is posted here whenever the last one ends.</div>
+  </div>`;
+}
+
 async function renderChallengeTab() {
   const el = document.getElementById('lb-tab-content');
   if (!el) return;
@@ -15615,6 +15691,14 @@ async function renderChallengeTab() {
         // "Return unavailable" has to look different from "flat", or the
         // fallback quietly becomes a score.
         const fmtRet = (v) => v === null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+
+        // ── The entrant's own outcome ──────────────────────────────────────
+        // Winning used to be an 18px percentage under a blank medal div, with
+        // the dollar figure shown nowhere and no payout status at all; losing
+        // was an identical red row. Both get a dedicated state, and it reads
+        // the settlement fields worker-payments actually writes rather than
+        // guessing: settled, payouts[], payoutsIncomplete, settlementBlocked.
+        if (ended && isParticipant) html += renderOutcomePanel(challenge, ranked, currentUser.uid);
 
         // Podium for top 3 if ended
         if (ended && ranked.length >= 1) {
