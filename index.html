@@ -61,9 +61,23 @@
   --hairline: #ffffff0a;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--font-body);height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+/* Kills the default grey/blue flash Safari and Chrome draw on every tap -
+   the single most reliable "this is a webpage" tell on a touch device.
+   Doesn't touch keyboard focus: :focus-visible below is untouched by it,
+   since tap-highlight only ever applies to a touch tap, never to Tab. */
+html{-webkit-tap-highlight-color:transparent;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);height:100vh;height:100dvh;overflow:hidden;overscroll-behavior:none;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
 ::selection{background:rgba(18,212,126,.22);color:var(--text);}
 button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--green);outline-offset:2px;}
+/* A long-press on a control is not a text selection or a "save image"
+   gesture. Scoped to real controls, not reading content - numbers and
+   copy stay selectable. overscroll-behavior stops a scrolled-out list from
+   chaining into the browser's own rubber-band/pull-to-refresh chrome,
+   which reads as "the page moved" rather than "the app responded". */
+button,[role="button"],.nav-tab,.tf,.qc,.ctab,.rb{
+  -webkit-touch-callout:none; -webkit-user-select:none; user-select:none;
+}
+.plist,.port-view,.lb-view,.g10-wrap,.trending-grid,#view-schedule,#view-feed,.news-pane,.wc-chat-msgs,#chat-messages{overscroll-behavior:contain;}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}}
 
 /* ── NAV ── */
