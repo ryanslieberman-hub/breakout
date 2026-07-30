@@ -96,6 +96,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
    text-only in the top nav, so the icon is hidden until the mobile block
    turns it back on. */
 .tab-icon{display:none;}
+/* An empty div with no mobile styling collapses to zero height anyway, so
+   this was never visible on desktop - explicit for the same reason
+   .tab-icon is: not left to an incidental "empty elements collapse". */
+.sheet-handle{display:none;}
 /* Mobile-only: above 768px the list and the detail are both on screen, so
    there is nothing to go back to. The mobile block re-shows it. */
 .mobile-back{display:none;}
@@ -937,7 +941,11 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 
   /* Modals */
   .modal { width: 94vw !important; max-width: 94vw !important; padding: 16px; }
-  .conf-box { width: 94vw !important; max-width: 94vw !important; }
+  /* .conf-box's own 94vw !important lived here and silently fought the
+     bottom-sheet width:100% added later in this file (a normal-specificity
+     rule can never beat !important regardless of source order), leaving
+     the trade-confirm sheet 11px narrower per side than the other two
+     sheets it's meant to match. Superseded, not duplicated. */
 
   /* g10 */
   .g10-wrap { padding: 6px 8px; }
@@ -1249,6 +1257,47 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   #pending-trades-bar, #pwa-banner{
     bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px) !important;
   }
+
+  /* ── Bottom sheets ──────────────────────────────────────────────────
+     A centered box fading in over a dimmed backdrop is a website dialog
+     pattern. Every native confirm/action surface on a phone slides up
+     from the edge you'll dismiss it back toward instead, which also puts
+     its content and buttons in the thumb zone rather than floating in the
+     middle of a screen you're holding by the edges. Same three overlays
+     (trade confirm, real-money charge confirm, the paid-challenge
+     compliance gate), same show/dismiss functions - only where they sit
+     and how they enter/exit changes here.
+
+     Entry is a @keyframes animation, which plays automatically the
+     instant the box paints - true whether it was just inserted (trade/
+     charge confirm build fresh HTML each time) or just unhidden by class
+     (the compliance gate persists in the DOM). No JS needed for opening.
+
+     Exit needs JS, because "wait for the animation, then actually remove
+     the dialog" has to happen before the promise these all resolve
+     settles - closeSheet() below adds .sheet-closing and waits for
+     transitionend, with a timeout fallback so a missed event can never
+     leave a payment confirmation stuck open forever.
+
+     The handle bar is a static visual affordance only, not a drag target
+     yet - real 1:1 grab-and-release gesture tracking is a bigger, riskier
+     piece to get right on the dialog that takes a real payment, and the
+     existing Cancel button and backdrop-tap dismissal are already
+     reliable. Deferred, not forgotten. */
+  .conf-overlay, .money-overlay, .wc-create-modal{ align-items:flex-end; padding:0; }
+  .conf-box, .money-box, .wc-create-box{
+    width:100%; max-width:100%; border-radius:18px 18px 0 0;
+    padding-top:8px; padding-bottom:calc(24px + env(safe-area-inset-bottom));
+    animation:sheet-in .32s cubic-bezier(.32,.72,0,1);
+    transform:translateY(0); transition:transform .26s cubic-bezier(.32,.72,0,1);
+  }
+  @keyframes sheet-in{ from{ transform:translateY(100%); } to{ transform:translateY(0); } }
+  .conf-overlay.sheet-closing .conf-box,
+  .money-overlay.sheet-closing .money-box,
+  .wc-create-modal.sheet-closing .wc-create-box{ transform:translateY(100%); }
+
+  .sheet-handle{ display:flex; justify-content:center; padding:2px 0 12px; }
+  .sheet-handle::after{ content:''; width:36px; height:4px; border-radius:2px; background:var(--border2); }
 
   .mobile-back{display:flex; align-items:center; gap:6px; width:100%; min-height:44px;
     padding:10px 14px; background:var(--surface); border:none; border-bottom:1px solid var(--border);
@@ -5342,6 +5391,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 <!-- Weekly Challenge Create Modal -->
 <div class="wc-create-modal" id="wc-create-modal">
   <div class="wc-create-box">
+    <div class="sheet-handle"></div>
     <div class="wc-create-title">Create Challenge</div>
     <div class="wc-field">
       <div class="wc-label">CHALLENGE NAME</div>
@@ -5374,6 +5424,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 <!-- ═══ COMPLIANCE GATE (paid challenges) ═══ -->
 <div class="wc-create-modal" id="compliance-modal" role="dialog" aria-modal="true" aria-labelledby="cg-heading">
   <div class="wc-create-box" style="max-width:420px;">
+    <div class="sheet-handle"></div>
     <h2 class="wc-create-title" id="cg-heading">Before You Enter a Paid Challenge</h2>
     <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:16px;">
       Paid challenges involve real money in and real money out. We need to verify your identity and location before your first entry.
@@ -13123,6 +13174,7 @@ function showTradeConfirm(mode, shares, cost, player) {
     const html = `
       <div class="conf-overlay" id="conf-overlay" role="dialog" aria-modal="true" aria-label="${isBuy ? 'Confirm buy' : 'Confirm sell'}" onclick="if(event.target===this)dismissConfirm(false)">
         <div class="conf-box">
+          <div class="sheet-handle"></div>
           <div class="conf-title">${isBuy ? 'Confirm Buy' : 'Confirm Sell'}</div>
           <div class="conf-detail">
             <strong style="color:var(--text)">${shares} shares of ${player}</strong><br>
@@ -13146,9 +13198,11 @@ function showTradeConfirm(mode, shares, cost, player) {
 
 function dismissConfirm(confirmed) {
   const overlay = document.getElementById('conf-overlay');
-  releaseFocus(overlay);
-  overlay?.remove();
-  if (_pendingTrade) { _pendingTrade(confirmed); _pendingTrade = null; }
+  closeSheet(overlay, () => {
+    releaseFocus(overlay);
+    overlay?.remove();
+    if (_pendingTrade) { _pendingTrade(confirmed); _pendingTrade = null; }
+  });
 }
 
 // Enter and Space activate anything carrying role="button" that is not a real
@@ -13205,6 +13259,34 @@ function releaseFocus(el) {
   if (t.prev && document.contains(t.prev)) { try { t.prev.focus(); } catch {} }
 }
 
+// Plays a bottom sheet's slide-down exit before running the real dismiss
+// logic. On desktop .sheet-closing has no rule at all - that treatment is
+// mobile-only CSS - so there is nothing to transition and `after` must run
+// immediately, not wait out a timeout with nothing to wait for; every one
+// of these dialogs is dismissed constantly (every trade confirm goes
+// through here), and a needless 300ms added to each would be a real,
+// noticeable regression on the desktop that has always closed instantly.
+// On mobile, the setTimeout fires alongside transitionend rather than as a
+// pure fallback: whichever settles first runs `after`, and the `done` guard
+// makes the second a no-op. This must never be a fallback ONLY on the
+// transitionend path, because a missed event on the one dialog that
+// confirms a real Stripe charge would leave that promise - and the user -
+// stuck looking at an open payment dialog.
+function closeSheet(el, after) {
+  if (!el || !isMobileLayout()) { after(); return; }
+  let done = false;
+  // The trade/charge overlays are destroyed on close (insertAdjacentHTML
+  // builds a fresh one next time), so a lingering class is harmless there.
+  // The compliance gate and the admin create-challenge modal persist across
+  // opens - without removing this, the SECOND open would still carry
+  // .sheet-closing from the first close and render permanently off-screen,
+  // since that class's transform doesn't care why it's present.
+  const finish = () => { if (done) return; done = true; el.classList.remove('sheet-closing'); after(); };
+  el.addEventListener('transitionend', finish, { once: true });
+  setTimeout(finish, 300);
+  el.classList.add('sheet-closing');
+}
+
 // ═══════════════════════════════════════════
 //  CHARGE CONFIRMATION (real money)
 // ═══════════════════════════════════════════
@@ -13228,6 +13310,7 @@ function showChargeConfirm({ amount, challengeName, deadline, poolNet, splitLabe
     const html = `
       <div class="money-overlay" id="charge-overlay" role="dialog" aria-modal="true" aria-labelledby="charge-amount">
         <div class="money-box">
+          <div class="sheet-handle"></div>
           <div class="money-head">
             <div class="money-label">You are paying</div>
             <div class="money-amount debit" id="charge-amount">${money(amount)}</div>
@@ -13250,9 +13333,12 @@ function showChargeConfirm({ amount, challengeName, deadline, poolNet, splitLabe
 }
 
 function dismissCharge(confirmed) {
-  releaseFocus(document.getElementById('charge-overlay'));
-  document.getElementById('charge-overlay')?.remove();
-  if (_pendingCharge) { _pendingCharge(confirmed); _pendingCharge = null; }
+  const overlay = document.getElementById('charge-overlay');
+  closeSheet(overlay, () => {
+    releaseFocus(overlay);
+    overlay?.remove();
+    if (_pendingCharge) { _pendingCharge(confirmed); _pendingCharge = null; }
+  });
 }
 
 function showToast(msg){
@@ -15400,7 +15486,8 @@ async function openCreateChallenge() {
 }
 
 function closeCreateChallenge() {
-  document.getElementById('wc-create-modal').classList.remove('open');
+  const modal = document.getElementById('wc-create-modal');
+  closeSheet(modal, () => modal.classList.remove('open'));
 }
 
 async function submitCreateChallenge() {
@@ -15597,11 +15684,14 @@ function requireComplianceGate() {
 }
 
 function closeComplianceGate() {
-  releaseFocus(document.getElementById('compliance-modal'));
-  document.getElementById('compliance-modal').classList.remove('open');
-  if (_complianceIdentityUnsub) { _complianceIdentityUnsub(); _complianceIdentityUnsub = null; }
-  stopIdentityStatusPolling();
-  if (_complianceGateResolve) { _complianceGateResolve(false); _complianceGateResolve = null; }
+  const modal = document.getElementById('compliance-modal');
+  closeSheet(modal, () => {
+    releaseFocus(modal);
+    modal.classList.remove('open');
+    if (_complianceIdentityUnsub) { _complianceIdentityUnsub(); _complianceIdentityUnsub = null; }
+    stopIdentityStatusPolling();
+    if (_complianceGateResolve) { _complianceGateResolve(false); _complianceGateResolve = null; }
+  });
 }
 
 async function submitComplianceGate() {
@@ -15613,11 +15703,14 @@ async function submitComplianceGate() {
     await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), { compliance }, { merge: true });
     userProfile = userProfile || {};
     userProfile.compliance = { ...(userProfile.compliance || {}), ...compliance };
-    releaseFocus(document.getElementById('compliance-modal'));
-  document.getElementById('compliance-modal').classList.remove('open');
-    if (_complianceIdentityUnsub) { _complianceIdentityUnsub(); _complianceIdentityUnsub = null; }
-    stopIdentityStatusPolling();
-    if (_complianceGateResolve) { _complianceGateResolve(true); _complianceGateResolve = null; }
+    const modal = document.getElementById('compliance-modal');
+    closeSheet(modal, () => {
+      releaseFocus(modal);
+      modal.classList.remove('open');
+      if (_complianceIdentityUnsub) { _complianceIdentityUnsub(); _complianceIdentityUnsub = null; }
+      stopIdentityStatusPolling();
+      if (_complianceGateResolve) { _complianceGateResolve(true); _complianceGateResolve = null; }
+    });
   } catch (e) { showToast('Could not save: ' + e.message); }
 }
 
