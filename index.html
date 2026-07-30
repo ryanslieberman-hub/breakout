@@ -1185,6 +1185,19 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
      document's h1. */
   .wordmark{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
 
+  /* League switcher (NBA/MLB/GOLF/NFL) had no dedicated styling at all -
+     it inherited a 15px inline-flex from .logo, resolving to a 55x25
+     button. With the wordmark now hidden next to it, that left the whole
+     first row of nav visually empty except one nearly invisible tap target
+     in the far top-left corner, under the 44px minimum and easy to miss
+     entirely one-handed. Same button, same onclick, now an obvious pill. */
+  #league-btn{
+    min-height:44px; padding:0 14px; gap:8px; font-size:15px; font-weight:700;
+    color:var(--text); background:var(--card); border:1px solid var(--border2);
+    border-radius:10px; transition:transform .1s ease-out, background .15s;
+  }
+  #league-btn:active{ transform:scale(.96); background:var(--card2); }
+
   /* ── Bottom tab bar ──────────────────────────────────────────────────
      Primary navigation living in a row of small text scrolled sideways at
      the TOP of the screen is a website pattern - every native app puts its
