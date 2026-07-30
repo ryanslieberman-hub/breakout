@@ -78,6 +78,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
    so there was no structure to skim by. Inherits the .logo look exactly. */
 .wordmark{font:inherit;letter-spacing:inherit;color:inherit;margin:0;display:inline;}
 .nav-tabs{display:flex;align-items:center;min-width:0;}
+/* Icon-above-label is a bottom-tab-bar pattern; on desktop the tabs stay
+   text-only in the top nav, so the icon is hidden until the mobile block
+   turns it back on. */
+.tab-icon{display:none;}
 /* Mobile-only: above 768px the list and the detail are both on screen, so
    there is nothing to go back to. The mobile block re-shows it. */
 .mobile-back{display:none;}
@@ -1128,8 +1132,6 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   .pprice{font-size:14px;}
   .hchg{font-size:10px;}
   .xbtn{font-size:16px;}
-  .nav-tab{font-size:10px;}   /* the 6 tabs still wrap to a second row - that
-                                 is the 146px logo, not the type size */
   .mover-item{font-size:10px;}
   .ctab{font-size:10px;}
   .mt{font-size:10px;}
@@ -1164,14 +1166,62 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   .market-layout.show-detail .center{display:flex;}
 
   /* Nav was 106px - 13% of the viewport - because six tabs plus a 146px
-     wordmark wrapped onto a second row, above the stats row. The tabs now
-     scroll sideways instead of wrapping, so the height is fixed no matter
-     how many tabs a signed-in user has. The wordmark goes visually hidden
-     rather than display:none, so it stays the document's h1. */
+     wordmark wrapped onto a second row, above the stats row. The wordmark
+     goes visually hidden rather than display:none, so it stays the
+     document's h1. */
   .wordmark{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
-  .nav-tabs{flex:1; overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; -webkit-overflow-scrolling:touch;}
-  .nav-tabs::-webkit-scrollbar{display:none;}
-  .nav-tab{flex-shrink:0;}
+
+  /* ── Bottom tab bar ──────────────────────────────────────────────────
+     Primary navigation living in a row of small text scrolled sideways at
+     the TOP of the screen is a website pattern - every native app puts its
+     five-or-so top-level destinations in the thumb zone at the bottom, as
+     icon-over-label buttons that don't scroll. Same six <button>s, same
+     showView() calls, same active-class handling; only where they render
+     and how they look changes here. Taken out of nav's flex flow, so nav
+     itself shrinks back down to just the wordmark/league picker row. */
+  :root{ --tabbar-h: 58px; }
+  .nav-tabs{
+    position:fixed; left:0; right:0; bottom:0; z-index:90;
+    display:flex; flex-wrap:nowrap; justify-content:space-around; align-items:stretch;
+    height:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+    padding-bottom:env(safe-area-inset-bottom);
+    background:rgba(15,18,24,.86);
+    backdrop-filter:blur(20px) saturate(180%);
+    -webkit-backdrop-filter:blur(20px) saturate(180%);
+    border-top:1px solid rgba(255,255,255,.1);
+  }
+  .nav-tab{
+    flex:1; min-width:0; height:auto; padding:6px 2px 0;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:3px;
+    font-size:10px; letter-spacing:0; white-space:nowrap;
+    border-bottom:none; color:var(--muted);
+    transition:transform .1s ease-out, color .15s ease-out;
+  }
+  .nav-tab.active{ color:var(--green); }
+  #nav-trending-tab.active{ color:var(--red) !important; }
+  /* Respond on press, not on release (WWDC "Designing Fluid Interfaces") -
+     feedback starts the instant a finger lands, not after showView() runs. */
+  .nav-tab:active{ transform:scale(.92); }
+  .tab-icon{ display:block; width:22px; height:22px; }
+  .tab-label-mobile{ font-size:10px; }
+
+  /* Reserves real space for the bar rather than letting content float
+     under it - simpler to keep correct than coordinating bottom-padding
+     across every scrollable region the bar could end up overlapping
+     (the player list, the trade bar), at the cost of the translucency
+     only reading as a hint of depth rather than literal see-through
+     scrolling underneath. */
+  body{ padding-bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom)); }
+
+  /* Three things float up from the bottom edge and all three assumed
+     nothing else lived down there: the toast (stylesheet rule, just needs
+     a bigger offset) and two banners built with inline bottom:70px in JS
+     (renderPendingTrades, showInstallBanner) - inline styles beat any
+     selector, so these need !important to actually win. */
+  .toast{ bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px); }
+  #pending-trades-bar, #pwa-banner{
+    bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px) !important;
+  }
 
   .mobile-back{display:flex; align-items:center; gap:6px; width:100%; min-height:44px;
     padding:10px 14px; background:var(--surface); border:none; border-bottom:1px solid var(--border);
@@ -1186,9 +1236,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 
   /* Touch targets. These were 13-34px against a 44px minimum, and the worst
      of them - the watchlist star - appears 285 times. The icons keep their
-     size; only the hit area grows, via padding rather than dimensions. */
+     size; only the hit area grows, via padding rather than dimensions.
+     .nav-tab isn't listed here - the bottom bar's own height (58px, plus
+     safe area) already clears 44px via align-items:stretch. */
   .star-btn{min-width:44px; min-height:44px; padding:12px; margin:-6px;}
-  .nav-tab{height:44px;}
   .auth-btn{min-height:44px; padding:0 12px;}
   .search-bar{min-height:44px;}
   .drawer-close{min-width:44px; min-height:44px;}
@@ -1229,12 +1280,12 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 <nav>
   <div class="logo" style="display:flex;align-items:center;gap:8px;"><h1 class="wordmark">Breakout</h1><button id="league-btn" onclick="openLeagueDrawer()" style="display:inline-flex;align-items:center;gap:4px;"><span id="league-label">NBA</span><span style="display:inline-flex;color:var(--muted)"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></button></div>
   <div class="nav-tabs" role="tablist" aria-label="Views">
-  <button type="button" class="nav-tab active" onclick="showView(&#39;market&#39;,this)"><span class="tab-label-full">Market</span><span class="tab-label-mobile">Market</span></button>
-  <button type="button" class="nav-tab" id="nav-portfolio-tab" onclick="showView(&#39;portfolio&#39;,this)" style="display:none"><span class="tab-label-full">Portfolio</span><span class="tab-label-mobile">Portfolio</span></button>
-  <button type="button" class="nav-tab" onclick="showView(&#39;leaderboard&#39;,this)"><span class="tab-label-full">Leaderboard</span><span class="tab-label-mobile">Leaders</span></button>
-  <button type="button" class="nav-tab" id="nav-schedule-tab" onclick="showView(&#39;schedule&#39;,this)"><span class="tab-label-full">Schedule</span><span class="tab-label-mobile">Schedule</span></button>
-  <button type="button" class="nav-tab" onclick="showView(&#39;feed&#39;,this)" id="nav-feed-tab"><span class="tab-label-full">Activity</span><span class="tab-label-mobile">Feed</span><span class="feed-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: 4px; vertical-align: middle;"></span></button>
-  <button type="button" class="nav-tab" onclick="showView(&#39;trending&#39;,this)" style="color:var(--red);border-bottom:2px solid transparent;" id="nav-trending-tab"><span class="tab-label-full">High Volume</span><span class="tab-label-mobile">Movers</span></button>
+  <button type="button" class="nav-tab active" onclick="showView(&#39;market&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 L10 11 L14 14 L20 6"/><path d="M15 6 L20 6 L20 11"/></svg><span class="tab-label-full">Market</span><span class="tab-label-mobile">Market</span></button>
+  <button type="button" class="nav-tab" id="nav-portfolio-tab" onclick="showView(&#39;portfolio&#39;,this)" style="display:none"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M8 8 V6 a2 2 0 0 1 2-2 h4 a2 2 0 0 1 2 2 V8"/></svg><span class="tab-label-full">Portfolio</span><span class="tab-label-mobile">Portfolio</span></button>
+  <button type="button" class="nav-tab" onclick="showView(&#39;leaderboard&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21 h8"/><path d="M12 17 v4"/><path d="M7 4 h10 v6 a5 5 0 0 1-10 0 Z"/><path d="M7 6 H4 a1 1 0 0 0-1 1 v1 a3 3 0 0 0 3 3"/><path d="M17 6 h3 a1 1 0 0 1 1 1 v1 a3 3 0 0 1-3 3"/></svg><span class="tab-label-full">Leaderboard</span><span class="tab-label-mobile">Leaders</span></button>
+  <button type="button" class="nav-tab" id="nav-schedule-tab" onclick="showView(&#39;schedule&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10 h18"/><path d="M8 3 v4"/><path d="M16 3 v4"/></svg><span class="tab-label-full">Schedule</span><span class="tab-label-mobile">Schedule</span></button>
+  <button type="button" class="nav-tab" onclick="showView(&#39;feed&#39;,this)" id="nav-feed-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12 h4 l2 -7 l4 14 l2 -7 h6"/></svg><span class="tab-label-full">Activity</span><span class="tab-label-mobile">Feed</span><span class="feed-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: 4px; vertical-align: middle;"></span></button>
+  <button type="button" class="nav-tab" onclick="showView(&#39;trending&#39;,this)" style="color:var(--red);border-bottom:2px solid transparent;" id="nav-trending-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 C12 2 6 9 6 14 a6 6 0 0 0 12 0 C18 11 16 10 16 10 c0 2 -1.5 2.5 -1.5 2.5 C15 9 12 2 12 2 Z"/></svg><span class="tab-label-full">High Volume</span><span class="tab-label-mobile">Movers</span></button>
   </div>
   <div class="nav-right">
     <div class="nav-stat">Cash: <span id="nav-cash">$100,000.00</span></div>
