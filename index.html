@@ -2,7 +2,7 @@
 <!-- saved from url=(0046)https://incandescent-torte-faa963.netlify.app/ -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Breakout: The Market for Sports Conviction</title>
 <meta name="description" content="Buy and sell NBA players like stocks. Prices move with real game performance. Start with $100K and build the best portfolio.">
 <meta name="theme-color" content="#04070e">
@@ -21,15 +21,17 @@
 <!-- Favicon (inline SVG as data URI) -->
 <link rel="icon" href="data:image/svg+xml,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; viewBox=&#39;0 0 32 32&#39;&gt;&lt;rect width=&#39;32&#39; height=&#39;32&#39; rx=&#39;6&#39; fill=&#39;%2304070e&#39;/&gt;&lt;path d=&#39;M6 22 L12 16 L16 19 L26 8&#39; fill=&#39;none&#39; stroke=&#39;%2312d47e&#39; stroke-width=&#39;2.5&#39; stroke-linecap=&#39;round&#39; stroke-linejoin=&#39;round&#39;/&gt;&lt;path d=&#39;M20 8 L26 8 L26 14&#39; fill=&#39;none&#39; stroke=&#39;%2312d47e&#39; stroke-width=&#39;2.5&#39; stroke-linecap=&#39;round&#39; stroke-linejoin=&#39;round&#39;/&gt;&lt;/svg&gt;">
 
-<!-- PWA -->
+<!-- PWA. iOS ignores manifest.json for its home-screen icon and reads
+     apple-touch-icon directly - a manifest with icons was not enough on its
+     own. Both icons are flat, full-bleed squares (no rounded corners baked
+     in); iOS and Android each apply their own mask on top, and a
+     pre-rounded source double-masks into visible artifacts at the corner. -->
 <link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Breakout">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Breakout">
 <meta name="apple-touch-fullscreen" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

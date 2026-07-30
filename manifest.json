@@ -1,0 +1,13 @@
+{
+  "name": "Breakout: The Market for Sports Conviction",
+  "short_name": "Breakout",
+  "description": "Buy and sell athletes like stocks. Prices move with real game performance.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#04070e",
+  "theme_color": "#04070e",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" }
+  ]
+}
