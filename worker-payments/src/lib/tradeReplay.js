@@ -6,11 +6,23 @@
 // client bug) and is rejected rather than silently trusted.
 export const START_VALUE = 100000;
 
+// Legitimate client-side prices never move further than this from a player's
+// fundamental statPrice - see band() in worker-pricing-engine/src/engine.js
+// (duplicated here rather than imported: these are two independently
+// deployed Workers, and engine.js itself is already a kept-close-to-verbatim
+// port rather than a shared module). A trade priced outside this band did not
+// come from the real AMM and is treated as forged.
+const PRICE_BAND = [0.55, 1.7];
+
 const EPSILON = 1e-6;
 
 // trades: array of Firestore trade docs {rank, type:'buy'|'sell', shares, price, ts, ...}
+// getStatPrice: optional async (rank) => statPrice|null, used to reject any
+// trade priced outside the legitimate band for its rank. A rank with no
+// resolvable statPrice is treated the same as tampering - see
+// portfolioValue()'s "never silently substitute a guess" below.
 // Returns { cash, holdings: {[rank]: shares}, rejected: [{trade, reason}] }
-export function replayTrades(trades) {
+export async function replayTrades(trades, getStatPrice) {
   const sorted = [...trades].sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
   let cash = START_VALUE;
   const holdings = {};
@@ -24,6 +36,20 @@ export function replayTrades(trades) {
     if (!rank || !(shares > 0) || !(price > 0)) {
       rejected.push({ trade: t, reason: 'invalid rank/shares/price' });
       continue;
+    }
+
+    if (getStatPrice) {
+      const statPrice = await getStatPrice(rank);
+      if (statPrice == null) {
+        rejected.push({ trade: t, reason: `no trusted statPrice available to validate price for rank ${rank}` });
+        continue;
+      }
+      const lo = statPrice * PRICE_BAND[0];
+      const hi = statPrice * PRICE_BAND[1];
+      if (price < lo || price > hi) {
+        rejected.push({ trade: t, reason: `price ${price} outside trusted band [${lo}, ${hi}] for rank ${rank}` });
+        continue;
+      }
     }
 
     if (t.type === 'buy') {

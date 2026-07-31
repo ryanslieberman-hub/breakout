@@ -13,10 +13,21 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Trade log - append-only, owner-authored, no money implication.
+    // Trade log - append-only, owner-authored. Real money DOES ride on this:
+    // worker-payments replays these docs at challenge settlement, so a
+    // malformed/fabricated price or shares value here is a payout integrity
+    // issue, not just cosmetic. These are cheap local shape checks only - no
+    // get() calls, no attempt to validate `price` against a trusted market
+    // price (that requires cross-doc lookups and stays server-side, in
+    // worker-payments/src/lib/tradeReplay.js's price-band check at
+    // settlement time, which is the actual authority here).
     match /trades/{tradeId} {
       allow read: if true;
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid
+        && request.resource.data.type in ['buy', 'sell']
+        && request.resource.data.shares is number && request.resource.data.shares > 0
+        && request.resource.data.price is number && request.resource.data.price > 0
+        && request.resource.data.rank is number && request.resource.data.rank > 0;
       allow update, delete: if false;
     }
 
