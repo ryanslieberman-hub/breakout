@@ -495,15 +495,30 @@ async function settleChallenge(env, challenge) {
   }
 
   const asOfDate = easternDateStr(challenge.endDate);
-  const priceCache = {}; // rank -> trusted close, fetched at most once per rank per sweep
+  const priceEngineDocCache = {}; // rank -> priceEngine doc (or null), fetched at most once per rank per sweep
 
-  async function trustedPrice(rank) {
-    if (rank in priceCache) return priceCache[rank];
+  async function priceEngineDoc(rank) {
+    if (rank in priceEngineDocCache) return priceEngineDocCache[rank];
     const league = leagueForRank(rank);
     const doc = await firestoreGetDoc(env, `priceEngine/${league}_${rank}`);
-    const val = doc ? closeAsOf(doc.closes, asOfDate) : null;
-    priceCache[rank] = val;
-    return val;
+    priceEngineDocCache[rank] = doc;
+    return doc;
+  }
+
+  async function trustedPrice(rank) {
+    const doc = await priceEngineDoc(rank);
+    return doc ? closeAsOf(doc.closes, asOfDate) : null;
+  }
+
+  // Used by replayTrades to reject any trade priced outside the legitimate
+  // AMM band for its rank - see tradeReplay.js's PRICE_BAND. Without this, a
+  // client could write a trades/{tradeId} doc directly (firestore.rules only
+  // checks uid on create, not price) with a fabricated low price and have it
+  // replay as an almost-free buy, then get the resulting holdings valued at
+  // the real trustedPrice() below.
+  async function getStatPrice(rank) {
+    const doc = await priceEngineDoc(rank);
+    return doc ? doc.statPrice ?? null : null;
   }
 
   // Score ONLY what happened inside the challenge window. `trades` is a
@@ -520,7 +535,7 @@ async function settleChallenge(env, challenge) {
   for (const uid of participantUids) {
     const allTrades = await firestoreQuery(env, 'trades', [{ field: 'uid', op: 'EQUAL', value: uid }]);
     const trades = allTrades.filter(t => t.ts >= windowStart && t.ts <= windowEnd);
-    const { cash, holdings, rejected } = replayTrades(trades);
+    const { cash, holdings, rejected } = await replayTrades(trades, getStatPrice);
     if (rejected.length) {
       console.warn(`${rejected.length} rejected (invalid) in-window trade(s) for ${uid} in challenge ${challenge.id}`);
     }
