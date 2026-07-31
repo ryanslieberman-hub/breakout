@@ -121,7 +121,17 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 /* ── MOVERS BAR ── */
 .movers-bar{height:32px;flex-shrink:0;display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--dim);overflow:hidden;padding:0 20px;}
 .movers-label{font-family:var(--font-mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-right:16px;flex-shrink:0;}
-.movers-scroll{display:flex;gap:20px;overflow:hidden;flex:1;-webkit-mask-image:linear-gradient(90deg,#000 0,#000 94%,transparent);mask-image:linear-gradient(90deg,#000 0,#000 94%,transparent);}
+/* The label needs to stay put and unfaded, so the mask/clip lives on this
+   viewport rather than on .movers-bar itself - same two-layer structure as
+   the onboarding ticker (.ob-ticker / .ob-ticker-track). */
+.movers-viewport{flex:1;min-width:0;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,#000 0,#000 94%,transparent);mask-image:linear-gradient(90deg,#000 0,#000 94%,transparent);}
+.movers-scroll{display:flex;gap:20px;width:max-content;}
+/* Content is duplicated in JS and this runs the first copy exactly off the
+   left edge as the second copy arrives - a seamless, continuous loop rather
+   than the old flex-shrink row that just silently clipped everything past
+   2-3 items with no way to see the rest. */
+.movers-scroll.ticking{animation:moversTick 36s linear infinite;}
+@keyframes moversTick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .mover-item{display:flex;align-items:center;gap:6px;flex-shrink:0;font-family:var(--font-mono);font-size:10px;white-space:nowrap;}
 .mover-name{color:var(--text);}
 .mover-price{color:var(--muted);}
@@ -626,13 +636,16 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .wc-btn.primary{background:var(--green);color:#000;}
 .wc-btn.secondary{background:var(--card);color:var(--fg);border:1px solid var(--hairline);}
 
-/* ── Profile modal ── */
-.profile-modal{position:fixed;inset:0;background:#000a;z-index:1000;display:none;align-items:center;justify-content:center;}
-.profile-modal.open{display:flex;}
-.profile-card{background:var(--surface);border:1px solid var(--hairline);border-radius:14px;padding:28px;width:340px;max-width:90vw;}
-.profile-title{font-family:var(--font-display);font-size:26px;letter-spacing:1px;margin-bottom:20px;}
+/* ── Profile page ── */
+.profile-view{flex:1;overflow-y:auto;padding:28px 32px;max-width:480px;margin:0 auto;width:100%;box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+.profile-title{font-family:var(--font-display);font-size:30px;letter-spacing:1px;margin-bottom:20px;}
 .profile-ava-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:20px;}
 .profile-ava{width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--card);border:2px solid var(--border2);}
+.profile-stat-row{display:flex;gap:10px;margin-bottom:24px;}
+.profile-stat{flex:1;background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:12px 14px;}
+.profile-stat-lbl{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.profile-stat-val{font-family:var(--font-mono);font-size:16px;font-variant-numeric:tabular-nums;}
+.profile-section-lbl{font-family:var(--font-mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:24px 0 10px;}
 .profile-input{width:100%;background:var(--bg);border:1px solid var(--hairline);border-radius:6px;padding:9px 12px;color:var(--fg);font-family:var(--font-mono);font-size:12px;box-sizing:border-box;margin-bottom:12px;}
 .profile-row{display:flex;gap:8px;margin-top:4px;}
 .profile-btn{flex:1;padding:9px;border-radius:6px;border:none;font-family:var(--font-mono);font-size:11px;cursor:pointer;}
@@ -699,14 +712,41 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .pav-wrap{position:relative;flex-shrink:0;}
 .pav-wrap .pav, .pav-wrap .pav-img{flex-shrink:0;}
 
-/* ── TRENDING VIEW ── */
-#view-trending{display:none;flex-direction:column;overflow:hidden;}
-#view-trending.active{display:flex;}
-.trending-layout{display:flex;flex:1;overflow:hidden;flex-direction:column;}
+/* ── TRENDING / HIGH VOLUME (embedded in the Leaderboard tab) ── */
 .trending-header{padding:20px 28px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface);}
 .trending-title{font-family:var(--font-display);font-size:30px;letter-spacing:2px;margin-bottom:2px;}
 .trending-title span{color:var(--red);}
 .trending-sub{font-family:var(--font-mono);font-size:9px;color:var(--muted);letter-spacing:1px;}
+/* Smaller, secondary league switcher for the Leaderboard tab - #league-btn itself
+   only shows on Market now, so this is the only way to change league without
+   leaving Leaderboard to see e.g. MLB's movers instead of NBA's. Same drawer,
+   same onclick, just a lighter-weight pill than the main one. */
+.league-btn-compact{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;padding:5px 10px;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);background:var(--card);border:1px solid var(--hairline);border-radius:7px;cursor:pointer;transition:transform .1s ease-out,background .15s,color .15s;}
+.league-btn-compact:hover{color:var(--text);}
+.league-btn-compact:active{transform:scale(.96);background:var(--card2);}
+
+/* Persistent "you're not trading your regular money" banner - only visible
+   while activePortfolioId isn't 'regular'. Deliberately loud (gold, its own
+   full-width row) since the cost of missing it is placing a real trade in
+   the wrong pot of money. */
+.portfolio-context-banner{display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;background:rgba(242,184,67,.12);border-bottom:1px solid rgba(242,184,67,.35);color:var(--gold);font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.3px;cursor:pointer;flex-shrink:0;}
+.portfolio-context-banner:active{background:rgba(242,184,67,.2);}
+
+/* Portfolio drawer - same slide-in pattern as #league-drawer, dynamic content
+   (built by openPortfolioDrawer()) instead of a static list, since which
+   challenges show up depends on which ones the signed-in user has joined. */
+#portfolio-drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:3000;}
+#portfolio-drawer-overlay.open{display:block;}
+#portfolio-drawer{position:fixed;top:0;left:-260px;width:240px;height:100vh;background:#0a1628;border-right:1px solid #1e3a5f;z-index:3001;transition:left .25s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;padding:0;box-shadow:4px 0 24px rgba(0,0,0,.5);overflow-y:auto;}
+#portfolio-drawer.open{left:0;}
+.portfolio-option{display:flex;align-items:center;gap:14px;padding:16px 18px;cursor:pointer;border-bottom:1px solid #0f2035;transition:background .15s;font-family:var(--font-mono);}
+.portfolio-option:hover{background:#0f2035;}
+.portfolio-option.active{background:#0d2240;border-left:3px solid var(--green);}
+.portfolio-option.active .po-name{color:var(--green);}
+.po-icon{width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--card);border:1px solid var(--border2);color:var(--muted);font-family:var(--font-mono);font-size:16px;}
+.po-info{display:flex;flex-direction:column;gap:3px;min-width:0;}
+.po-name{font-size:14px;color:var(--fg);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.po-sub{font-size:10px;color:var(--muted);}
 .trending-tabs{display:flex;gap:6px;margin-top:12px;}
 .trend-tab{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:4px 12px;border:1px solid var(--hairline);background:transparent;color:var(--muted);cursor:pointer;border-radius:6px;transition:all .12s;}
 .trend-tab.active{border-color:var(--red);color:var(--red);background:rgba(245,68,95,.07);}
@@ -751,6 +791,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
     height: auto;
     flex-wrap: wrap;
     padding: 0 8px;
+    padding-top: env(safe-area-inset-top, 0px);
     position: sticky; top: 0; z-index: 100;
   }
   .logo { padding: 6px 0; font-size: 15px; margin-right: 4px; flex-shrink: 0; }
@@ -759,20 +800,9 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   .tab-label-full { display: none; }
   /* #nav-schedule-tab visible on mobile */
   /* Shorten tab labels on very small screens */
-  #nav-trending-tab { order: 2; }
-  .nav-right {
-    width: 100%; order: 3;
-    padding: 3px 0 5px;
-    gap: 6px; flex-wrap: wrap;
-    margin-left: 0;
-    align-items: center;
-  }
-  .nav-stat { font-size: 9px; }
-  /* Hide clutter on mobile nav, keep cash + total + auth */
-  #last-updated { display: none !important; }
-  #live-badge-nav { display: none !important; }
-  .nbtn { display: none !important; }
-  #auth-bar { margin-left: auto; }
+  /* Cash/Total/avatar row - Portfolio and Profile are now their own bottom
+     tabs, so this second nav row was showing the same numbers twice. */
+  .nav-right { display: none; }
 
   /* ── Market layout: sidebar left (fixed width), center fills rest ── */
   .market-layout {
@@ -842,6 +872,11 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   .ln-v { font-size: 11px; }
   .ln-l { font-size: 6px; }
   .ln-stat { padding: 0 4px 0 0; }
+  /* A live game's box score can run to 10 chips - left uncapped, that pushed
+     the chart shorter and shorter over the course of a game. Two rows show
+     without scrolling; the rest is a scroll away instead of stealing chart
+     height every time a game goes long. */
+  #ln-chip-row { max-height: 60px; overflow-y: auto; }
 
   /* Movers bar: hidden at top level on mobile, shown inline instead */
   .movers-bar { height: 28px; padding: 0 8px; }
@@ -882,9 +917,16 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   .sinp { width: 55px; font-size: 11px; padding: 4px 6px; }
   .qcs { gap: 3px; }
   .qc { font-size: 8px; padding: 2px 5px; }
+  /* "Shares" as its own text line above the input it obviously belongs to -
+     the input keeps it as an aria-label instead, screen readers still get it. */
+  .inp-lbl { display: none; }
   /* Preview row: compact on mobile so it doesn't consume the vertical space
-     the Buy button needs. Wraps to two tidy rows instead of five tall ones. */
-  .trade-bar .prev-row { gap: 8px 12px; flex-wrap: wrap; row-gap: 3px; }
+     the Buy button needs. Wraps to two tidy rows instead of five tall ones.
+     That only works if it actually GETS the full row width to wrap within -
+     without this it was squeezed into a narrow leftover column next to
+     .inp-grp and its 5 stats stacked one-per-line instead, which was most of
+     what made the trade bar feel oversized. */
+  .trade-bar .prev-row { flex: 1 0 100%; gap: 8px 12px; flex-wrap: wrap; row-gap: 3px; }
   .trade-bar .prev-row .pvl { font-size: 8px; }
   .trade-bar .prev-row .pvv { font-size: 11px; }
   /* Buy/Sell button always full width and comfortably tappable at the bottom. */
@@ -918,7 +960,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 
   /* ── Other views: scroll normally ── */
   .view { overflow: hidden; }
-  #view-portfolio, #view-leaderboard, #view-schedule, #view-trending {
+  #view-portfolio, #view-leaderboard, #view-schedule, #view-profile {
     overflow-y: auto;
     height: calc(100vh - 90px);
   }
@@ -1004,7 +1046,8 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .league-option:hover { background: #0f2035; }
 .league-option.active { background: #0d2240; border-left: 3px solid var(--green); }
 .league-option.active .lo-name { color: var(--green); }
-.lo-icon { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 1px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 8px; color: var(--muted); background: var(--card); }
+.lo-icon { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 1px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 8px; color: var(--muted); background: #fff; flex-shrink: 0; overflow: hidden; }
+.lo-icon img { width: 100%; height: 100%; object-fit: contain; padding: 4px; box-sizing: border-box; }
 .lo-info { display: flex; flex-direction: column; gap: 3px; }
 .lo-name { font-size: 14px; color: var(--fg); font-weight: 600; }
 .lo-sub  { font-size: 10px; color: var(--muted); }
@@ -1168,6 +1211,14 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   /* Guard: the name column must never be squeezed out of existence again,
      whatever the price ends up costing in width. */
   .hinfo{min-width:96px;}
+  /* .hinfo (name/team/season-stats/tonight-box), capped and independently
+     scrollable. This is NOT the old hero max-height that got removed below -
+     that capped the WHOLE hero including price/buzz, which is why it got
+     dropped. .hright (price) is hinfo's sibling, not its child, so it's
+     unaffected by this cap and always stays visible right after it. Without
+     this, a live game's box score made hinfo grow without limit and the
+     chart kept shrinking as the game went on. */
+  .hinfo{max-height:132px;overflow-y:auto;}
   .hprice{letter-spacing:-1px;}
   /* Name and price stop competing for one line: the price takes its own row
      underneath, which at full width reads as the hero number it is. The
@@ -1197,6 +1248,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
      goes visually hidden rather than display:none, so it stays the
      document's h1. */
   .wordmark{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;}
+  /* This ▲ was a flourish sitting right after the "Breakout" wordmark text
+     on desktop. With the wordmark visually hidden above, it became an
+     orphaned green triangle floating next to the league pill instead. */
+  .logo::after{display:none;}
 
   /* League switcher (NBA/MLB/GOLF/NFL) had no dedicated styling at all -
      it inherited a 15px inline-flex from .logo, resolving to a 55x25
@@ -1238,7 +1293,6 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
     transition:transform .1s ease-out, color .15s ease-out;
   }
   .nav-tab.active{ color:var(--green); }
-  #nav-trending-tab.active{ color:var(--red) !important; }
   /* Respond on press, not on release (WWDC "Designing Fluid Interfaces") -
      feedback starts the instant a finger lands, not after showView() runs. */
   .nav-tab:active{ transform:scale(.92); }
@@ -1336,8 +1390,11 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 (function(){
   const lg = localStorage.getItem('ax_league') || 'NBA';
   document.addEventListener('DOMContentLoaded', function() {
+    const lgText = lg === 'MLB' ? 'MLB' : lg === 'GOLF' ? 'Golf' : lg === 'NFL' ? 'NFL' : 'NBA';
     const lbl = document.getElementById('league-label');
-    if (lbl) lbl.textContent = lg === 'MLB' ? 'MLB' : lg === 'GOLF' ? 'Golf' : lg === 'NFL' ? 'NFL' : 'NBA';
+    if (lbl) lbl.textContent = lgText;
+    const lblSched = document.getElementById('league-label-compact-sched');
+    if (lblSched) lblSched.textContent = lgText;
     const pf1 = document.getElementById('pf-1');
     const pf2 = document.getElementById('pf-2');
     const pf3 = document.getElementById('pf-3');
@@ -1366,7 +1423,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   <button type="button" class="nav-tab" onclick="showView(&#39;leaderboard&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21 h8"/><path d="M12 17 v4"/><path d="M7 4 h10 v6 a5 5 0 0 1-10 0 Z"/><path d="M7 6 H4 a1 1 0 0 0-1 1 v1 a3 3 0 0 0 3 3"/><path d="M17 6 h3 a1 1 0 0 1 1 1 v1 a3 3 0 0 1-3 3"/></svg><span class="tab-label-full">Leaderboard</span><span class="tab-label-mobile">Leaders</span></button>
   <button type="button" class="nav-tab" id="nav-schedule-tab" onclick="showView(&#39;schedule&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10 h18"/><path d="M8 3 v4"/><path d="M16 3 v4"/></svg><span class="tab-label-full">Schedule</span><span class="tab-label-mobile">Schedule</span></button>
   <button type="button" class="nav-tab" onclick="showView(&#39;feed&#39;,this)" id="nav-feed-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12 h4 l2 -7 l4 14 l2 -7 h6"/></svg><span class="tab-label-full">Activity</span><span class="tab-label-mobile">Feed</span><span class="feed-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: 4px; vertical-align: middle;"></span></button>
-  <button type="button" class="nav-tab" onclick="showView(&#39;trending&#39;,this)" style="color:var(--red);border-bottom:2px solid transparent;" id="nav-trending-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 C12 2 6 9 6 14 a6 6 0 0 0 12 0 C18 11 16 10 16 10 c0 2 -1.5 2.5 -1.5 2.5 C15 9 12 2 12 2 Z"/></svg><span class="tab-label-full">High Volume</span><span class="tab-label-mobile">Movers</span></button>
+  <button type="button" class="nav-tab" onclick="showView('profile',this)" id="nav-profile-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span class="tab-label-full">Profile</span><span class="tab-label-mobile">Profile</span></button>
   </div>
   <div class="nav-right">
     <div class="nav-stat">Cash: <span id="nav-cash">$100,000.00</span></div>
@@ -1387,6 +1444,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 <!-- MOVERS BAR -->
 <div class="movers-bar">
   <div class="movers-label" id="movers-header">Today</div>
+  <div class="movers-viewport">
   <div class="movers-scroll" id="movers-scroll">
     <div class="mover-item" onclick="selectPlayerFromList(85)" style="cursor:pointer">
       <span class="mover-name">Miller</span>
@@ -1438,10 +1496,18 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
       <span class="mover-price">$8.85</span>
       <span class="mover-pct up">+4.3%</span>
     </div></div>
+  </div>
 </div>
 
 <!-- MARKET VIEW -->
 <div id="view-market" class="view active">
+  <!-- Shown only while trading inside a challenge portfolio instead of the regular
+       one - the whole point is to make it impossible to forget which pot of money
+       a trade is about to use. -->
+  <div id="portfolio-context-banner" onclick="openPortfolioDrawer()" style="display:none;">
+    <span id="portfolio-context-banner-text"></span>
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+  </div>
   <div class="market-layout">
 
     <!-- Left sidebar -->
@@ -5253,7 +5319,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
             <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;">
               <span id="ln-header">Last Night</span> · <span id="ln-game">26pts 8reb 11ast · Last Night</span>
             </div>
-            <div style="display:flex;gap:0;flex-wrap:wrap;">
+            <div id="ln-chip-row" style="display:flex;gap:0;flex-wrap:wrap;">
               <div class="ln-stat"><div class="ln-v great" id="ln-pts">26</div><div class="ln-l" id="ln-lbl-pts">PTS</div></div>
               <div class="ln-stat"><div class="ln-v great" id="ln-reb">8</div><div class="ln-l" id="ln-lbl-reb">REB</div></div>
               <div class="ln-stat"><div class="ln-v great" id="ln-ast">11</div><div class="ln-l" id="ln-lbl-ast">AST</div></div>
@@ -5334,7 +5400,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="inp-grp">
           <div class="inp-lbl">Shares</div>
           <div class="inp-row">
-            <input class="sinp" id="sinp" type="number" value="10" min="1">
+            <input class="sinp" id="sinp" type="number" value="10" min="1" aria-label="Shares">
             <div class="qcs">
               <div class="qc" onclick="setQ(5)">5</div>
               <div class="qc" onclick="setQ(10)">10</div>
@@ -5368,6 +5434,11 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 <!-- LEADERBOARD VIEW -->
 <div id="view-leaderboard" class="view">
   <div class="lb-view" id="lb-view-inner"></div>
+</div>
+
+<!-- PROFILE VIEW -->
+<div id="view-profile" class="view">
+  <div class="profile-view" id="profile-view-inner"></div>
 </div>
 
 
@@ -5455,8 +5526,11 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 </div>
 
 <div id="view-schedule" class="view" style="display:none;flex-direction:column;overflow-y:auto;padding:24px 20px;max-width:640px;margin:0 auto;width:100%;box-sizing:border-box;">
-  <div style="font-family:var(--font-display);font-size:36px;letter-spacing:2px;margin-bottom:4px;">
-    Nightly <span style="color:var(--gold)">Schedule</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">
+    <div style="font-family:var(--font-display);font-size:36px;letter-spacing:2px;">
+      Nightly <span style="color:var(--gold)">Schedule</span>
+    </div>
+    <button class="league-btn-compact" onclick="openLeagueDrawer()"><span id="league-label-compact-sched">NBA</span><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
   </div>
   <div id="schedule-date-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
     <button onclick="scheduleOffset--; loadSchedule()" style="background:var(--card);border:1px solid var(--hairline);border-radius:6px;padding:5px 12px;color:var(--fg);font-family:var(--font-mono);font-size:12px;cursor:pointer;">◀</button>
@@ -5476,24 +5550,6 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   </div>
   <div id="feed-list" style="display:flex;flex-direction:column;padding:12px 16px;gap:0;">
     <div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Loading feed…</div>
-  </div>
-</div>
-
-<!-- TRENDING / HIGH VOLUME VIEW -->
-<div id="view-trending" class="view">
-  <div class="trending-layout">
-    <div class="trending-header">
-      <div class="trending-title">High <span>Volume</span></div>
-      <div class="trending-sub">Players with spiking activity, buzz, and price momentum</div>
-      <div class="trending-tabs">
-        <div class="trend-tab active" id="ttab-volume" onclick="setTrendTab(&#39;volume&#39;,this)">Volume Spike</div>
-        <div class="trend-tab" id="ttab-gainers" onclick="setTrendTab(&#39;gainers&#39;,this)">Top Gainers</div>
-        <div class="trend-tab" id="ttab-losers" onclick="setTrendTab(&#39;losers&#39;,this)">Top Losers</div>
-        <div class="trend-tab" id="ttab-buzz" onclick="setTrendTab(&#39;buzz&#39;,this)">Buzz Score</div>
-        <div class="trend-tab" id="ttab-watchlisted" onclick="setTrendTab(&#39;watchlisted&#39;,this)" style="display:inline-flex;align-items:center;gap:5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Most Watched</div>
-      </div>
-    </div>
-    <div class="trending-grid" id="trending-grid"></div>
   </div>
 </div>
 
@@ -6976,6 +7032,12 @@ function switchLeague(league) {
   closeLeagueDrawer();
   renderAll();
   updateMovers();
+  // The High Volume section on Leaderboard doesn't live-update off renderAll()/
+  // updateMovers() - without this it kept showing the OLD league's players until
+  // the 60s auto-refresh interval happened to fire, which read as "switching
+  // leagues does nothing" if you were sitting on that tab when you switched.
+  const lbView = document.getElementById('view-leaderboard');
+  if (lbView && lbView.style.display !== 'none') renderTrending();
   updatePosFilters();
   if (league === 'MLB') applyPitcherAnticipation();
   updateLeagueDrawerUI();
@@ -7040,9 +7102,14 @@ function updateLeagueDrawerUI() {
   document.querySelectorAll('.league-option').forEach(el => {
     el.classList.toggle('active', el.dataset.league === currentLeague);
   });
-  // Update logo/label in nav
+  // Update logo/label in nav, and the compact switcher on Leaderboard if it's rendered
+  const label = currentLeague === 'MLB' ? 'MLB' : currentLeague === 'GOLF' ? 'Golf' : currentLeague === 'NFL' ? 'NFL' : 'NBA';
   const lbl = document.getElementById('league-label');
-  if (lbl) lbl.textContent = currentLeague === 'MLB' ? 'MLB' : currentLeague === 'GOLF' ? 'Golf' : currentLeague === 'NFL' ? 'NFL' : 'NBA';
+  if (lbl) lbl.textContent = label;
+  const lblCompact = document.getElementById('league-label-compact');
+  if (lblCompact) lblCompact.textContent = label;
+  const lblCompactSched = document.getElementById('league-label-compact-sched');
+  if (lblCompactSched) lblCompactSched.textContent = label;
 }
 
 
@@ -7069,6 +7136,188 @@ const pendingTrades=[]; // {id,mode,rank,shares,lockedPrice,ammResult,name,queue
 let _commentUnsub=null;
 let scheduleOffset=0;
 const holdings={},portHx=[{day:0,value:100000,t:Date.now()}],logs=[];
+
+// ── Multi-portfolio: regular practice portfolio, plus one independent
+// $100,000 portfolio per challenge joined ──────────────────────────────────
+// cash/holdings/logs/portHx above stay bare globals (dozens of existing call
+// sites read them directly - trade bar, hero header, market list ownership
+// dots, buildPortfolio, etc.) - rather than threading a portfolioId through
+// all of them, we SWAP their contents in place when the user switches which
+// portfolio they're trading in. Prices/AMM pools (liveP, pools, priceHx,
+// volume) are NOT part of this - those stay one shared market for everyone,
+// regardless of portfolio context.
+let activePortfolioId = 'regular'; // 'regular' | challengeId
+const _portfolios = {}; // cached {cash,holdings,logs,portHx} blobs for inactive contexts
+const _challengeNames = {}; // challengeId -> name, filled in wherever a challenge doc is read
+
+// Capture the currently-active bare globals into _portfolios[activePortfolioId].
+function snapshotActivePortfolio(){
+  _portfolios[activePortfolioId] = {
+    cash, holdings: {...holdings}, logs: [...logs], portHx: [...portHx],
+  };
+}
+
+// Load a saved blob INTO the bare globals. holdings/logs/portHx are `const` -
+// they can never be reassigned, only cleared and refilled in place. This is
+// the exact pattern loadCloudPortfolio() already uses for the regular
+// portfolio, just factored out so both paths share it.
+function loadPortfolioIntoGlobals(blob){
+  cash = blob.cash ?? 100000;
+  Object.keys(holdings).forEach(k => delete holdings[k]);
+  Object.assign(holdings, blob.holdings || {});
+  logs.length = 0;
+  logs.push(...(blob.logs || []));
+  portHx.length = 0;
+  portHx.push(...((blob.portHx && blob.portHx.length) ? blob.portHx : [{day:0,value:blob.cash ?? 100000,t:Date.now()}]));
+}
+
+// Switch which portfolio is "active" (the one the trade bar, portfolio tab,
+// hero header, etc. all read). challengeId, or 'regular' for the practice
+// portfolio.
+async function switchPortfolioContext(targetId){
+  if (targetId === activePortfolioId) return true;
+  // Queued live-game trades reserve funds/shares immediately and complete
+  // 10-90s later on a wall-clock timer (settleTrade), with no portfolio
+  // awareness of their own - if the active context changed in between, that
+  // completion would land in the WRONG portfolio. Simplest safe fix: don't
+  // allow a switch while one is in flight, rather than trying to redirect it.
+  if (pendingTrades.length > 0) {
+    showToast('Finish your pending trade before switching portfolios');
+    return false;
+  }
+
+  // Flush the OUTGOING context synchronously with the swap, and cancel any
+  // debounced cloud save still in flight for it. saveCloudPortfolio() reads
+  // the bare cash/holdings/logs globals directly - if a debounced save from
+  // a trade made just before switching were left to fire AFTER the swap, it
+  // would write the NEW context's data into the OLD context's Firestore doc.
+  clearTimeout(window._autoSaveTimer);
+  const outgoingId = activePortfolioId;
+  saveLocalPortfolio(outgoingId);
+  if (currentUser && db) { try { await saveCloudPortfolio(true, outgoingId); } catch(e){} }
+
+  snapshotActivePortfolio();
+
+  let blob = _portfolios[targetId];
+  if (!blob) {
+    blob = await loadPortfolioBlob(targetId);
+    _portfolios[targetId] = blob;
+  }
+  loadPortfolioIntoGlobals(blob);
+  activePortfolioId = targetId;
+
+  renderAll();
+  updatePortfolioContextUI();
+  saveLocalPortfolio(activePortfolioId);
+  return true;
+}
+
+// Switch into a challenge's portfolio and jump straight to the Market, so
+// "I just joined" to "I'm trading" is one tap from the challenge tab.
+async function goTradeInChallenge(challengeId){
+  const ok = await switchPortfolioContext(challengeId);
+  if (!ok) return;
+  showView('market', document.querySelectorAll('.nav-tab')[0]);
+}
+
+// Show/hide the persistent "you're not trading your regular money" banner on
+// the Market view.
+function updatePortfolioContextUI(){
+  const banner = document.getElementById('portfolio-context-banner');
+  const text = document.getElementById('portfolio-context-banner-text');
+  if (!banner || !text) return;
+  if (activePortfolioId === 'regular') {
+    banner.style.display = 'none';
+    return;
+  }
+  const name = _challengeNames[activePortfolioId] || 'this challenge';
+  text.textContent = `Trading in: ${name} — tap to switch`;
+  banner.style.display = 'flex';
+}
+
+// Challenges the signed-in user has joined that haven't ended yet. There's no
+// dedicated "my challenges" index - this reuses the same recent-challenges
+// query renderChallengeTab() already runs and filters client-side, which is
+// cheap since challenges are a small, admin-created, roughly-weekly set.
+async function getMyActiveChallenges(){
+  if (!currentUser || !db) return [];
+  try {
+    const snap = await (window._fbGetDocsFromServer || window._fbGetDocs)(
+      window._fbQuery(window._fbCollection(db, 'challenges'), window._fbOrderBy('createdAt', 'desc'), window._fbLimit(20))
+    );
+    const now = Date.now();
+    const mine = snap.docs.map(d => d.data())
+      .filter(c => c.participants && c.participants[currentUser.uid] && c.endDate > now);
+    mine.forEach(c => { _challengeNames[c.id] = c.name; });
+    return mine;
+  } catch(e) { console.warn('[portfolio] getMyActiveChallenges failed:', e.message); return []; }
+}
+
+async function openPortfolioDrawer(){
+  document.getElementById('portfolio-drawer').classList.add('open');
+  document.getElementById('portfolio-drawer-overlay').classList.add('open');
+  const list = document.getElementById('portfolio-drawer-list');
+  if (!currentUser) {
+    list.innerHTML = `
+      <div class="portfolio-option active">
+        <div class="po-icon">$</div>
+        <div class="po-info"><div class="po-name">Practice Portfolio</div><div class="po-sub">${fmt(portVal())} · sign in to join challenges</div></div>
+      </div>`;
+    return;
+  }
+  list.innerHTML = `<div class="g10-loading">Loading…</div>`;
+  const challenges = await getMyActiveChallenges();
+  const rows = [
+    { id: 'regular', name: 'Practice Portfolio', icon: '$',
+      sub: (activePortfolioId==='regular' ? fmt(portVal()) : fmt(_portfolios['regular']?.cash ?? 100000)) + ' cash' },
+    ...challenges.map(c => ({
+      id: c.id, name: c.name, icon: '🏆',
+      sub: fmt((activePortfolioId===c.id ? cash : _portfolios[c.id]?.cash) ?? 100000) + ` cash · ends ${fmtStamp(c.endDate)}`,
+    })),
+  ];
+  list.innerHTML = rows.map(r => `
+    <div class="portfolio-option ${activePortfolioId===r.id?'active':''}" onclick="switchPortfolioContext('${r.id}').then(ok=>{ if(ok) closePortfolioDrawer(); })">
+      <div class="po-icon">${r.icon}</div>
+      <div class="po-info"><div class="po-name">${escHtml(r.name)}</div><div class="po-sub">${escHtml(r.sub)}</div></div>
+    </div>`).join('');
+}
+
+function closePortfolioDrawer(){
+  document.getElementById('portfolio-drawer').classList.remove('open');
+  document.getElementById('portfolio-drawer-overlay').classList.remove('open');
+}
+
+// Fetch (or lazily create) the saved blob for a portfolio context that isn't
+// already cached in memory this session. 'regular' always exists (loaded at
+// app start the same way it always has been); a challenge context may not
+// have a cloud doc yet on the very first switch, in which case we start it
+// fresh at $100,000 - joinChallenge()/the Stripe webhook normally create this
+// doc at join time, so this is a defensive fallback, not the common path.
+async function loadPortfolioBlob(portfolioId){
+  if (portfolioId === 'regular') {
+    return { cash, holdings: {...holdings}, logs: [...logs], portHx: [...portHx] };
+  }
+  // Cloud is authoritative when signed in (synced across devices) - fall back
+  // to the local cache (offline, or cloud read failed), then to a fresh start.
+  if (currentUser && db) {
+    try {
+      const snap = await window._fbGetDoc(window._fbDoc(db, 'portfolios', currentUser.uid, 'challenges', portfolioId));
+      if (snap.exists()) {
+        const d = snap.data();
+        return { cash: d.cash ?? 100000, holdings: d.holdings || {}, logs: d.logs || [], portHx: d.portHx || [] };
+      }
+    } catch(e) { console.warn('[portfolio] load challenge portfolio failed:', e.message); }
+  }
+  try {
+    const raw = localStorage.getItem('ax_portfolio_ch_' + portfolioId);
+    if (raw) {
+      const d = JSON.parse(raw);
+      return { cash: d.cash ?? 100000, holdings: d.holdings || {}, logs: d.logs || [], portHx: d.portHx || [] };
+    }
+  } catch(e) {}
+  return { cash: 100000, holdings: {}, logs: [], portHx: [{day:0,value:100000,t:Date.now()}] };
+}
+
 // Record a portfolio-value snapshot stamped with the real wall-clock time, so the
 // portfolio chart can plot value against actual dates (Robinhood-style). De-dupes
 // rapid successive snapshots within the same minute to keep the series lean.
@@ -7508,6 +7757,17 @@ const ENGINE = (() => {
     const priorValid = Object.keys(c)
       .filter(d => d < today && c[d] >= lo && c[d] <= hi)
       .sort();
+    if (!priorValid.length && !window._closesRestoredFromFirestore) {
+      // Firestore's close history hasn't finished loading yet on this device - a real
+      // prior close may exist but just hasn't arrived, not that one doesn't exist. Locking
+      // in statPrice as today's BASE here silently turns a routine game into a phantom
+      // double-digit move once the real (much higher, for anyone who's traded up) close
+      // shows up and gets compared against this wrong base - same failure mode as the
+      // "Austin Riley -24%" bug mlbTick's yesterday-backfill already guards against below,
+      // just hitting this path instead. Return statPrice for THIS call only, without
+      // caching it, so the next tick (after history has loaded) retries properly.
+      return Math.min(Math.max(p.statPrice, lo), hi);
+    }
     let base = priorValid.length ? c[priorValid[priorValid.length - 1]] : p.statPrice;
     base = Math.min(Math.max(base, lo), hi);
     BASE[p.rank] = { date: today, price: base };
@@ -8030,37 +8290,54 @@ async function mlbTick(isFinal=false){
       });
     }
 
-    // ── YESTERDAY: capture last night's finals for players with NO game today. ──
-    // This is what was missing - on a morning load, today's schedule is empty/pre-game,
-    // so last night's games (on yesterday's date) must be pulled or players show 0s and
-    // the movers tab shows stale data from 2 nights ago.
+    // ── YESTERDAY: capture last night's finals for players with NO game today, AND
+    // any game that started before midnight and is STILL LIVE right now. ──
+    // The finals part is what was missing originally - on a morning load, today's
+    // schedule is empty/pre-game, so last night's games (on yesterday's date) must
+    // be pulled or players show 0s and the movers tab shows stale data.
+    //
+    // The live part covers a gap that only shows up overnight: MLB's schedule API
+    // dates a game by when it STARTED, so a 10pm game still going at 1am stays filed
+    // under yesterday's date. The instant the calendar rolled over, that game fell out
+    // of TODAY's live check (wrong date) and this backfill USED to only look at
+    // ySched.final - a still-live game is in ySched.live, not ySched.final, so it was
+    // invisible to both checks and stats silently stopped updating until the game
+    // actually ended and became a final (which is why it looked fine again by morning).
     const ySched = await mlbFetchSchedule(yday);
     let yStatMapRef = {};
-    if (ySched.final.length){
-      const yStatMap = await mlbFetchBoxes(ySched.final);
+    const yActivePks = [...ySched.final, ...ySched.live];
+    if (yActivePks.length){
+      const yStatMap = await mlbFetchBoxes(yActivePks);
       yStatMapRef = yStatMap;
+      const yLiveStatMap = ySched.live.length ? await mlbFetchBoxes(ySched.live) : {};
       mlbPlayers.forEach(p => {
         const yst = yStatMap[p.rank];
         if (!yst) return;
         if (statMap[p.rank]) return;             // already has a game today → today wins
+        const yIsLive = !!yLiveStatMap[p.rank];
         // Write yesterday's display line + ensure a close exists for yesterday.
-        writeMLBStatLineOfficial(p, yst, yday, false);
-        if (!closes[p.rank]) closes[p.rank] = {};
-        if (!(closes[p.rank][yday] > 0)){
-          const prior = Object.keys(closes[p.rank]).filter(d => closes[p.rank][d] > 0 && d < yday).sort();
-          // Only trust "no prior close exists" once Firestore's price history has
-          // actually finished loading this session - otherwise a real prior close
-          // might exist but just hasn't arrived yet, and falling back to statPrice
-          // here silently bases a real day's move on the wrong number (this produced
-          // Austin Riley's stored close reading as a -24% "move" from a real -3.9%
-          // game - it chained from statPrice instead of his real prior close because
-          // this ran before that close had loaded). Defer instead; the next tick
-          // retries once history has actually loaded.
-          if (prior.length || window._closesRestoredFromFirestore) {
-            const yBase = prior.length ? closes[p.rank][prior[prior.length-1]] : p.statPrice;
-            const clean = Math.min(Math.max(yBase, p.statPrice*0.55), p.statPrice*1.7);
-            const perf = ENGINE.perfFor(p, _statToEngineShape(yst));
-            closes[p.rank][yday] = Math.max(0.01, clean * (1 + perf));
+        writeMLBStatLineOfficial(p, yst, yday, yIsLive);
+        if (!yIsLive) {
+          // Only lock in a close once the game has actually finished - an in-progress
+          // game's running totals aren't a real end-of-day value yet, and would get
+          // overwritten (and its price move double-counted) once it does finish.
+          if (!closes[p.rank]) closes[p.rank] = {};
+          if (!(closes[p.rank][yday] > 0)){
+            const prior = Object.keys(closes[p.rank]).filter(d => closes[p.rank][d] > 0 && d < yday).sort();
+            // Only trust "no prior close exists" once Firestore's price history has
+            // actually finished loading this session - otherwise a real prior close
+            // might exist but just hasn't arrived yet, and falling back to statPrice
+            // here silently bases a real day's move on the wrong number (this produced
+            // Austin Riley's stored close reading as a -24% "move" from a real -3.9%
+            // game - it chained from statPrice instead of his real prior close because
+            // this ran before that close had loaded). Defer instead; the next tick
+            // retries once history has actually loaded.
+            if (prior.length || window._closesRestoredFromFirestore) {
+              const yBase = prior.length ? closes[p.rank][prior[prior.length-1]] : p.statPrice;
+              const clean = Math.min(Math.max(yBase, p.statPrice*0.55), p.statPrice*1.7);
+              const perf = ENGINE.perfFor(p, _statToEngineShape(yst));
+              closes[p.rank][yday] = Math.max(0.01, clean * (1 + perf));
+            }
           }
         }
         // CRITICAL: invalidate this player's cached base so baseFor() recomputes and
@@ -8076,6 +8353,12 @@ async function mlbTick(isFinal=false){
         window._engineYesterday = window._engineYesterday || {};
         window._engineYesterday[p.rank] = true;
       });
+    }
+    // A still-live overnight game keeps the "game in progress" state accurate even
+    // when today's own schedule has nothing live yet.
+    if (ySched.live.length) {
+      window._anyLiveThisCycle = true;
+      if (!isGameLive) { isGameLive = true; localStorage.setItem('ax_isGameLive','true'); }
     }
 
     // ── Derive ALL prices from the engine (single authority) ──
@@ -8100,8 +8383,9 @@ async function mlbTick(isFinal=false){
     // Capture intraday ticks for the 1D chart (MLB). The ENGINE-85 fix added this to the NBA
     // live path but NOT here, so MLB players' in-game price arc was never recorded - a hitter
     // moving 2%→1.5% during his game showed nothing on the 1D chart. Record a point for any
-    // player with a live stat whose price moved enough since the last tick.
-    if (activePks.length) {
+    // player with a live stat whose price moved enough since the last tick. Also runs for a
+    // still-live overnight game even when today's own schedule has nothing active yet.
+    if (activePks.length || ySched.live.length) {
       const _now = Date.now();
       mlbPlayers.forEach(p => {
         const r = p.rank;
@@ -8127,7 +8411,7 @@ async function mlbTick(isFinal=false){
       mlbPlayers.forEach(p => { if (statMap[p.rank]) ENGINE.finalize(p, today); });
     }
 
-    if (!activePks.length && !ySched.final.length){
+    if (!activePks.length && !ySched.final.length && !ySched.live.length){
       // Genuinely no games to reflect → clear live flag, settle at base.
       if (isGameLive){ isGameLive = false; localStorage.setItem('ax_isGameLive','false'); }
       window._liveTeamIds = null;
@@ -10148,6 +10432,33 @@ async function fetchGolfLiveStats(isFinal=false) {
         statsArr.forEach(s => { map[s.rank] = { toPar: s.toPar, date: s.date }; });
         window._engineStats = map;
         ENGINE.deriveAll();
+
+        // Capture intraday ticks for the 1D chart (golf). Same fix mlbTick already has
+        // (see its comment) - the price genuinely moves hole-by-hole as ENGINE.deriveAll
+        // re-derives it each poll, but without this nothing recorded those in-between
+        // values, so a golfer's round showed as one flat jump on the 1D chart instead of
+        // the actual arc.
+        {
+          const _now = Date.now();
+          golfPlayers.forEach(p => {
+            const r = p.rank;
+            const ln = lastNight[r];
+            if (!ln || !ln.live) return;          // only golfers mid-round right now
+            const np = liveP[r];
+            if (!(np > 0)) return;
+            if (!intraday[r]) intraday[r] = [];
+            const arr = intraday[r];
+            const last = arr.length ? arr[arr.length-1] : null;
+            const mins = last ? (_now - last.t) / 60000 : 999;
+            const delta = last ? Math.abs(np - last.price) / last.price : 1;
+            if (!last || mins > 5 || delta > 0.003) {
+              arr.push({ t: _now, price: np });
+              if (!priceHx[r]) priceHx[r] = [];
+              priceHx[r].push({ day: todayDayNum(), price: np });
+            }
+          });
+        }
+
         if (isComplete || isFinal) {
           statsArr.forEach(s => {
             const p = golfPlayers.find(x => x.rank === s.rank);
@@ -10552,7 +10863,11 @@ function applySell(rank, sell, r){
 function queueTrade(mode, rank, shares, ammResult, name, delayMs){
   const id = Date.now();
   const executeAt = Date.now() + delayMs;
-  const trade = {id, mode, rank, shares, ammResult, name, queuedAt:Date.now(), executeAt};
+  // Captured now, not read back from activePortfolioId at settle time 10-90s
+  // later - switching portfolios is already blocked while a trade is
+  // pending (see switchPortfolioContext), but this makes settleTrade
+  // correct on its own terms rather than depending on that guard holding.
+  const trade = {id, mode, rank, shares, ammResult, name, portfolioId: activePortfolioId, queuedAt:Date.now(), executeAt};
 
   // Reserve cash/shares immediately so user can't double-spend
   if(mode==='buy'){
@@ -10587,7 +10902,8 @@ function settleTrade(id){
   const trade = pendingTrades.splice(idx,1)[0];
   clearInterval(trade._interval);
 
-  const {mode, rank, shares, ammResult, name} = trade;
+  const {mode, rank, shares, ammResult, name, portfolioId} = trade;
+  const pid = portfolioId || 'regular'; // trades queued before this field existed
 
   if(mode==='buy'){
     // cash was already deducted on queue - just apply the rest
@@ -10600,7 +10916,7 @@ function settleTrade(id){
     priceHx[rank].push({day:todayDayNum(),price:ammResult.newPrice});
     logs.unshift({type:'buy',shares,amount:ammResult.cost,name,price:ammResult.newPrice});
     pushTradePrice(rank, ammResult.newPrice);
-    pushTradeToFeed(rank, 'buy', shares, ammResult.newPrice, name);
+    pushTradeToFeed(rank, 'buy', shares, ammResult.newPrice, name, pid);
     flashHero(true);
     showToast(`\u2705 BUY executed: ${shares} × ${name}`);
   } else {
@@ -10616,7 +10932,7 @@ function settleTrade(id){
     priceHx[rank].push({day:todayDayNum(),price:ammResult.newPrice});
     logs.unshift({type:'sell',shares,amount:ammResult.returned,name,price:ammResult.newPrice});
     pushTradePrice(rank, ammResult.newPrice);
-    pushTradeToFeed(rank, 'sell', shares, ammResult.newPrice, name);
+    pushTradeToFeed(rank, 'sell', shares, ammResult.newPrice, name, pid);
     flashHero(false);
     showToast(`\u2705 SELL executed: ${shares} × ${name}`);
   }
@@ -10624,10 +10940,10 @@ function settleTrade(id){
   pushPortHx();
   renderPendingTrades();
   renderAll();
-  saveLocalPortfolio();
+  saveLocalPortfolio(pid);
   if(currentUser && db){
     clearTimeout(window._autoSaveTimer);
-    window._autoSaveTimer = setTimeout(()=>saveCloudPortfolio(true),3000);
+    window._autoSaveTimer = setTimeout(()=>saveCloudPortfolio(true, pid),3000);
   }
 }
 
@@ -10666,6 +10982,9 @@ function renderAll(){renderList();updateHero();drawMain();updateNav();updateRang
   // Rebuild portfolio if it's currently open so holdings/prices stay current
   const pv = document.getElementById('view-portfolio');
   if(pv && pv.style.display === 'flex') buildPortfolio();
+  // Same for Profile - it shows live Cash/Total/P&L now that they're not in nav
+  const prv = document.getElementById('view-profile');
+  if(prv && prv.style.display === 'flex') renderProfileView();
 }
 
 function updateNav(){
@@ -11284,9 +11603,15 @@ function pushTradePrice(rank, newPrice) {
 }
 
 // Write a trade event to the global trades feed in Firestore
-async function pushTradeToFeed(rank, type, shares, price, playerName) {
+async function pushTradeToFeed(rank, type, shares, price, playerName, portfolioId = activePortfolioId) {
   if (!db || !currentUser || !window._fbAddDoc || !window._fbCollection) return;
   try {
+    // Derive from the traded player's OWN rank, not the UI's currently-selected
+    // league - currentLeague is whatever tab happens to be open right now, which
+    // can differ from the traded player's league for a queued/delayed trade that
+    // finishes executing after the user has already switched tabs (this tagged an
+    // MLB trade "GOLF" in the feed because Golf was on-screen when it posted).
+    const league = rank >= 3001 ? 'NFL' : rank >= 2001 ? 'GOLF' : rank >= 1001 ? 'MLB' : 'NBA';
     await window._fbAddDoc(window._fbCollection(db, 'trades'), {
       uid: currentUser.uid,
       displayName: userProfile?.displayName || currentUser.displayName || 'Anonymous',
@@ -11297,7 +11622,11 @@ async function pushTradeToFeed(rank, type, shares, price, playerName) {
       type,       // 'buy' | 'sell'
       shares,
       price,
-      league: currentLeague,
+      league,
+      // null = regular practice portfolio, else the challengeId this trade
+      // belongs to - lets settlement replay exactly the right trades for a
+      // challenge even when the user is in several overlapping ones at once.
+      portfolioId: portfolioId === 'regular' ? null : portfolioId,
       ts: Date.now(),
     });
   } catch(e) {}
@@ -11754,9 +12083,15 @@ function updateMovers(){
       <span class="mover-name">${p.name.split(' ').pop()}</span>
       <span class="mover-price">${fmt(liveP[p.rank])}</span>
       <span class="mover-pct ${p.pct>=0?'up':'down'}">${fmtP(p.pct)}</span>
-    </div>`).join('') || '<div class="mover-item"><span class="mover-name" style="color:var(--muted)">No movers yet</span></div>';
+    </div>`).join('');
 
-  document.getElementById('movers-scroll').innerHTML = moversHtml;
+  const scrollEl = document.getElementById('movers-scroll');
+  // Duplicated so the CSS animation can slide exactly one copy's width and
+  // loop seamlessly (same trick as the onboarding ticker). Only worth doing
+  // - and only worth animating - when there's an actual list to loop through.
+  scrollEl.innerHTML = sorted.length ? moversHtml + moversHtml
+    : '<div class="mover-item"><span class="mover-name" style="color:var(--muted)">No movers yet</span></div>';
+  scrollEl.classList.toggle('ticking', sorted.length > 0);
 }
 
 // ═══════════════════════════════════════════
@@ -12205,18 +12540,23 @@ function drawPortChartRanged(range){
   const cursor = document.getElementById('pchart-cursor');
   const dot = document.getElementById('pchart-dot');
 
+  // Scrub against `resampled` - the SAME points the visible spline was built from
+  // (see `pts`/`line` above) - not the sparser raw `series`. The curve doesn't pass
+  // through raw series points exactly (it's a Catmull-Rom spline through the
+  // resampled/interpolated ones), so snapping the dot to a raw point routinely put
+  // it visibly off the line, worse the sparser/jaggier the real data was.
   const nearestIdx = (clientX)=>{
     const rect = svg.getBoundingClientRect();
     const xRel = (clientX-rect.left)/rect.width*W;
     // map x back to time, find nearest point
     const tAt = t0 + (xRel-2)/(W-4)*tspan;
     let best=0, bestD=Infinity;
-    series.forEach((p,i)=>{ const d=Math.abs(p.t-tAt); if(d<bestD){bestD=d;best=i;} });
+    resampled.forEach((p,i)=>{ const d=Math.abs(p.t-tAt); if(d<bestD){bestD=d;best=i;} });
     return best;
   };
 
   const moveTo = (i)=>{
-    const p = series[i];
+    const p = resampled[i];
     const x = px(p.t), y = py(p.value);
     cursor.setAttribute('x1',x); cursor.setAttribute('x2',x); cursor.setAttribute('opacity','0.5');
     dot.setAttribute('cx',x); dot.setAttribute('cy',y); dot.setAttribute('opacity','1');
@@ -12283,6 +12623,11 @@ function selectPlayerFromList(rank){
 function openPlayerDetail(){
   if (!isMobileLayout()) return;
   document.querySelector('.market-layout')?.classList.add('show-detail');
+  // The movers ticker is for browsing the list, not for a player you've
+  // already picked - reclaim its 28px for the chart, which was getting
+  // squeezed thin between it, the hero, and the trade bar.
+  const mb = document.querySelector('.movers-bar');
+  if (mb) mb.style.display = 'none';
   // The chart canvas was display:none while the detail was hidden, so it had
   // no measurable size to draw into. Redraw now that it does.
   requestAnimationFrame(() => { drawMain(); initChartHover(); });
@@ -12291,6 +12636,8 @@ function openPlayerDetail(){
 
 function closePlayerDetail(){
   document.querySelector('.market-layout')?.classList.remove('show-detail');
+  const mb = document.querySelector('.movers-bar');
+  if (mb) mb.style.display = '';
   // Send focus back to the row the user came from, not to the top of the list.
   const row = document.querySelector(`.prow.active`);
   if (row) { row.scrollIntoView({block:'center'}); row.focus(); }
@@ -12435,18 +12782,22 @@ function flashHero(up){
 //  VIEWS
 // ═══════════════════════════════════════════
 function showView(v,el){
-  ['market','portfolio','leaderboard','schedule','feed','trending'].forEach(n=>{
+  ['market','portfolio','leaderboard','schedule','feed','profile'].forEach(n=>{
     const el2 = document.getElementById('view-'+n);
     if (el2) el2.style.display = n===v ? 'flex' : 'none';
   });
   document.querySelectorAll('.nav-tab').forEach(e=>e.classList.remove('active'));
-  el.classList.add('active');
+  if (el) el.classList.add('active');
+  // League switcher only makes sense while looking at the player market -
+  // it has nothing to do with Portfolio/Leaders/Schedule/Feed/Profile.
+  const leagueBtn = document.getElementById('league-btn');
+  if (leagueBtn) leagueBtn.style.display = (v==='market') ? '' : 'none';
   if(v==='portfolio')buildPortfolio();
   if(v==='leaderboard') buildLeaderboardFirebase();
   if(v==='market')setTimeout(()=>drawMain(),30);
   if(v==='schedule') loadSchedule();
-  if(v==='trending') renderTrending();
   if(v==='feed') showFeedView();
+  if(v==='profile') renderProfileView();
 }
 
 function goMarket(rank){
@@ -12804,8 +13155,10 @@ function buildPortfolio(){
   const holdingsVal = total - cash;
   const todayPp = holdingsVal > 0 ? (todayPnl / holdingsVal) * 100 : 0;
 
+  const portLabel = activePortfolioId === 'regular' ? 'Practice' : (_challengeNames[activePortfolioId] || 'Challenge');
   let html=`
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;"><div class="ptitle">Your <span style="color:var(--green)">Portfolio</span></div><button onclick="sharePortfolio()" style="margin-top:8px;padding:7px 14px;background:#12d47e18;border:1px solid #12d47e44;border-radius:6px;color:var(--green);font-family:var(--font-mono);font-size:11px;cursor:pointer">Share</button></div>
+    <button class="league-btn-compact" onclick="openPortfolioDrawer()" style="margin-bottom:10px;"><span>${escHtml(portLabel)}</span><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
     <div class="psub-txt">Holdings, performance, and trade history</div>
     <div class="pgrid">
       <div class="pcard"><div class="pclbl">Total Value</div><div class="pcval" style="color:var(--green)">${fmt(total)}</div></div>
@@ -13035,7 +13388,18 @@ function toggleWatchlist(btn) {
 // ═══════════════════════════════════════════
 //  LOCALSTORAGE PORTFOLIO PERSISTENCE
 // ═══════════════════════════════════════════
-function saveLocalPortfolio() {
+function saveLocalPortfolio(portfolioId = 'regular') {
+  if (portfolioId !== 'regular') {
+    // Challenge portfolios: just the cash/holdings/logs/portHx slice - market
+    // data (prices/closes/etc.) is shared and already saved by the regular
+    // path below, no need to duplicate it per challenge.
+    try {
+      localStorage.setItem('ax_portfolio_ch_' + portfolioId, JSON.stringify({
+        cash, holdings, logs: logs.slice(0, 50), portHx: portHx.slice(-400), savedAt: Date.now(),
+      }));
+    } catch(e) {}
+    return;
+  }
   // Save closes and priceApplied FIRST - before portfolio which might fail on storage full
   _saveCloses();
   _savePriceApplied(priceApplied);
@@ -14436,7 +14800,7 @@ async function loadCloudPortfolio() {
   } catch(e) { console.error('Load portfolio failed:', e); }
 }
 
-async function saveCloudPortfolio(silent = false) {
+async function saveCloudPortfolio(silent = false, portfolioId = activePortfolioId) {
   if (!currentUser || !db) return;
   // Don't save if we're in default state - likely localStorage was cleared on mobile
   // and cloud data would be overwritten with blank $100k portfolio
@@ -14447,23 +14811,33 @@ async function saveCloudPortfolio(silent = false) {
   }
   try {
     const val = portVal();
-    const ret = ((val - START_VALUE) / START_VALUE) * 100;
-    await window._fbSetDoc(window._fbDoc(db, 'portfolios', currentUser.uid), {
+    const docRef = portfolioId === 'regular'
+      ? window._fbDoc(db, 'portfolios', currentUser.uid)
+      : window._fbDoc(db, 'portfolios', currentUser.uid, 'challenges', portfolioId);
+    await window._fbSetDoc(docRef, {
       cash, holdings,
       logs: logs.slice(-50),
       savedAt: window._fbServerTimestamp(),
     }, { merge: true });   // MERGE - without this, every app save overwrote the whole doc
                            // and wiped the portHx history that snapshotPortfolios writes
                            // server-side each hour, so the portfolio chart never had data.
-    await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), {
-      displayName: userProfile.displayName,
-      photoURL: userProfile.photoURL || null,
-      avatarColor: userProfile.avatarColor,
-      portfolioValue: Math.round(val),
-      returnPct: Math.round(ret * 10) / 10,
-    }, { merge: true });
+    // users/{uid}.portfolioValue/returnPct feeds the free/casual GLOBAL leaderboard -
+    // that must always reflect the REGULAR portfolio. Skipping this write while
+    // trading inside a challenge is deliberate: nothing about the regular
+    // portfolio changed, so there's nothing correct to write here, and writing
+    // the challenge's value would silently corrupt the practice leaderboard.
+    if (portfolioId === 'regular') {
+      const ret = ((val - START_VALUE) / START_VALUE) * 100;
+      await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), {
+        displayName: userProfile.displayName,
+        photoURL: userProfile.photoURL || null,
+        avatarColor: userProfile.avatarColor,
+        portfolioValue: Math.round(val),
+        returnPct: Math.round(ret * 10) / 10,
+      }, { merge: true });
+      updateAuthUI(); // refresh pill P&L
+    }
     if (!silent) showToast('Portfolio saved to cloud');
-    updateAuthUI(); // refresh pill P&L
   } catch(e) { if (!silent) showToast('Save failed: ' + e.message); }
 }
 
@@ -14515,9 +14889,26 @@ function handleAuthBtn() {
   openProfile();
 }
 
+// Profile used to be a modal opened from a nav icon; it's now a full bottom
+// tab/view. openProfile() is kept as a compatibility shim - it's called from
+// a dozen "Sign in to..." prompts scattered across Leaderboard/Feed/Challenges
+// that just want to send the user to sign in, wherever that now lives.
 function openProfile() {
-  const modal = document.getElementById('profile-modal');
-  const inner = document.getElementById('profile-card-inner');
+  showView('profile', document.getElementById('nav-profile-tab'));
+}
+
+// Various auth/profile actions (sign in, sign out, save) used to call this to
+// dismiss the modal once they'd finished. There's no modal anymore, so it
+// just re-renders the page in place - which doubles as "show the result of
+// what you just did" (the signed-in view right after signing in, etc).
+function closeProfile() {
+  const view = document.getElementById('view-profile');
+  if (view && view.style.display !== 'none') renderProfileView();
+}
+
+function renderProfileView() {
+  const inner = document.getElementById('profile-view-inner');
+  if (!inner) return;
 
   if (!currentUser) {
     // Show sign-in screen
@@ -14528,16 +14919,14 @@ function openProfile() {
         <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
         Continue with Google
       </button>
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);text-align:center;">Your portfolio and leaderboard position will sync automatically</div>
-      <div class="profile-row" style="margin-top:12px;">
-        <button class="profile-btn secondary" id="profile-cancel-btn">Maybe later</button>
-      </div>`;
-    // Wire up after innerHTML set (onclick in innerHTML can lose scope)
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);text-align:center;">Your portfolio and leaderboard position will sync automatically</div>`;
     document.getElementById('google-signin-btn').addEventListener('click', signInWithGoogle);
-    document.getElementById('profile-cancel-btn').addEventListener('click', closeProfile);
   } else {
     // Show profile editor
     const p = userProfile;
+    const total = portVal();
+    const pnl = total - START_VALUE;
+    const pnlPct = pnl / START_VALUE * 100;
     inner.innerHTML = `
       <div class="profile-title">Your <span style="color:var(--green)">Profile</span></div>
       <div class="profile-ava-wrap">
@@ -14546,6 +14935,11 @@ function openProfile() {
           : `<div class="profile-ava" style="background:${p.avatarColor};display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:32px;color:#fff;">${(p.displayName||'?')[0].toUpperCase()}</div>`
         }
         <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);">${currentUser.email}</div>
+      </div>
+      <div class="profile-stat-row">
+        <div class="profile-stat"><div class="profile-stat-lbl">Cash</div><div class="profile-stat-val">${fmt(cash)}</div></div>
+        <div class="profile-stat"><div class="profile-stat-lbl">Total Value</div><div class="profile-stat-val">${fmt(total)}</div></div>
+        <div class="profile-stat"><div class="profile-stat-lbl">P&amp;L</div><div class="profile-stat-val" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${fmtP(pnlPct)}</div></div>
       </div>
       <label style="font-family:var(--font-mono);font-size:9px;color:var(--muted);display:block;margin-bottom:4px;">Display Name</label>
       <input class="profile-input" id="disp-name-inp" value="${p.displayName||''}" maxlength="24" placeholder="Your name...">
@@ -14559,24 +14953,23 @@ function openProfile() {
         <button class="profile-btn primary" onclick="saveProfile()">Save Profile</button>
         <button class="profile-btn secondary" onclick="saveCloudPortfolio()">Save Portfolio️</button>
       </div>
-      <div class="profile-row" style="margin-top:8px;">
-        <button class="profile-btn danger" onclick="signOutUser()">Sign Out</button>
-        <button class="profile-btn secondary" onclick="closeProfile()">Close</button>
-      </div>
-      <div class="profile-row" style="margin-top:8px;">
+      <div class="profile-section-lbl">Account</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px;">Signed in with Google as ${currentUser.email}</div>
+      <div class="profile-row">
         <button class="profile-btn secondary" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:6px;" onclick="enablePushNotifications()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>Enable Notifications</button>
       </div>
-      <div class="profile-row" style="margin-top:8px;flex-direction:column;align-items:stretch;gap:6px;">
-        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);">Payout account (for paid challenge winnings)</div>
-        <div id="connect-status-text" style="font-family:var(--font-mono);font-size:10px;color:var(--muted);">Checking status…</div>
+      <div class="profile-section-lbl">Payout Account</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:8px;">Where paid-challenge winnings get sent.</div>
+      <div id="connect-status-text" style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:8px;">Checking status…</div>
+      <div class="profile-row">
         <button class="profile-btn secondary" style="width:100%;" onclick="startConnectOnboarding()">Set Up Payout Account</button>
       </div>
-      <div class="profile-row" style="margin-top:8px;">
-        <button class="profile-btn secondary" style="width:100%;font-size:10px;opacity:0.7;" onclick="resetPriceData()">Reset all prices (rarely needed - prices self-heal on load)</button>
+      <div class="profile-section-lbl">Danger Zone</div>
+      <div class="profile-row">
+        <button class="profile-btn danger" style="width:100%;" onclick="signOutUser()">Sign Out</button>
       </div>`;
     refreshConnectStatusUI();
   }
-  modal.classList.add('open');
 }
 
 // Cached payout-account state, so the challenge tab can show a warning without
@@ -14676,8 +15069,6 @@ function renderPayoutBanner() {
       <button class="wc-join-btn" style="margin:0;" onclick="startConnectOnboarding()">${started ? 'Finish payout setup ↗' : 'Set up payout account ↗'}</button>
     </div>`;
 }
-
-function closeProfile(){ document.getElementById('profile-modal').classList.remove('open'); }
 
 function selectAvatarColor(c) {
   if (userProfile) userProfile.avatarColor = c;
@@ -15096,8 +15487,81 @@ async function loadSchedule() {
   el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Loading…</div>`;
 
   const isMLB = currentLeague === 'MLB';
+  const isGolf = currentLeague === 'GOLF';
+
+  // Golf doesn't have day-by-day team games - a tournament runs Thu-Sun and the
+  // schedule's Today/Tomorrow paging doesn't map onto that. Show the current/nearest
+  // PGA Tour event and where our tracked golfers stand in it, regardless of which
+  // day is selected, instead of the NBA scoreboard this used to silently fall back
+  // to for every non-MLB league ("No NBA games" for a golf tournament in progress).
+  if (isGolf) {
+    try {
+      const sb = await espnFetch('https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard');
+      const events = sb?.events || [];
+      const ev = events.find(e => e.status?.type?.state === 'in') || events[0];
+      if (!ev) {
+        el.innerHTML = `<div style="text-align:center;padding:48px;color:var(--muted);font-family:var(--font-mono);font-size:11px;">No PGA Tour event this week</div>`;
+        return;
+      }
+      const comp = ev.competitions?.[0];
+      const courseName = comp?.venue?.fullName || comp?.course?.name || '';
+      const statusTxt = ev.status?.type?.state === 'in' ? (ev.status?.type?.shortDetail || 'In progress')
+        : ev.status?.type?.completed ? 'Final'
+        : ev.status?.type?.shortDetail || ev.status?.type?.detail || 'Upcoming';
+      const isLive = ev.status?.type?.state === 'in';
+
+      const byNorm = {};
+      (comp?.competitors || ev.competitors || []).forEach(c => {
+        const nm = _normName(c.athlete?.displayName || c.athlete?.fullName || c.displayName || '');
+        if (!nm) return;
+        const sc = c.score ?? c.statistics?.find?.(s => /score|topar/i.test(s.name))?.value;
+        let toPar = null;
+        if (typeof sc === 'string') { if (/^e$/i.test(sc.trim())) toPar = 0; else { const n = parseInt(sc.replace('+','')); if (!isNaN(n)) toPar = n; } }
+        else if (typeof sc === 'number') toPar = sc;
+        byNorm[nm] = {
+          pos: c.status?.position?.displayName || c.status?.position?.id || '',
+          thru: c.status?.thru != null ? c.status.thru : (c.status?.hole != null ? c.status.hole : null),
+          toPar,
+        };
+      });
+
+      const ourGolfers = (typeof golfPlayers !== 'undefined' ? golfPlayers : [])
+        .map(p => ({ p, standing: byNorm[_normName(p.name)] }))
+        .filter(x => x.standing)
+        .sort((a,b) => (a.standing.toPar ?? 999) - (b.standing.toPar ?? 999));
+
+      const golferRows = ourGolfers.length
+        ? `<div class="sched-players" style="border-top:1px solid var(--border);">
+            ${ourGolfers.map(({p, standing}) => {
+              const toParStr = standing.toPar == null ? '—' : standing.toPar === 0 ? 'E' : (standing.toPar > 0 ? '+' : '') + standing.toPar;
+              const thruStr = standing.thru ? ` · thru ${standing.thru}` : '';
+              return `<div class="sched-player-chip" onclick="goMarket(${p.rank})">
+                <div class="sched-player-tier" style="background:${TIER_COLOR[p.tier]}22;color:${TIER_COLOR[p.tier]};border:1px solid ${TIER_COLOR[p.tier]}44;">${p.tier}</div>
+                <span class="sched-player-name">${standing.pos ? standing.pos + ' ' : ''}${p.name.split(' ').pop()} ${toParStr}${thruStr}</span>
+              </div>`;
+            }).join('')}
+          </div>`
+        : `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);padding-top:8px;border-top:1px solid var(--border);">None of your tracked golfers are in this field.</div>`;
+
+      el.innerHTML = `<div class="sched-game${isLive?' live':''}">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <div class="sched-team-name" style="font-size:16px;">${escHtml(ev.name || ev.shortName || 'PGA Tour')}</div>
+          ${courseName ? `<div class="sched-team-record">${escHtml(courseName)}</div>` : ''}
+          <div class="sched-status${isLive?' live':''}">${escHtml(statusTxt)}</div>
+        </div>
+        ${golferRows}
+      </div>`;
+    } catch(e) {
+      el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Schedule unavailable</div>`;
+    }
+    return;
+  }
+
+  const isNFL = currentLeague === 'NFL';
   const apiUrl = isMLB
     ? `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=${dateStr}&limit=20`
+    : isNFL
+    ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${dateStr}&limit=20`
     : `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}&limit=20`;
 
   try {
@@ -15105,7 +15569,7 @@ async function loadSchedule() {
     const events = sb.events || [];
 
     if (!events.length) {
-      el.innerHTML = `<div style="text-align:center;padding:48px;color:var(--muted);font-family:var(--font-mono);font-size:11px;">No ${isMLB?'MLB':'NBA'} games scheduled</div>`;
+      el.innerHTML = `<div style="text-align:center;padding:48px;color:var(--muted);font-family:var(--font-mono);font-size:11px;">No ${isMLB?'MLB':isNFL?'NFL':'NBA'} games scheduled</div>`;
       return;
     }
 
@@ -15427,10 +15891,23 @@ async function renderGlobalLeaderboard() {
     <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:20px;">Ranked by % return from $100,000 starting portfolio</div>
     <div id="ulb-list"><div class="g10-loading">Loading traders…</div></div>
     <div style="height:32px"></div>
-    <div style="font-family:var(--font-display);font-size:24px;letter-spacing:2px;margin-bottom:12px;">Player <span style="color:var(--gold)">Market</span></div>
-    <div id="player-lb-table"></div>`;
+    <div class="trending-header" style="padding:0;border-bottom:none;background:transparent;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div class="trending-title">High <span>Volume</span></div>
+        <button class="league-btn-compact" onclick="openLeagueDrawer()"><span id="league-label-compact">${currentLeague === 'MLB' ? 'MLB' : currentLeague === 'GOLF' ? 'Golf' : currentLeague === 'NFL' ? 'NFL' : 'NBA'}</span><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+      </div>
+      <div class="trending-sub">Players with spiking activity, buzz, and price momentum</div>
+      <div class="trending-tabs">
+        <div class="trend-tab ${activeTrendTab==='volume'?'active':''}" id="ttab-volume" onclick="setTrendTab('volume',this)">Volume Spike</div>
+        <div class="trend-tab ${activeTrendTab==='gainers'?'active':''}" id="ttab-gainers" onclick="setTrendTab('gainers',this)">Top Gainers</div>
+        <div class="trend-tab ${activeTrendTab==='losers'?'active':''}" id="ttab-losers" onclick="setTrendTab('losers',this)">Top Losers</div>
+        <div class="trend-tab ${activeTrendTab==='buzz'?'active':''}" id="ttab-buzz" onclick="setTrendTab('buzz',this)">Buzz Score</div>
+        <div class="trend-tab ${activeTrendTab==='watchlisted'?'active':''}" id="ttab-watchlisted" onclick="setTrendTab('watchlisted',this)" style="display:inline-flex;align-items:center;gap:5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Most Watched</div>
+      </div>
+    </div>
+    <div class="trending-grid" id="trending-grid" style="flex:none;overflow:visible;padding:0;"></div>`;
 
-  buildPlayerTable();
+  renderTrending();
 
   if (!db || !currentUser) {
     if (db && auth && !currentUser) setTimeout(() => buildLeaderboardFirebase(), 1500);
@@ -15730,6 +16207,7 @@ async function joinChallenge(challengeId) {
     const snap = await window._fbGetDoc(ref);
     if (!snap.exists()) { showToast('Challenge not found'); return; }
     const data = snap.data();
+    _challengeNames[challengeId] = data.name;
     if (Date.now() > data.joinDeadline) { showToast('Join deadline has passed'); return; }
 
     const entryFee = Number(data.entryFee) || 0;
@@ -15770,6 +16248,15 @@ async function joinChallenge(challengeId) {
       portfolioValueAtJoin: Math.round(portVal()),
     };
     await window._fbSetDoc(ref, { participants }, { merge: true });
+
+    // Give this challenge its own real $100,000 portfolio, independent of the
+    // regular practice portfolio and every other challenge - this is what
+    // actually honors the "same $100K start for everyone" promise (previously
+    // portfolioValueAtJoin above was captured but never used for anything).
+    const freshPortfolio = { cash: 100000, holdings: {}, logs: [], portHx: [{day:0,value:100000,t:Date.now()}], createdAt: Date.now(), savedAt: Date.now() };
+    await window._fbSetDoc(window._fbDoc(db, 'portfolios', currentUser.uid, 'challenges', challengeId), freshPortfolio);
+    _portfolios[challengeId] = freshPortfolio; // seed in memory so switching to it is instant, no round-trip
+
     showToast('You joined the challenge!');
     await renderChallengeTab();
   } catch(e) { showToast('Failed to join: ' + e.message); }
@@ -15891,6 +16378,10 @@ async function renderChallengeList() {
     const now = Date.now();
     let html = adminBtn + `<div class="wc-challenge-list">`;
     challenges.forEach(c => {
+      // Feeds the portfolio-switcher drawer's challenge names - cache every
+      // challenge here, not just the most recent, since a user can be in any
+      // of them.
+      _challengeNames[c.id] = c.name;
       const joinDeadlinePassed = now > c.joinDeadline;
       const ended = now > c.endDate;
       const status = ended ? 'ended' : joinDeadlinePassed ? 'live' : 'upcoming';
@@ -15934,6 +16425,7 @@ async function renderChallengeDetail(challengeId) {
   try {
     const docSnap = await (window._fbGetDocFromServer || window._fbGetDoc)(window._fbDoc(db, 'challenges', challengeId));
     const challenge = docSnap && docSnap.exists() ? docSnap.data() : null;
+    if (challenge) _challengeNames[challenge.id] = challenge.name;
 
     if (!challenge) {
       window._selectedChallengeId = null;
@@ -15990,18 +16482,18 @@ async function renderChallengeDetail(challengeId) {
       if (!currentUser) {
         html += `<button class="wc-join-btn" onclick="openProfile()">Sign in to Join</button>`;
       } else if (isParticipant) {
-        html += `<button class="wc-join-btn joined" disabled>Joined</button>`;
+        html += `<button class="wc-join-btn joined" onclick="goTradeInChallenge('${challenge.id}')">Joined · Trade in this challenge →</button>`;
       } else {
         html += `<button class="wc-join-btn" onclick="joinChallenge('${challenge.id}')">${enterLabel}</button>`;
       }
     } else if (!ended && joinDeadlinePassed) {
       if (isParticipant) {
-        html += `<button class="wc-join-btn joined" disabled>You're in - trading ends ${fmtDate(challenge.endDate)}</button>`;
+        html += `<button class="wc-join-btn joined" onclick="goTradeInChallenge('${challenge.id}')">You're in - trade now →</button>`;
       } else {
         html += `<button class="wc-join-btn" style="opacity:0.5" disabled>Join deadline passed</button>`;
       }
     } else if (isParticipant && !ended) {
-      html += `<button class="wc-join-btn joined" disabled>You're in - trading ends ${fmtDate(challenge.endDate)}</button>`;
+      html += `<button class="wc-join-btn joined" onclick="goTradeInChallenge('${challenge.id}')">You're in - trade now →</button>`;
     }
 
     // Payout-account warning, shown in the one place the user is thinking about
@@ -16035,6 +16527,8 @@ async function renderChallengeDetail(challengeId) {
         // size, and from the server for the same reason the old call was:
         // standings must not come off a stale local cache.
         const uniqueUids = [...new Set(participantUids)];
+        // Still needed for display metadata (name/photo/avatar) regardless of
+        // which path below computes the actual standing.
         const snaps = await Promise.all(uniqueUids.map(uid =>
           window._fbGetDocFromServer(window._fbDoc(db, 'users', uid)).catch(() => null)
         ));
@@ -16043,19 +16537,51 @@ async function renderChallengeDetail(challengeId) {
           if (snap && snap.exists()) allUsers[uniqueUids[i]] = snap.data();
         });
 
+        // Where the actual returnPct/value comes from is what the original bug
+        // was about - it used to read each participant's LIFETIME regular-
+        // portfolio return here, which has nothing to do with how they're
+        // doing in THIS challenge and doesn't even reset to $100K on join.
+        let returnByUid = {};
+        if (entryFee > 0) {
+          // Paid: same computation settlement will eventually use to pay out
+          // (trade replay against trusted prices), so live standings and the
+          // final result can never quietly diverge again.
+          try {
+            const res = await paymentsWorkerFetch(`/challenges/${challenge.id}/standings`);
+            if (res.available) res.standings.forEach(s => { returnByUid[s.uid] = { returnPct: s.returnPct, value: s.value }; });
+          } catch(e) { console.warn('[challenge] standings fetch failed:', e.message); }
+        } else {
+          // Free: no money at stake, so it's fine to read the client-writable
+          // per-challenge portfolio doc directly and value it at current
+          // prices - same trust level as the casual global leaderboard, and
+          // still a strict correctness improvement over lifetime returnPct.
+          const cSnaps = await Promise.all(uniqueUids.map(uid =>
+            window._fbGetDoc(window._fbDoc(db, 'portfolios', uid, 'challenges', challenge.id)).catch(() => null)
+          ));
+          cSnaps.forEach((snap, i) => {
+            if (!snap || !snap.exists()) return;
+            const d = snap.data();
+            const cashVal = d.cash ?? 100000;
+            let value = cashVal;
+            Object.entries(d.holdings || {}).forEach(([r, h]) => { if (h.shares > 0) value += h.shares * (liveP[r] || 0); });
+            returnByUid[uniqueUids[i]] = { returnPct: ((value - 100000) / 100000) * 100, value };
+          });
+        }
+
         const ranked = participantUids.map(uid => {
           const saved = participants[uid];
           const live = allUsers[uid] || {};
+          const computed = returnByUid[uid];
           // null, not 0: "we have no figure for this entrant" is a different
           // statement from "this entrant is flat", and only one of them is
           // safe to rank.
-          const ret = typeof live.returnPct === 'number' ? live.returnPct : null;
+          const ret = computed ? computed.returnPct : null;
           return {
             uid,
             displayName: live.displayName || saved.displayName || 'Anonymous',
             photoURL: live.photoURL || saved.photoURL || null,
             avatarColor: live.avatarColor || saved.avatarColor || '#4caf50',
-            portfolioValue: live.portfolioValue ?? saved.portfolioValueAtJoin ?? 100000,
+            portfolioValue: computed ? computed.value : 100000,
             returnPct: ret,
           };
         }).sort((a,b) => {
@@ -16226,34 +16752,6 @@ async function sendChallengeChat(challengeId) {
     if (btn) btn.disabled = false;
     inp?.focus();
   }
-}
-
-function buildPlayerTable() {
-  const sorted = [...players].sort((a,b) => liveP[b.rank]-liveP[a.rank]);
-  const tc={S:'var(--t1)',A:'var(--t2)',B:'var(--t3)',C:'var(--t4)',D:'var(--t5)'};
-  document.getElementById('player-lb-table').innerHTML = `
-    <table class="dtable">
-      <thead><tr>
-        <th style="text-align:left">#</th><th style="text-align:left">Player</th>
-        <th style="text-align:left">Team</th><th>Pos</th><th>Tier</th>
-        <th>Price</th><th>Change</th><th>${currentLeague === 'MLB' ? 'Stat' : 'PPG'}</th><th>You Own</th>
-      </tr></thead>
-      <tbody>${sorted.map((p,i)=>{
-        const price=liveP[p.rank];
-        const pct=getTodayPct(p.rank);
-        const own=holdings[p.rank]?.shares||0;
-        return `<tr onclick="goMarket(${p.rank})" style="cursor:pointer;">
-          <td style="color:var(--muted);text-align:left">${i+1}</td>
-          <td>${p.name}</td><td style="color:var(--muted)">${p.team}</td>
-          <td style="color:var(--blue);text-align:right">${p.pos}</td>
-          <td style="color:${tc[p.tier]||'var(--muted)'};text-align:right">${p.tier}</td>
-          <td style="text-align:right">${fmt(price)}</td>
-          <td style="color:${pct>=0?'var(--green)':'var(--red)'};text-align:right">${fmtP(pct)}</td>
-          <td style="text-align:right">${seasonStat(p).val}</td>
-          <td style="color:${own>0?'var(--green)':'var(--muted)'};text-align:right">${own>0?own+'sh':'—'}</td>
-        </tr>`;
-      }).join('')}</tbody>
-    </table>`;
 }
 
 // ═══════════════════════════════════════════
@@ -16623,21 +17121,6 @@ window.addEventListener('appinstalled', () => {
   showToast('Breakout added to home screen');
 });
 </script>
-<!-- Profile / Account Modal -->
-<div class="profile-modal" id="profile-modal" onclick="if(event.target===this)closeProfile()">
-  <div class="profile-card" id="profile-card-inner">
-      <div class="signin-title">Join <span style="color:var(--green)">Breakout</span></div>
-      <div class="signin-sub">Sign in to save your portfolio, compete on the leaderboard, and track your returns across devices.</div>
-      <button class="google-signin-btn" id="google-signin-btn">
-        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path></svg>
-        Continue with Google
-      </button>
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);text-align:center;">Your portfolio and leaderboard position will sync automatically</div>
-      <div class="profile-row" style="margin-top:12px;">
-        <button class="profile-btn secondary" id="profile-cancel-btn">Maybe later</button>
-      </div></div>
-</div>
-
 <!-- Firebase modular SDK - runs after app is fully loaded -->
 <script type="module">
   import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
@@ -16768,7 +17251,38 @@ window.addEventListener('appinstalled', () => {
         </div>
       </div>
 
-      <!-- SLIDE 3: CTA - challenge + sign in -->
+      <!-- SLIDE 3: What the app actually looks like, before they land in it cold -->
+      <div class="ob-slide">
+        <div class="ob-title">This is what <span>you'll see</span></div>
+        <div class="ob-body">Every player is a live price. Tap one, watch the chart, buy in.</div>
+        <div style="background:var(--card);border:1px solid var(--hairline);border-radius:12px;overflow:hidden;margin-bottom:16px;">
+          <div class="prow" style="cursor:default;">
+            <div class="pav" style="background:#0a1835;color:#3d9bff;">JT</div>
+            <div class="pinfo">
+              <div class="pname">Jayson Tatum</div>
+              <div class="psub">Boston Celtics · <span style="color:var(--blue)">SF</span> · TS</div>
+            </div>
+            <div class="pright">
+              <div class="pprice">$463.66</div>
+              <div class="pchg up">+5.8%</div>
+            </div>
+          </div>
+          <div class="prow" style="cursor:default;border-top:1px solid var(--border);">
+            <div class="pav" style="background:#1f0a0a;color:#f5445f;">AE</div>
+            <div class="pinfo">
+              <div class="pname">Anthony Edwards</div>
+              <div class="psub">Minnesota T-Wolves · <span style="color:var(--blue)">SG</span> · TS</div>
+            </div>
+            <div class="pright">
+              <div class="pprice" style="color:var(--red)">$467.64</div>
+              <div class="pchg down">-3.2%</div>
+            </div>
+          </div>
+        </div>
+        <div class="ob-body" style="font-size:11px;">Tap a player, pick a share count, and you're in.</div>
+      </div>
+
+      <!-- SLIDE 4: CTA - challenge + sign in -->
       <div class="ob-slide">
         <div class="ob-title">Back your <span>conviction</span>.</div>
         <div class="ob-body">
@@ -16793,6 +17307,7 @@ window.addEventListener('appinstalled', () => {
         <div class="ob-dot active" id="ob-dot-0"></div>
         <div class="ob-dot" id="ob-dot-1"></div>
         <div class="ob-dot" id="ob-dot-2"></div>
+        <div class="ob-dot" id="ob-dot-3"></div>
       </div>
       <div style="display:flex;align-items:center;gap:12px;">
         <button type="button" class="ob-skip" id="ob-skip" onclick="closeOnboarding()">Browse as guest</button>
@@ -16808,7 +17323,7 @@ window.addEventListener('appinstalled', () => {
 //  ONBOARDING
 // ═══════════════════════════════════════════
 let obSlide = 0;
-const OB_TOTAL = 3;
+const OB_TOTAL = 4;
 
 function obGoTo(n) {
   obSlide = n;
@@ -17018,28 +17533,28 @@ window.addEventListener('DOMContentLoaded', function() {
   </div>
   <div class="drawer-section-label">Active Season</div>
   <div class="league-option active" data-league="NBA" onclick="switchLeague(&#39;NBA&#39;)">
-    <div class="lo-icon">NBA</div>
+    <div class="lo-icon"><img src="assets/leagues/nba.png" alt="NBA"></div>
     <div class="lo-info">
       <div class="lo-name">NBA</div>
       <div class="lo-sub">250 players · Live prices</div>
     </div>
   </div>
   <div class="league-option" data-league="MLB" onclick="switchLeague(&#39;MLB&#39;)">
-    <div class="lo-icon">MLB</div>
+    <div class="lo-icon"><img src="assets/leagues/mlb.png" alt="MLB"></div>
     <div class="lo-info">
       <div class="lo-name">MLB</div>
       <div class="lo-sub">250 players · Season in progress</div>
     </div>
   </div>
   <div class="league-option" data-league="GOLF" onclick="switchLeague(&#39;GOLF&#39;)">
-    <div class="lo-icon">PGA</div>
+    <div class="lo-icon"><img src="assets/leagues/PGA.png" alt="PGA Tour"></div>
     <div class="lo-info">
       <div class="lo-name">PGA Tour</div>
       <div class="lo-sub">115 golfers · Live prices</div>
     </div>
   </div>
   <div class="league-option" data-league="NFL" onclick="switchLeague(&#39;NFL&#39;)">
-    <div class="lo-icon">NFL</div>
+    <div class="lo-icon"><img src="assets/leagues/NFL.png" alt="NFL"></div>
     <div class="lo-info">
       <div class="lo-name">NFL</div>
       <div class="lo-sub">408 players · Season starts Sept</div>
@@ -17047,7 +17562,7 @@ window.addEventListener('DOMContentLoaded', function() {
   </div>
   <div class="drawer-section-label" style="margin-top:8px">Coming Soon</div>
   <div class="league-option" style="opacity:.45;cursor:default;">
-    <div class="lo-icon">NHL</div>
+    <div class="lo-icon"><img src="assets/leagues/NHL.png" alt="NHL"></div>
     <div class="lo-info">
       <div class="lo-name">NHL</div>
       <div class="lo-sub">Coming soon</div>
@@ -17055,6 +17570,17 @@ window.addEventListener('DOMContentLoaded', function() {
   </div>
 </div>
 
+<!-- PORTFOLIO DRAWER OVERLAY -->
+<div id="portfolio-drawer-overlay" onclick="closePortfolioDrawer()"></div>
 
+<!-- PORTFOLIO DRAWER (content built dynamically by openPortfolioDrawer - which
+     challenges are joined/active depends on who's signed in) -->
+<div id="portfolio-drawer">
+  <div class="drawer-header">
+    <span>Trading In</span>
+    <button class="drawer-close" onclick="closePortfolioDrawer()" aria-label="Close" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+  </div>
+  <div id="portfolio-drawer-list"><div class="g10-loading">Loading…</div></div>
+</div>
 
 </body></html>
