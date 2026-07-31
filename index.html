@@ -587,8 +587,13 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .wc-podium-card.first .wc-podium-rank{color:var(--gold);}
 .wc-podium-name{font-family:var(--font-body);font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .wc-podium-ret{font-family:var(--font-display);font-size:18px;color:var(--green);}
-.wc-admin-btn{font-family:var(--font-mono);font-size:10px;padding:6px 14px;background:var(--card);border:1px solid var(--hairline);border-radius:6px;color:var(--muted);cursor:pointer;margin-bottom:16px;}
+.wc-admin-btn{font-family:var(--font-mono);font-size:10px;padding:6px 14px;background:var(--card);border:1px solid var(--hairline);border-radius:6px;color:var(--muted);cursor:pointer;margin-bottom:16px;margin-right:8px;}
 .wc-no-challenge{background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:32px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--muted);}
+
+/* ── Challenge list (every challenge, click one for standings/chat) ── */
+.wc-challenge-list{display:flex;flex-direction:column;gap:12px;}
+.wc-challenge-card{background:var(--card);border:1px solid var(--hairline);border-radius:12px;padding:16px 18px;cursor:pointer;transition:border-color .15s;}
+.wc-challenge-card:hover{border-color:var(--green);}
 
 /* ── Challenge Chat ── */
 .wc-chat-wrap{margin-top:24px;}
@@ -15516,7 +15521,10 @@ async function submitCreateChallenge() {
     });
     closeCreateChallenge();
     showToast('Challenge created!');
-    await renderChallengeTab();
+    // Always land back on the list (not whatever detail view was open) so
+    // the challenge just created is visibly there alongside every other one.
+    window._selectedChallengeId = null;
+    await renderChallengeList();
   } catch(e) { showToast('Failed: ' + e.message); }
 }
 
@@ -15831,25 +15839,105 @@ function renderOutcomePanel(challenge, ranked, uid) {
   </div>`;
 }
 
+// Dispatches to the list view, or back into whichever challenge's detail
+// view the user last opened (so the 60s leaderboard auto-refresh and
+// post-join/post-create re-renders don't kick someone out of a detail view
+// they're actively looking at).
 async function renderChallengeTab() {
+  if (window._selectedChallengeId) {
+    await renderChallengeDetail(window._selectedChallengeId);
+  } else {
+    await renderChallengeList();
+  }
+}
+
+function selectChallenge(challengeId) {
+  window._selectedChallengeId = challengeId;
+  renderChallengeDetail(challengeId);
+}
+
+function backToChallengeList() {
+  window._selectedChallengeId = null;
+  if (_challengeChatUnsub) { _challengeChatUnsub(); _challengeChatUnsub = null; }
+  renderChallengeList();
+}
+
+function adminCreateChallengeBtn() {
+  return isAdminUser ? `<button class="wc-admin-btn" onclick="openCreateChallenge()" style="display:inline-flex;align-items:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Create New Challenge</button>` : '';
+}
+
+// Every challenge ever created, newest first, as clickable cards - a
+// challenge no longer vanishes from the UI just because a newer one exists.
+// Click a card to see its standings/chat (renderChallengeDetail).
+async function renderChallengeList() {
+  const el = document.getElementById('lb-tab-content');
+  if (!el) return;
+  el.innerHTML = `<div class="g10-loading">Loading challenges…</div>`;
+
+  await refreshAdminClaim();
+  const adminBtn = adminCreateChallengeBtn();
+
+  if (!db) { el.innerHTML = adminBtn + `<div class="wc-no-challenge">Firebase not connected.</div>`; return; }
+
+  try {
+    const snap = await (window._fbGetDocsFromServer || window._fbGetDocs)(window._fbQuery(window._fbCollection(db, 'challenges'), window._fbOrderBy('createdAt', 'desc'), window._fbLimit(50)));
+    const challenges = snap.docs.map(d => d.data()).sort((a,b) => b.createdAt - a.createdAt);
+
+    if (!challenges.length) {
+      el.innerHTML = adminBtn + `<div class="wc-no-challenge">No challenges yet.<br><br>Check back soon.</div>`;
+      return;
+    }
+
+    const now = Date.now();
+    let html = adminBtn + `<div class="wc-challenge-list">`;
+    challenges.forEach(c => {
+      const joinDeadlinePassed = now > c.joinDeadline;
+      const ended = now > c.endDate;
+      const status = ended ? 'ended' : joinDeadlinePassed ? 'live' : 'upcoming';
+      const statusLabel = ended ? 'FINAL' : joinDeadlinePassed ? 'IN PLAY' : 'OPEN FOR ENTRY';
+      const participantUids = Object.keys(c.participants || {});
+      const entryFee = Number(c.entryFee) || 0;
+      const isParticipant = currentUser && participantUids.includes(currentUser.uid);
+      html += `<div class="wc-challenge-card" onclick="selectChallenge('${c.id}')">
+        <div class="wc-banner-header">
+          <div class="wc-title">${c.name}</div>
+          <div class="wc-badge ${status}">${statusLabel}</div>
+        </div>
+        ${c.desc ? `<div class="wc-desc">${c.desc}</div>` : ''}
+        <div class="wc-meta">
+          <div class="wc-meta-item">${entryFee > 0 ? `Entry: <span>$${entryFee}</span>` : '<span>Free</span>'}</div>
+          <div class="wc-meta-item">Entrants: <span>${participantUids.length}</span></div>
+          <div class="wc-meta-item">Ends: <span>${fmtStamp(c.endDate)}</span></div>
+        </div>
+        ${isParticipant ? `<div class="wc-badge live" style="margin-top:10px;display:inline-block;">YOU'RE IN</div>` : ''}
+      </div>`;
+    });
+    html += `</div>`;
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="wc-no-challenge" style="color:var(--red)">Could not load challenges: ${e.message}</div>`;
+  }
+}
+
+async function renderChallengeDetail(challengeId) {
   const el = document.getElementById('lb-tab-content');
   if (!el) return;
   el.innerHTML = `<div class="g10-loading">Loading challenge…</div>`;
 
   // Admin button - only rendered for users with the Firebase custom "admin" claim
   await refreshAdminClaim();
-  const adminBtn = isAdminUser ? `<button class="wc-admin-btn" onclick="openCreateChallenge()" style="display:inline-flex;align-items:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Create New Challenge</button>` : '';
+  const adminBtn = adminCreateChallengeBtn();
+  const backBtn = `<button class="wc-admin-btn" onclick="backToChallengeList()">← All Challenges</button>`;
 
-  if (!db) { el.innerHTML = adminBtn + `<div class="wc-no-challenge">Firebase not connected.</div>`; return; }
+  if (!db) { el.innerHTML = backBtn + adminBtn + `<div class="wc-no-challenge">Firebase not connected.</div>`; return; }
 
   try {
-    // Get the most recent active challenge
-    const snap = await (window._fbGetDocsFromServer || window._fbGetDocs)(window._fbQuery(window._fbCollection(db, 'challenges'), window._fbOrderBy('createdAt', 'desc'), window._fbLimit(10)));
-    const challenges = snap.docs.map(d => d.data()).sort((a,b) => b.createdAt - a.createdAt);
-    const challenge = challenges[0]; // most recent
+    const docSnap = await (window._fbGetDocFromServer || window._fbGetDoc)(window._fbDoc(db, 'challenges', challengeId));
+    const challenge = docSnap && docSnap.exists() ? docSnap.data() : null;
 
     if (!challenge) {
-      el.innerHTML = adminBtn + `<div class="wc-no-challenge">No active challenge right now.<br><br>Check back soon.</div>`;
+      window._selectedChallengeId = null;
+      el.innerHTML = backBtn + adminBtn + `<div class="wc-no-challenge">Challenge not found.</div>`;
       return;
     }
 
@@ -15873,7 +15961,7 @@ async function renderChallengeTab() {
     const netPotDollars = Math.round(potDollars * 0.9 * 100) / 100; // 10% platform fee
     const enterLabel = entryFee > 0 ? `Enter — $${entryFee}` : 'Join Challenge';
 
-    let html = adminBtn + `
+    let html = backBtn + adminBtn + `
       <div class="wc-banner">
         <div class="wc-banner-header">
           <div class="wc-title">${challenge.name}</div>
@@ -16029,13 +16117,18 @@ async function renderChallengeTab() {
       <div class="wc-chat-title">Challenge Chat</div>
       <div class="wc-chat-msgs" id="wc-chat-msgs"><div style="color:var(--muted);font-family:var(--font-mono);font-size:10px;text-align:center;padding:12px;">Loading messages…</div></div>`;
 
-    if (currentUser) {
+    if (!currentUser) {
+      html += `<div class="wc-chat-signin" onclick="openProfile()">Sign in to chat →</div>`;
+    } else if (!isParticipant) {
+      // Chat is scoped to people who actually entered - firestore.rules
+      // enforces this server-side too (see comments/{commentId}), this is
+      // just the honest UI for it rather than an input that would 400.
+      html += `<div class="wc-chat-signin" style="cursor:default;text-decoration:none;">Join this challenge to chat</div>`;
+    } else {
       html += `<div class="wc-chat-input-row">
         <input class="wc-chat-inp" id="wc-chat-inp" placeholder="Say something…" maxlength="200" onkeydown="if(event.key==='Enter')sendChallengeChat('${challenge.id}')">
         <button class="wc-chat-send" onclick="sendChallengeChat('${challenge.id}')">Send</button>
       </div>`;
-    } else {
-      html += `<div class="wc-chat-signin" onclick="openProfile()">Sign in to chat →</div>`;
     }
     html += `</div>`;
 

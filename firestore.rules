@@ -67,10 +67,18 @@ service cloud.firestore {
 
     // Comments (player comments + challenge chat, same collection) -
     // owner-authored, owner-deletable, likes are the only field anyone
-    // else can bump.
+    // else can bump. Player comments have no challengeId; challenge chat
+    // messages do, and are further restricted to that challenge's own
+    // participants - membership rides on the challenge doc's participants
+    // map, the same source settlement trusts, not anything the client
+    // asserts about itself.
     match /comments/{commentId} {
       allow read: if true;
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid
+        && (
+          !('challengeId' in request.resource.data) || request.resource.data.challengeId == null ||
+          request.auth.uid in get(/databases/$(database)/documents/challenges/$(request.resource.data.challengeId)).data.participants
+        );
       allow update: if request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']);
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
