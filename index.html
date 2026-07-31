@@ -7143,12 +7143,54 @@ const holdings={},portHx=[{day:0,value:100000,t:Date.now()}],logs=[];
 // sites read them directly - trade bar, hero header, market list ownership
 // dots, buildPortfolio, etc.) - rather than threading a portfolioId through
 // all of them, we SWAP their contents in place when the user switches which
-// portfolio they're trading in. Prices/AMM pools (liveP, pools, priceHx,
-// volume) are NOT part of this - those stay one shared market for everyone,
-// regardless of portfolio context.
+// portfolio they're trading in.
 let activePortfolioId = 'regular'; // 'regular' | challengeId
 const _portfolios = {}; // cached {cash,holdings,logs,portHx} blobs for inactive contexts
 const _challengeNames = {}; // challengeId -> name, filled in wherever a challenge doc is read
+
+// ── Per-portfolio AMM isolation ─────────────────────────────────────────────
+// liveP/pools stay exactly what they've always been: ENGINE-driven fundamental
+// price + the practice-mode market. A challenge gets its OWN pool reserves,
+// lazily created the first time that challenge actually trades a given rank,
+// seeded from the fundamental price at that moment - so a buy in one context
+// (e.g. practice mode, or a different/cheaper challenge) can never move the
+// price a DIFFERENT challenge executes trades at. Without this, a user could
+// buy a small stake in an expensive paid challenge, then buy a huge amount of
+// the same player in practice mode (zero real money at risk) to pump the
+// shared price via AMM slippage, then transact the paid-challenge position at
+// the inflated price - extracting value using capital that was never really
+// at risk. priceHx/volume (chart history, movers ticker) deliberately stay
+// global/practice-only - nothing money-relevant reads them, and scoping them
+// too would roughly double this change's surface for a cosmetic-only gain.
+// Each user's challenge pool is private/session-local (not synced across that
+// challenge's other participants) - persisted per-user via the existing
+// per-challenge localStorage blob and portfolios/{uid}/challenges/{id} doc,
+// same as cash/holdings already are. This matches existing precedent: cross-
+// client propagation of liveP via config/prices is already dead code today
+// (see startPricesListener), so the "shared market" isn't tightly synced
+// across users' live sessions even for the practice-mode pool.
+const challengePools = {}; // challengeId -> { [rank]: {x,y,k} }, lazily populated
+
+// Returns the pool object AMM math should read/write for a given portfolio
+// context + rank. 'regular' is a pure pass-through to the bare global pool -
+// byte-identical behavior to today, same object reference.
+function poolFor(portfolioId, rank){
+  if (portfolioId === 'regular') return pools[rank];
+  let cp = challengePools[portfolioId];
+  if (!cp) cp = challengePools[portfolioId] = {};
+  if (!cp[rank]) {
+    // rank arrives as a string from callers that got it via Object.entries
+    // (holdings keys are always strings) - coerce for the strict-equality
+    // player lookup, same as any other object-key access here already does.
+    const rankNum = Number(rank);
+    const p = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].find(x => x.rank === rankNum);
+    const x = getPool(p?.tier), y = x * liveP[rank];
+    cp[rank] = { x, y, k: x * y };
+  }
+  return cp[rank];
+}
+function activePool(rank){ return poolFor(activePortfolioId, rank); }
+function activePrice(rank){ const p = activePool(rank); return p.y / p.x; }
 
 // Capture the currently-active bare globals into _portfolios[activePortfolioId].
 function snapshotActivePortfolio(){
@@ -7204,6 +7246,14 @@ async function switchPortfolioContext(targetId){
     _portfolios[targetId] = blob;
   }
   loadPortfolioIntoGlobals(blob);
+  // challengePools isn't swapped through the bare globals like cash/holdings
+  // are - it's already keyed by portfolio id and stays resident for every
+  // challenge touched this session. Only seed it from the persisted blob the
+  // FIRST time this session switches into a given challenge; on later
+  // switches back, the live in-memory state is more current than any blob.
+  if (targetId !== 'regular' && !challengePools[targetId]) {
+    challengePools[targetId] = blob.pools || {};
+  }
   activePortfolioId = targetId;
 
   renderAll();
@@ -7304,7 +7354,7 @@ async function loadPortfolioBlob(portfolioId){
       const snap = await window._fbGetDoc(window._fbDoc(db, 'portfolios', currentUser.uid, 'challenges', portfolioId));
       if (snap.exists()) {
         const d = snap.data();
-        return { cash: d.cash ?? 100000, holdings: d.holdings || {}, logs: d.logs || [], portHx: d.portHx || [] };
+        return { cash: d.cash ?? 100000, holdings: d.holdings || {}, logs: d.logs || [], portHx: d.portHx || [], pools: d.pools || {} };
       }
     } catch(e) { console.warn('[portfolio] load challenge portfolio failed:', e.message); }
   }
@@ -7312,10 +7362,10 @@ async function loadPortfolioBlob(portfolioId){
     const raw = localStorage.getItem('ax_portfolio_ch_' + portfolioId);
     if (raw) {
       const d = JSON.parse(raw);
-      return { cash: d.cash ?? 100000, holdings: d.holdings || {}, logs: d.logs || [], portHx: d.portHx || [] };
+      return { cash: d.cash ?? 100000, holdings: d.holdings || {}, logs: d.logs || [], portHx: d.portHx || [], pools: d.pools || {} };
     }
   } catch(e) {}
-  return { cash: 100000, holdings: {}, logs: [], portHx: [{day:0,value:100000,t:Date.now()}] };
+  return { cash: 100000, holdings: {}, logs: [], portHx: [{day:0,value:100000,t:Date.now()}], pools: {} };
 }
 
 // Record a portfolio-value snapshot stamped with the real wall-clock time, so the
@@ -7975,7 +8025,8 @@ const ENGINE = (() => {
     const val = Math.max(0.01, base * (1 + (perf || 0)));
     liveP[p.rank] = val;
     dayOpen[p.rank] = { day: Math.floor(todayDayNum()), price: base };
-    if (pools[p.rank]) { pools[p.rank].y = pools[p.rank].x * val; syncPool(p.rank); }
+    if (pools[p.rank]) { pools[p.rank].y = pools[p.rank].x * val; syncPool(pools[p.rank]); }
+    reanchorChallengePools(p.rank, val);
     return val;
   }
 
@@ -8068,7 +8119,8 @@ const ENGINE = (() => {
         if (todayClose > 0 && closes[p.rank]) delete closes[p.rank][today]; // ghost close
         price(p, null);                        // no game → price = base exactly
       }
-      if (pools[p.rank]) { pools[p.rank].y = pools[p.rank].x * liveP[p.rank]; syncPool(p.rank); }
+      if (pools[p.rank]) { pools[p.rank].y = pools[p.rank].x * liveP[p.rank]; syncPool(pools[p.rank]); }
+      reanchorChallengePools(p.rank, liveP[p.rank]);
     });
     try { localStorage.setItem('ax_liveP_cache', JSON.stringify(liveP)); } catch(e){}
     try { _saveCloses && _saveCloses(); } catch(e){}
@@ -8076,6 +8128,20 @@ const ENGINE = (() => {
 
   function allPlayers(){ return [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers]; }
   function round1(n){ return Math.round(n * 10) / 10; }
+
+  // Real game stats move price the same way for everyone - fan a fundamental
+  // re-anchor out to any challenge pools that already exist for this rank, the
+  // same way the bare pool is re-anchored right next to each call site below.
+  // Without this a challenge that traded a rank once would freeze at that
+  // price forever, never following the player's actual game performance.
+  // Bounded cost: only loops however many challenges THIS session has
+  // actually traded in, not every challenge that exists.
+  function reanchorChallengePools(rank, val){
+    for (const cid in challengePools) {
+      const cp = challengePools[cid][rank];
+      if (cp) { cp.y = cp.x * val; syncPool(cp); }
+    }
+  }
 
   // Wipe all engine price state (clean reset). Keeps holdings/cash/portfolio.
   function reset(){
@@ -8085,7 +8151,7 @@ const ENGINE = (() => {
     ['ax_engine_base','ax_closes','ax_liveP_cache','ax_dayOpen','ax_priceHx','ax_intraday',
      'ax_pregame','ax_processed_games','ax_mlb_base','ax_moveApplied','ax_liveOpen']
       .forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
-    allPlayers().forEach(p => { liveP[p.rank] = p.statPrice; if (pools[p.rank]) pools[p.rank].y = pools[p.rank].x * p.statPrice; });
+    allPlayers().forEach(p => { liveP[p.rank] = p.statPrice; if (pools[p.rank]) pools[p.rank].y = pools[p.rank].x * p.statPrice; reanchorChallengePools(p.rank, p.statPrice); });
     deriveAll();
   }
 
@@ -8542,7 +8608,7 @@ function autoRepairPrices(reason){
       const validCloses = Object.keys(c).filter(d => _priceValid(p, c[d])).sort();
       const repaired = validCloses.length ? c[validCloses[validCloses.length-1]] : p.statPrice;
       liveP[p.rank] = repaired;
-      if (pools[p.rank]) { pools[p.rank].y = pools[p.rank].x * repaired; syncPool(p.rank); }
+      if (pools[p.rank]) { pools[p.rank].y = pools[p.rank].x * repaired; syncPool(pools[p.rank]); }
       fixed++;
     }
     // 2) Scrub corrupt entries out of stored close history.
@@ -8578,7 +8644,7 @@ try {
       const price = savedP[p.rank];
       if (_priceValid(p, price)) {
         liveP[p.rank] = price;
-        if (pools[p.rank]) { pools[p.rank].y = pools[p.rank].x * price; syncPool(p.rank); }
+        if (pools[p.rank]) { pools[p.rank].y = pools[p.rank].x * price; syncPool(pools[p.rank]); }
       } else if (price > 0) {
         console.warn(`[cache] Ignoring corrupt price for ${p.name}: $${price?.toFixed(2)}`);
       }
@@ -8595,18 +8661,20 @@ try {
 //  AMM
 // ═══════════════════════════════════════════
 function ammBuy(rank,shares){
-  const p=pools[rank];
+  const p=activePool(rank);
   if(shares<=0||shares>=p.x)return null;
   const nx=p.x-shares,ny=p.k/nx,cost=ny-p.y,np=ny/nx,avg=cost/shares,imp=(np-p.y/p.x)/(p.y/p.x)*100;
   return{cost,newX:nx,newY:ny,newPrice:np,avgPrice:avg,impact:imp};
 }
 function ammSell(rank,shares){
-  const p=pools[rank];
+  const p=activePool(rank);
   if(shares<=0)return null;
   const nx=p.x+shares,ny=p.k/nx,ret=p.y-ny,np=ny/nx,avg=ret/shares,imp=(np-p.y/p.x)/(p.y/p.x)*100;
   return{returned:ret,newX:nx,newY:ny,newPrice:np,avgPrice:avg,impact:imp};
 }
-function syncPool(r){pools[r].k=pools[r].x*pools[r].y;}
+// Takes the pool object directly (not a rank) so it works for both the bare
+// global pool and a challenge's own isolated pool.
+function syncPool(pool){pool.k=pool.x*pool.y;}
 
 // ═══════════════════════════════════════════
 //  HELPERS
@@ -8618,7 +8686,7 @@ function fmt(n){return'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDig
 function fmtS(n){return(n>=0?'+':'-')+fmt(n);}
 function fmtP(n){return(n>=0?'+':'')+n.toFixed(1)+'%';}
 function fmtMcap(n){if(n>=1e9)return'$'+(n/1e9).toFixed(1)+'B';if(n>=1e6)return'$'+(n/1e6).toFixed(1)+'M';return'$'+(n/1e3).toFixed(0)+'K';}
-function portVal(){let v=cash;Object.entries(holdings).forEach(([r,h])=>{if(h.shares>0)v+=h.shares*liveP[r];});return v;}
+function portVal(){let v=cash;Object.entries(holdings).forEach(([r,h])=>{if(h.shares>0)v+=h.shares*activePrice(r);});return v;}
 function get7DPrices(rank){const hx=priceHx[rank];return hx.length>=7?hx.slice(-7).map(h=>h.price):hx.map(h=>h.price);}
 
 // ═══════════════════════════════════════════
@@ -10582,7 +10650,7 @@ function runSim(){
     recordDayOpen(p.rank);
     liveP[p.rank]=newP;
     pools[p.rank].y=pools[p.rank].x*newP;
-    syncPool(p.rank);
+    syncPool(pools[p.rank]);
     priceHx[p.rank].push({day:todayDayNum(),price:newP});
     const ap=Math.round(((newP-cur)/cur)*1000)/10;
     if(Math.abs(ap)>Math.abs(biggest.pct))biggest={name:p.name,pct:ap};
@@ -10809,7 +10877,7 @@ async function sellAllPositions(){
   if(!currentUser){ showToast('Sign in to trade'); return; }
   const held = Object.entries(holdings).filter(([,h])=>h.shares>0);
   if(!held.length){ showToast('No positions to sell'); return; }
-  const totalVal = held.reduce((s,[r,h])=>s+h.shares*liveP[r],0);
+  const totalVal = held.reduce((s,[r,h])=>s+h.shares*activePrice(r),0);
   const ok = await showTradeConfirm('sell', held.length, totalVal, 'ALL positions');
   if(!ok) return;
   held.forEach(([rank,h])=>{
@@ -10833,13 +10901,16 @@ function applyBuy(rank, shares, r){
   if(!holdings[rank])holdings[rank]={shares:0,totalCost:0};
   holdings[rank].shares+=shares;
   holdings[rank].totalCost+=r.cost;
-  liveP[rank]=r.newPrice;
-  pools[rank].x=r.newX;pools[rank].y=r.newY;syncPool(rank);
+  // liveP / the shared config/prices sync only ever reflect the practice/
+  // fundamental market - a challenge's own AMM drift lives entirely in its
+  // own pool (challengePools), never leaking into the price every other
+  // context sees.
+  if (activePortfolioId === 'regular') { liveP[rank]=r.newPrice; pushTradePrice(rank, r.newPrice); }
+  const ap=activePool(rank); ap.x=r.newX; ap.y=r.newY; syncPool(ap);
   volume[rank]=(volume[rank]||0)+shares;
   priceHx[rank].push({day:todayDayNum(),price:r.newPrice});
   const pName = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers].find(x=>x.rank===rank)?.name || '';
   logs.unshift({type:'buy',shares,amount:r.cost,name:pName,price:r.newPrice});
-  pushTradePrice(rank, r.newPrice);
   pushTradeToFeed(rank, 'buy', shares, r.newPrice, pName);
   flashHero(true);
 }
@@ -10849,13 +10920,12 @@ function applySell(rank, sell, r){
   const avg=holdings[rank].totalCost/holdings[rank].shares;
   holdings[rank].shares-=sell;
   holdings[rank].totalCost=Math.max(0,holdings[rank].shares*avg);
-  liveP[rank]=r.newPrice;
-  pools[rank].x=r.newX;pools[rank].y=r.newY;syncPool(rank);
+  if (activePortfolioId === 'regular') { liveP[rank]=r.newPrice; pushTradePrice(rank, r.newPrice); }
+  const ap=activePool(rank); ap.x=r.newX; ap.y=r.newY; syncPool(ap);
   volume[rank]=(volume[rank]||0)+sell;
   priceHx[rank].push({day:todayDayNum(),price:r.newPrice});
   const pName = players.find(x=>x.rank===rank)?.name || '';
   logs.unshift({type:'sell',shares:sell,amount:r.returned,name:pName,price:r.newPrice});
-  pushTradePrice(rank, r.newPrice);
   pushTradeToFeed(rank, 'sell', sell, r.newPrice, pName);
   flashHero(false);
 }
@@ -10910,12 +10980,13 @@ function settleTrade(id){
     if(!holdings[rank])holdings[rank]={shares:0,totalCost:0};
     holdings[rank].shares+=shares;
     holdings[rank].totalCost+=ammResult.cost;
-    liveP[rank]=ammResult.newPrice;
-    pools[rank].x=ammResult.newX;pools[rank].y=ammResult.newY;syncPool(rank);
+    // Use pid (captured at queue time), not activePortfolioId - the user may
+    // have switched contexts while this trade was pending.
+    if (pid === 'regular') { liveP[rank]=ammResult.newPrice; pushTradePrice(rank, ammResult.newPrice); }
+    { const p=poolFor(pid, rank); p.x=ammResult.newX; p.y=ammResult.newY; syncPool(p); }
     volume[rank]=(volume[rank]||0)+shares;
     priceHx[rank].push({day:todayDayNum(),price:ammResult.newPrice});
     logs.unshift({type:'buy',shares,amount:ammResult.cost,name,price:ammResult.newPrice});
-    pushTradePrice(rank, ammResult.newPrice);
     pushTradeToFeed(rank, 'buy', shares, ammResult.newPrice, name, pid);
     flashHero(true);
     showToast(`\u2705 BUY executed: ${shares} × ${name}`);
@@ -10926,12 +10997,11 @@ function settleTrade(id){
       const avg=(holdings[rank].totalCost||0)/Math.max(1,(holdings[rank].shares||0)+shares);
       holdings[rank].totalCost=Math.max(0,holdings[rank].shares*avg);
     }
-    liveP[rank]=ammResult.newPrice;
-    pools[rank].x=ammResult.newX;pools[rank].y=ammResult.newY;syncPool(rank);
+    if (pid === 'regular') { liveP[rank]=ammResult.newPrice; pushTradePrice(rank, ammResult.newPrice); }
+    { const p=poolFor(pid, rank); p.x=ammResult.newX; p.y=ammResult.newY; syncPool(p); }
     volume[rank]=(volume[rank]||0)+shares;
     priceHx[rank].push({day:todayDayNum(),price:ammResult.newPrice});
     logs.unshift({type:'sell',shares,amount:ammResult.returned,name,price:ammResult.newPrice});
-    pushTradePrice(rank, ammResult.newPrice);
     pushTradeToFeed(rank, 'sell', shares, ammResult.newPrice, name, pid);
     flashHero(false);
     showToast(`\u2705 SELL executed: ${shares} × ${name}`);
@@ -11060,7 +11130,7 @@ function updateHero(){
     if (players.length) { selRank = players[0].rank; return updateHero(); }
     return;
   }
-  const price=liveP[selRank];
+  const price=activePrice(selRank);
   // Header % reflects the SELECTED range so it matches the active range button and
   // the chart's line (not a separate "today" number that reads as contradictory).
   const pct=_rangePct(selRank, chartRange);
@@ -11396,7 +11466,7 @@ function updateHero(){
 
 function updatePreview(){
   const shares=parseInt(document.getElementById('sinp').value)||0;
-  const price=liveP[selRank];
+  const price=activePrice(selRank);
   document.getElementById('pv-price').textContent=fmt(price);
   if(tradeMode==='buy'){
     const r=shares>0?ammBuy(selRank,shares):null;
@@ -11655,7 +11725,7 @@ function startPricesListener() {
           if (pl && !_priceValid(pl, price)) return; // reject inflated prices
           if (Math.abs(price - liveP[r]) / liveP[r] < 0.0001) return;
           liveP[r] = price;
-          if (pools[r]) { pools[r].y = pools[r].x * price; syncPool(r); }
+          if (pools[r]) { pools[r].y = pools[r].x * price; syncPool(pools[r]); }
           changed = true;
         });
         if (changed) {
@@ -11858,7 +11928,7 @@ async function loadPricesFromFirestore() {
         const pl = allP.find(x => x.rank === r);
         if (pl && !_priceValid(pl, price)) return;
         liveP[r] = price;
-        if (pools[r]) { pools[r].y = pools[r].x * price; syncPool(r); }
+        if (pools[r]) { pools[r].y = pools[r].x * price; syncPool(pools[r]); }
         applied++;
       });
     }
@@ -13147,7 +13217,7 @@ function buildPortfolio(){
   let todayPnl = 0;
   Object.entries(holdings).forEach(([rk, h]) => {
     if (!h || !(h.shares > 0)) return;
-    const cur = liveP[rk]; if (!(cur > 0)) return;
+    const cur = activePrice(rk); if (!(cur > 0)) return;
     const avg = h.totalCost / h.shares;
     const base = (dayOpen[rk] && dayOpen[rk].price > 0) ? dayOpen[rk].price : avg;
     todayPnl += (cur - base) * h.shares;
@@ -13199,12 +13269,12 @@ function buildPortfolio(){
     <table class="dtable"><thead><tr>
       <th>Player</th><th>Shares</th><th>Avg Buy</th><th>Cur Price</th><th>Value</th><th>Today</th><th>Total P&L</th><th>P&L %</th><th></th>
     </tr></thead><tbody>`;
-    held.sort(([a],[b])=>holdings[b].shares*liveP[b]-holdings[a].shares*liveP[a])
+    held.sort(([a],[b])=>holdings[b].shares*activePrice(b)-holdings[a].shares*activePrice(a))
       .forEach(([rank,h])=>{
         const r = parseInt(rank);
         const p = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers].find(x=>x.rank===r);
         if (!p) return;
-        const cur=liveP[rank],avg=h.totalCost/h.shares;
+        const cur=activePrice(rank),avg=h.totalCost/h.shares;
         const pnlH=(cur-avg)*h.shares,ppH=h.totalCost>0?pnlH/h.totalCost*100:0;
         // Today's P/L: current price vs today's opening price for this player. If we don't
         // have a today-open yet (e.g. bought fresh today), fall back to avg buy so it
@@ -13396,6 +13466,7 @@ function saveLocalPortfolio(portfolioId = 'regular') {
     try {
       localStorage.setItem('ax_portfolio_ch_' + portfolioId, JSON.stringify({
         cash, holdings, logs: logs.slice(0, 50), portHx: portHx.slice(-400), savedAt: Date.now(),
+        pools: challengePools[portfolioId] || {}, // this challenge's own AMM drift, not the shared market
       }));
     } catch(e) {}
     return;
@@ -13479,7 +13550,7 @@ function loadLocalPortfolio() {
             return; // keep statPrice
           }
           liveP[r] = price;
-          if (pools[r]) { pools[r].y = pools[r].x * price; syncPool(r); }
+          if (pools[r]) { pools[r].y = pools[r].x * price; syncPool(pools[r]); }
         }
       });
     }
@@ -14818,6 +14889,9 @@ async function saveCloudPortfolio(silent = false, portfolioId = activePortfolioI
       cash, holdings,
       logs: logs.slice(-50),
       savedAt: window._fbServerTimestamp(),
+      // This challenge's own AMM drift, not the shared practice market -
+      // never written to the 'regular' doc.
+      ...(portfolioId !== 'regular' ? { pools: challengePools[portfolioId] || {} } : {}),
     }, { merge: true });   // MERGE - without this, every app save overwrote the whole doc
                            // and wiped the portHx history that snapshotPortfolios writes
                            // server-side each hour, so the portfolio chart never had data.
