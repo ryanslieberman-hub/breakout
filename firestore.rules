@@ -13,14 +13,24 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Trade log - append-only, owner-authored. Real money DOES ride on this:
-    // worker-payments replays these docs at challenge settlement, so a
-    // malformed/fabricated price or shares value here is a payout integrity
-    // issue, not just cosmetic. These are cheap local shape checks only - no
-    // get() calls, no attempt to validate `price` against a trusted market
-    // price (that requires cross-doc lookups and stays server-side, in
-    // worker-payments/src/lib/tradeReplay.js's price-band check at
-    // settlement time, which is the actual authority here).
+    // Trade log - append-only, owner-authored. Tamper-resistant (create-only,
+    // no update/delete) which is exactly why settlement replays THIS
+    // collection rather than trusting any client-writable portfolio snapshot.
+    // Each doc carries a portfolioId (null = regular practice portfolio, else
+    // a challengeId) so settlement can filter to a specific challenge's trades
+    // precisely, instead of an ambiguous time window that breaks once a user
+    // is in two overlapping challenges. A client mislabeling its own
+    // portfolioId only misfiles the trade into the wrong replay bucket - it
+    // can't forge value, so no rule change is needed for this field.
+    //
+    // price/shares/rank/type DO need shape checks here: settlement replays
+    // `price` directly into cost/credit math (see worker-payments'
+    // tradeReplay.js), so an unconstrained field here was a payout-integrity
+    // hole, not a cosmetic one. These are cheap local checks only - no get()
+    // calls, no attempt to validate `price` against a trusted market price
+    // (that requires cross-doc lookups and stays server-side, in
+    // tradeReplay.js's price-band check at settlement time, which is the
+    // actual authority on price legitimacy).
     match /trades/{tradeId} {
       allow read: if true;
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid
@@ -63,6 +73,18 @@ service cloud.firestore {
 
     match /portfolios/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      // One doc per challenge the user has joined, same trust level as the
+      // parent doc above (client-writable convenience cache for fast
+      // display/reload, e.g. "your challenge portfolio is worth $X right
+      // now"). Just like the parent, this is NEVER the source of truth for
+      // real-money settlement - that independently replays the tamper-
+      // resistant /trades log (now tagged with portfolioId) against trusted
+      // prices. A client could set cash here to anything; it can't forge a
+      // payout because settlement never reads this doc.
+      match /challenges/{challengeId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
     }
 
     // Comments (player comments + challenge chat, same collection) -

@@ -134,6 +134,19 @@ async function handleStripeWebhook(request, env) {
       amountPaidCents: session.amount_total,
       stripeSessionId: session.id,
     });
+    // Give this challenge its own real $100,000 portfolio for the paying
+    // entrant, same as the free-join path - this doc is a client-writable
+    // display cache only (see firestore.rules), never the settlement source
+    // of truth. Naturally idempotent on webhook retry: a retry can only land
+    // here before the client has traded in this challenge, so re-writing a
+    // fresh $100k start is still correct.
+    await firestorePatchDoc(env, `portfolios/${uid}/challenges/${challengeId}`, {
+      cash: 100000,
+      holdings: {},
+      logs: [],
+      createdAt: Date.now(),
+      savedAt: Date.now(),
+    });
   }
   if (event.type === 'identity.verification_session.verified') {
     const session = event.data.object;
@@ -483,19 +496,36 @@ export async function runSettlementSweep(env) {
   return { checked: ended.length, attempted: unsettled.length, settled: settledCount };
 }
 
-// Returns true if the challenge was actually marked settled, false if it was
-// safely skipped (missing trusted price data, non-NBA holdings, etc.) - the
-// sweep will simply retry it next time.
-async function settleChallenge(env, challenge) {
+// Shared by settleChallenge() (payout side effects, below) and the read-only
+// GET /challenges/:id/standings endpoint (live display, no side effects) -
+// both need exactly the same "how well is each participant actually doing in
+// THIS challenge" computation. That was the actual root cause of the original
+// bug: live standings and final settlement used to be two different
+// computations (one read the user's lifetime portfolio return, the other
+// replayed trades) that could quietly disagree. Now there's exactly one.
+//
+// Filters trades by an explicit portfolioId tag rather than a time window -
+// a time window breaks the instant a user is in two overlapping challenges,
+// since the same trade would land in both windows. A client mislabeling its
+// own trade's portfolioId only misfiles it into the wrong replay bucket, it
+// can't forge value (see firestore.rules' /trades comment).
+//
+// asOfMs defaults to "now" (for a live, still-running challenge) but callers
+// settling a genuinely-ended challenge should pass challenge.endDate - never
+// look for a trusted close on a date that hasn't happened yet.
+//
+// Returns { ranked: [{uid,value,returnPct}], blockedReason: string|null }.
+// blockedReason is set (and ranked is empty) when a held position has no
+// trusted closing price yet - callers decide what that means for them
+// (settlement waits/escalates; a live read just shows "unavailable").
+async function computeChallengeStandings(env, challenge, asOfMs = Date.now()) {
   const participants = challenge.participants || {};
   const participantUids = Object.keys(participants);
-  if (participantUids.length === 0) {
-    await firestorePatchDoc(env, `challenges/${challenge.id}`, { settled: true, settledAt: Date.now(), payouts: [] });
-    return true;
-  }
+  if (participantUids.length === 0) return { ranked: [], blockedReason: null };
 
-  const asOfDate = easternDateStr(challenge.endDate);
-  const priceEngineDocCache = {}; // rank -> priceEngine doc (or null), fetched at most once per rank per sweep
+  const windowEnd = Math.min(challenge.endDate, asOfMs);
+  const asOfDate = easternDateStr(windowEnd);
+  const priceEngineDocCache = {}; // rank -> priceEngine doc (or null), fetched at most once per rank per call
 
   async function priceEngineDoc(rank) {
     if (rank in priceEngineDocCache) return priceEngineDocCache[rank];
@@ -521,23 +551,19 @@ async function settleChallenge(env, challenge) {
     return doc ? doc.statPrice ?? null : null;
   }
 
-  // Score ONLY what happened inside the challenge window. `trades` is a
-  // lifetime, append-only log, so replaying all of it ranks people on activity
-  // from before the challenge existed - and since every replay restarts from a
-  // single $100k, a long history inevitably overdraws and gets mass-rejected
-  // (one user showed 11 "tampered" trades that were nothing of the sort).
-  // The product promises "same $100K start for everyone, no carryover"; this
-  // is what makes settlement actually mean it.
-  const windowStart = challenge.joinDeadline || challenge.createdAt || 0;
-  const windowEnd = challenge.endDate;
-
   const valuations = [];
   for (const uid of participantUids) {
-    const allTrades = await firestoreQuery(env, 'trades', [{ field: 'uid', op: 'EQUAL', value: uid }]);
-    const trades = allTrades.filter(t => t.ts >= windowStart && t.ts <= windowEnd);
-    const { cash, holdings, rejected } = await replayTrades(trades, getStatPrice);
+    const trades = await firestoreQuery(env, 'trades', [
+      { field: 'uid', op: 'EQUAL', value: uid },
+      { field: 'portfolioId', op: 'EQUAL', value: challenge.id },
+    ]);
+    // ts <= windowEnd stays as defense-in-depth even though portfolioId is now
+    // the real filter - catches a correctly-tagged trade somehow timestamped
+    // after the cutoff, which shouldn't happen but costs nothing to guard.
+    const inWindow = trades.filter(t => t.ts <= windowEnd);
+    const { cash, holdings, rejected } = await replayTrades(inWindow, getStatPrice);
     if (rejected.length) {
-      console.warn(`${rejected.length} rejected (invalid) in-window trade(s) for ${uid} in challenge ${challenge.id}`);
+      console.warn(`${rejected.length} rejected (invalid) trade(s) for ${uid} in challenge ${challenge.id}`);
     }
 
     const heldRanks = Object.keys(holdings).map(Number);
@@ -545,28 +571,7 @@ async function settleChallenge(env, challenge) {
     for (const rank of heldRanks) {
       const price = await trustedPrice(rank);
       if (price == null) {
-        // Long-dead challenges whose price data never materialised were retrying
-        // every hour forever, burning a sweep and filling the logs with the same
-        // six errors. Past a grace period the data isn't coming, so flag it and
-        // stop. Deliberately NOT marked `settled` - that would make an unpaid
-        // challenge indistinguishable from one that paid out correctly. This
-        // needs a human, so it's recorded as needing one.
-        const STALE_MS = 14 * 24 * 60 * 60 * 1000;
-        const reason = `no trusted ${leagueForRank(rank)} price for rank ${rank} (held by ${uid}) as of ${asOfDate}`;
-        if (Date.now() - challenge.endDate > STALE_MS) {
-          await firestorePatchDoc(env, `challenges/${challenge.id}`, {
-            settlementBlocked: true,
-            settlementBlockedReason: reason,
-            settlementBlockedAt: Date.now(),
-          });
-          console.error(
-            `Challenge ${challenge.id} ended over 14 days ago and still cannot be priced (${reason}) - ` +
-            `flagged settlementBlocked and will no longer be retried. Needs manual review.`
-          );
-          return false;
-        }
-        console.error(`Challenge ${challenge.id}: ${reason} - skipping automatic settlement, will retry next sweep.`);
-        return false;
+        return { ranked: [], blockedReason: `no trusted ${leagueForRank(rank)} price for rank ${rank} (held by ${uid}) as of ${asOfDate}` };
       }
       priceByRank[rank] = price;
     }
@@ -576,7 +581,44 @@ async function settleChallenge(env, challenge) {
     valuations.push({ uid, value, returnPct });
   }
 
-  const ranked = valuations.sort((a, b) => b.returnPct - a.returnPct);
+  return { ranked: valuations.sort((a, b) => b.returnPct - a.returnPct), blockedReason: null };
+}
+
+// Returns true if the challenge was actually marked settled, false if it was
+// safely skipped (missing trusted price data, non-NBA holdings, etc.) - the
+// sweep will simply retry it next time.
+async function settleChallenge(env, challenge) {
+  const participants = challenge.participants || {};
+  const participantUids = Object.keys(participants);
+  if (participantUids.length === 0) {
+    await firestorePatchDoc(env, `challenges/${challenge.id}`, { settled: true, settledAt: Date.now(), payouts: [] });
+    return true;
+  }
+
+  const { ranked, blockedReason } = await computeChallengeStandings(env, challenge, challenge.endDate);
+  if (blockedReason) {
+    // Long-dead challenges whose price data never materialised were retrying
+    // every hour forever, burning a sweep and filling the logs with the same
+    // six errors. Past a grace period the data isn't coming, so flag it and
+    // stop. Deliberately NOT marked `settled` - that would make an unpaid
+    // challenge indistinguishable from one that paid out correctly. This
+    // needs a human, so it's recorded as needing one.
+    const STALE_MS = 14 * 24 * 60 * 60 * 1000;
+    if (Date.now() - challenge.endDate > STALE_MS) {
+      await firestorePatchDoc(env, `challenges/${challenge.id}`, {
+        settlementBlocked: true,
+        settlementBlockedReason: blockedReason,
+        settlementBlockedAt: Date.now(),
+      });
+      console.error(
+        `Challenge ${challenge.id} ended over 14 days ago and still cannot be priced (${blockedReason}) - ` +
+        `flagged settlementBlocked and will no longer be retried. Needs manual review.`
+      );
+    } else {
+      console.error(`Challenge ${challenge.id}: ${blockedReason} - skipping automatic settlement, will retry next sweep.`);
+    }
+    return false;
+  }
 
   const entryFee = Number(challenge.entryFee) || 0;
   const potCents = Math.round(participantUids.length * entryFee * 100);
@@ -695,6 +737,35 @@ async function settleChallenge(env, challenge) {
   return true;
 }
 
+// Read-only live standings for a challenge - the SAME computation settlement
+// uses (see computeChallengeStandings above), just without the payout side
+// effects, and evaluated as of "now" instead of the challenge's end date so
+// it works while a challenge is still running. This is the actual fix for
+// live standings previously reading each user's lifetime portfolio return
+// instead of their performance in this specific challenge.
+//
+// Cached for 90s via the Workers Cache API (not Firestore) - cheap to add,
+// bounds Firestore read cost under repeated client polling, no schema change.
+async function handleChallengeStandings(request, env, challengeId) {
+  const cache = caches.default;
+  const cacheKey = new Request(new URL(request.url).toString(), request);
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
+
+  const challenge = await firestoreGetDoc(env, `challenges/${challengeId}`);
+  if (!challenge) return json({ error: 'Challenge not found' }, 404, env);
+
+  const { ranked, blockedReason } = await computeChallengeStandings(env, challenge);
+  const body = blockedReason
+    ? { available: false, reason: blockedReason }
+    : { available: true, standings: ranked };
+
+  const response = json(body, 200, env);
+  response.headers.set('Cache-Control', 'public, max-age=90');
+  await cache.put(cacheKey, response.clone());
+  return response;
+}
+
 // ── Router ──
 export default {
   async fetch(request, env) {
@@ -723,6 +794,11 @@ export default {
       }
       if (request.method === 'GET' && url.pathname === '/internal/stripe-info') {
         return await handleStripeInfo(request, env);
+      }
+      if (request.method === 'GET' && /^\/challenges\/[^/]+\/standings$/.test(url.pathname)) {
+        await requireUser(request, env); // any signed-in user, not admin-only - this moves no money
+        const challengeId = url.pathname.split('/')[2];
+        return await handleChallengeStandings(request, env, challengeId);
       }
       // Manual trigger for the settlement sweep. ADMIN ONLY: this moves real
       // money (it creates Stripe transfers), so it must never be reachable by
