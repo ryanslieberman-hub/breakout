@@ -128,7 +128,13 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants'])
         && request.resource.data.participants.diff(resource.data.get('participants', {})).affectedKeys().hasOnly([request.auth.uid]);
 
-      allow delete: if false;
+      // Deleting a challenge can erase the only record of a real settled
+      // payout, so this is deliberately narrower than the admin claim used
+      // for create/update above - it also requires the request to come from
+      // this exact account email, not just anyone an admin claim gets
+      // granted to in the future.
+      allow delete: if request.auth != null && request.auth.token.admin == true
+        && request.auth.token.email == 'ryanslieberman@gmail.com';
     }
 
     // Push notification device tokens - keyed by the token itself, not uid.
