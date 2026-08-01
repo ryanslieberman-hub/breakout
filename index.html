@@ -16423,6 +16423,23 @@ function backToChallengeList() {
   renderChallengeList();
 }
 
+// Permanently removes a challenge doc. Gated narrower than every other admin
+// action here (see the matching firestore.rules check) because this can
+// erase the only record of a real settled payout, not just data a client is
+// allowed to lose - the button that calls this is only ever rendered for
+// that same one account.
+async function deleteChallenge(challengeId) {
+  const name = _challengeNames[challengeId] || challengeId;
+  if (!confirm(`Permanently delete "${name}"? This cannot be undone.`)) return;
+  try {
+    await window._fbDeleteDoc(window._fbDoc(db, 'challenges', challengeId));
+    showToast('Challenge deleted');
+    backToChallengeList();
+  } catch(e) {
+    showToast('Delete failed: ' + e.message);
+  }
+}
+
 function adminCreateChallengeBtn() {
   return isAdminUser ? `<button class="wc-admin-btn" onclick="openCreateChallenge()" style="display:inline-flex;align-items:center;gap:5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Create New Challenge</button>` : '';
 }
@@ -16493,6 +16510,10 @@ async function renderChallengeDetail(challengeId) {
   await refreshAdminClaim();
   const adminBtn = adminCreateChallengeBtn();
   const backBtn = `<button class="wc-admin-btn" onclick="backToChallengeList()">← All Challenges</button>`;
+  // Delete is narrower than the admin claim used for create/update - see the
+  // matching firestore.rules check - since it can erase the only record of
+  // a real settled payout, not just data a client is allowed to lose.
+  const canDelete = isAdminUser && currentUser?.email === 'ryanslieberman@gmail.com';
 
   if (!db) { el.innerHTML = backBtn + adminBtn + `<div class="wc-no-challenge">Firebase not connected.</div>`; return; }
 
@@ -16500,6 +16521,12 @@ async function renderChallengeDetail(challengeId) {
     const docSnap = await (window._fbGetDocFromServer || window._fbGetDoc)(window._fbDoc(db, 'challenges', challengeId));
     const challenge = docSnap && docSnap.exists() ? docSnap.data() : null;
     if (challenge) _challengeNames[challenge.id] = challenge.name;
+    // Name is looked up from _challengeNames at click time (set two lines up)
+    // rather than threaded through the onclick string, so a challenge name
+    // containing a quote can't break the inline handler.
+    const deleteBtn = (canDelete && challenge)
+      ? `<button class="wc-admin-btn" style="color:var(--red);border-color:#ff335544;" onclick="deleteChallenge('${challengeId}')">Delete Challenge</button>`
+      : '';
 
     if (!challenge) {
       window._selectedChallengeId = null;
@@ -16527,7 +16554,7 @@ async function renderChallengeDetail(challengeId) {
     const netPotDollars = Math.round(potDollars * 0.9 * 100) / 100; // 10% platform fee
     const enterLabel = entryFee > 0 ? `Enter — $${entryFee}` : 'Join Challenge';
 
-    let html = backBtn + adminBtn + `
+    let html = backBtn + adminBtn + deleteBtn + `
       <div class="wc-banner">
         <div class="wc-banner-header">
           <div class="wc-title">${challenge.name}</div>
