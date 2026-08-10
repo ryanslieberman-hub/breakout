@@ -106,6 +106,20 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
+    // Global chat (main-nav Chat tab) - owner-authored, owner-deletable, separate
+    // collection from `comments` (player/challenge threads) since this has much
+    // higher volume and uses a plain orderBy query rather than client-side filtering.
+    // `trade` is an optional embedded card (rank/type/shares/price/playerName) for
+    // "share a trade" posts - display-only, never read by settlement or pricing.
+    match /globalChat/{msgId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid
+        && request.resource.data.kind in ['text', 'trade']
+        && request.resource.data.text is string && request.resource.data.text.size() <= 280;
+      allow update: if false;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
     // Challenges: admins (Firebase custom "admin" claim) may create a
     // challenge and edit its non-participant fields directly (name, dates,
     // description, entryFee).

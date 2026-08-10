@@ -77,7 +77,7 @@ button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px so
 button,[role="button"],.nav-tab,.tf,.qc,.ctab,.rb{
   -webkit-touch-callout:none; -webkit-user-select:none; user-select:none;
 }
-.plist,.port-view,.lb-view,.g10-wrap,.trending-grid,#view-schedule,#view-feed,.news-pane,.wc-chat-msgs,#chat-messages{overscroll-behavior:contain;}
+.plist,.port-view,.lb-view,.g10-wrap,.trending-grid,#view-schedule,#view-chat,.news-pane,.wc-chat-msgs,#chat-messages{overscroll-behavior:contain;}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}}
 
 /* ── NAV ── */
@@ -121,6 +121,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 /* ── MOVERS BAR ── */
 .movers-bar{height:32px;flex-shrink:0;display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--dim);overflow:hidden;padding:0 20px;}
 .movers-label{font-family:var(--font-mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-right:16px;flex-shrink:0;}
+.movers-range{display:flex;align-items:center;gap:2px;margin-right:16px;flex-shrink:0;}
+.movers-range-btn{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 7px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer;border-radius:4px;transition:all .15s;}
+.movers-range-btn:hover{color:var(--text);}
+.movers-range-btn.active{color:var(--green);border-color:var(--hairline);background:var(--bg);}
 /* The label needs to stay put and unfaded, so the mask/clip lives on this
    viewport rather than on .movers-bar itself - same two-layer structure as
    the onboarding ticker (.ob-ticker / .ob-ticker-track). */
@@ -421,6 +425,15 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 /* Replies sit indented under their parent with a connector rail. */
 .comment-card.is-reply{margin-left:20px;border-left:2px solid var(--border2);border-radius:6px;background:#ffffff05;}
 .comment-card.is-reply.own{border-left-color:#12d47e55;}
+.chat-trade-card{display:flex;align-items:center;gap:8px;margin-top:4px;padding:7px 10px;background:var(--bg);border:1px solid var(--hairline);border-radius:6px;cursor:pointer;transition:border-color .12s;}
+.chat-trade-card:hover{border-color:var(--green);}
+.chat-trade-pick{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background .12s;}
+.chat-trade-pick:hover{background:var(--bg);}
+.chat-trade-type{font-family:var(--font-mono);font-size:8px;letter-spacing:1px;font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0;}
+.chat-trade-type.buy{color:var(--green);background:#12d47e18;}
+.chat-trade-type.sell{color:var(--red);background:#f5445f18;}
+.chat-trade-name{font-family:var(--font-mono);font-size:11px;color:var(--fg);font-weight:700;}
+.chat-trade-sub{font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-left:auto;}
 .g10-table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10px;}
 .g10-table th{color:var(--muted);font-weight:400;padding:3px 6px;text-align:right;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);}
 .g10-table th:first-child{text-align:left;}
@@ -434,9 +447,9 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .g10-bar{flex:1;border-radius:6px 2px 0 0;min-height:2px;}
 .g10-loading{padding:30px;text-align:center;color:var(--muted);font-family:var(--font-mono);font-size:10px;}
 
-/* ── Activity Feed (social tape) ── */
-#view-feed::-webkit-scrollbar{width:4px;}
-#view-feed::-webkit-scrollbar-thumb{background:var(--border2);border-radius:6px;}
+/* ── Chat ── */
+#view-chat::-webkit-scrollbar{width:4px;}
+#view-chat::-webkit-scrollbar-thumb{background:var(--border2);border-radius:6px;}
 .fx-day{font-family:var(--font-mono);font-size:8px;letter-spacing:2px;color:var(--muted);padding:14px 4px 6px;}
 .fx-day:first-child{padding-top:4px;}
 .fx-row{display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:8px;cursor:pointer;transition:background .12s;border-bottom:1px solid var(--border);}
@@ -1048,6 +1061,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .league-option.active .lo-name { color: var(--green); }
 .lo-icon { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 1px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 8px; color: var(--muted); background: #fff; flex-shrink: 0; overflow: hidden; }
 .lo-icon img { width: 100%; height: 100%; object-fit: contain; padding: 4px; box-sizing: border-box; }
+.lo-fallback { display:none; align-items:center; justify-content:center; width:100%; height:100%; font-family:var(--font-mono); font-size:9px; font-weight:700; letter-spacing:1px; color:var(--muted); }
 .lo-info { display: flex; flex-direction: column; gap: 3px; }
 .lo-name { font-size: 14px; color: var(--fg); font-weight: 600; }
 .lo-sub  { font-size: 10px; color: var(--muted); }
@@ -1422,7 +1436,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   <button type="button" class="nav-tab" id="nav-portfolio-tab" onclick="showView(&#39;portfolio&#39;,this)" style="display:none"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M8 8 V6 a2 2 0 0 1 2-2 h4 a2 2 0 0 1 2 2 V8"/></svg><span class="tab-label-full">Portfolio</span><span class="tab-label-mobile">Portfolio</span></button>
   <button type="button" class="nav-tab" onclick="showView(&#39;leaderboard&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21 h8"/><path d="M12 17 v4"/><path d="M7 4 h10 v6 a5 5 0 0 1-10 0 Z"/><path d="M7 6 H4 a1 1 0 0 0-1 1 v1 a3 3 0 0 0 3 3"/><path d="M17 6 h3 a1 1 0 0 1 1 1 v1 a3 3 0 0 1-3 3"/></svg><span class="tab-label-full">Leaderboard</span><span class="tab-label-mobile">Leaders</span></button>
   <button type="button" class="nav-tab" id="nav-schedule-tab" onclick="showView(&#39;schedule&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10 h18"/><path d="M8 3 v4"/><path d="M16 3 v4"/></svg><span class="tab-label-full">Schedule</span><span class="tab-label-mobile">Schedule</span></button>
-  <button type="button" class="nav-tab" onclick="showView(&#39;feed&#39;,this)" id="nav-feed-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12 h4 l2 -7 l4 14 l2 -7 h6"/></svg><span class="tab-label-full">Activity</span><span class="tab-label-mobile">Feed</span><span class="feed-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: 4px; vertical-align: middle;"></span></button>
+  <button type="button" class="nav-tab" onclick="showView(&#39;chat&#39;,this)" id="nav-chat-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg><span class="tab-label-full">Chat</span><span class="tab-label-mobile">Chat</span><span class="chat-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: 4px; vertical-align: middle;"></span></button>
   <button type="button" class="nav-tab" onclick="showView('profile',this)" id="nav-profile-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span class="tab-label-full">Profile</span><span class="tab-label-mobile">Profile</span></button>
   </div>
   <div class="nav-right">
@@ -1444,6 +1458,11 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 <!-- MOVERS BAR -->
 <div class="movers-bar">
   <div class="movers-label" id="movers-header">Today</div>
+  <div class="movers-range" id="movers-range">
+    <button class="movers-range-btn active" data-range="1D" onclick="setMoversRange('1D')">1D</button>
+    <button class="movers-range-btn" data-range="1W" onclick="setMoversRange('1W')">1W</button>
+    <button class="movers-range-btn" data-range="1M" onclick="setMoversRange('1M')">1M</button>
+  </div>
   <div class="movers-viewport">
   <div class="movers-scroll" id="movers-scroll">
     <div class="mover-item" onclick="selectPlayerFromList(85)" style="cursor:pointer">
@@ -5542,14 +5561,23 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   </div>
 </div>
 
-<!-- ACTIVITY FEED VIEW -->
-<div id="view-feed" class="view" style="display:none;flex-direction:column;overflow-y:auto;padding:0;max-width:640px;margin:0 auto;width:100%;box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;">
-  <div style="padding:20px 20px 12px;position:sticky;top:0;background:var(--bg);z-index:10;border-bottom:1px solid var(--border2);">
-    <div style="font-family:var(--font-display);font-size:22px;letter-spacing:1px;">Activity Feed</div>
-    <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px;">All trades across Breakout · <span style="color:var(--green);">● live</span></div>
+<!-- CHAT VIEW -->
+<div id="view-chat" class="view" style="display:none;flex-direction:column;overflow:hidden;max-width:640px;margin:0 auto;width:100%;box-sizing:border-box;">
+  <div style="padding:20px 20px 12px;border-bottom:1px solid var(--border2);flex-shrink:0;">
+    <div style="font-family:var(--font-display);font-size:22px;letter-spacing:1px;">Chat</div>
+    <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px;">Talk trades, talk games · <span style="color:var(--green);">● live</span></div>
   </div>
-  <div id="feed-list" style="display:flex;flex-direction:column;padding:12px 16px;gap:0;">
-    <div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Loading feed…</div>
+  <div id="gchat-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;">
+    <div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Loading chat…</div>
+  </div>
+  <div id="gchat-signin-prompt" style="display:none;padding:14px 20px;text-align:center;color:var(--muted);font-family:var(--font-mono);font-size:10px;border-top:1px solid var(--border2);flex-shrink:0;">Sign in to join the chat</div>
+  <div id="gchat-input-area" style="display:none;padding:10px 14px;border-top:1px solid var(--border2);flex-shrink:0;flex-direction:column;gap:8px;">
+    <div id="gchat-trade-picker" style="display:none;flex-direction:column;gap:4px;background:var(--card);border:1px solid var(--hairline);border-radius:8px;padding:8px;max-height:160px;overflow-y:auto;"></div>
+    <div style="display:flex;gap:8px;align-items:flex-end;">
+      <button class="nbtn" onclick="toggleTradePicker()" title="Share a recent trade" style="flex-shrink:0;">Share Trade</button>
+      <textarea id="gchat-input" rows="1" maxlength="280" placeholder="Talk trades, mention games…" style="flex:1;background:var(--bg);border:1px solid var(--hairline);border-radius:8px;padding:8px 10px;color:var(--fg);font-family:var(--font-mono);font-size:11px;resize:none;max-height:100px;" onkeydown="if(event.key==='Enter'&amp;&amp;!event.shiftKey){event.preventDefault();sendChatMessage();}"></textarea>
+      <button class="nbtn" onclick="sendChatMessage()" style="flex-shrink:0;">Send</button>
+    </div>
   </div>
 </div>
 
@@ -8222,6 +8250,15 @@ async function mlbFetchSchedule(dateStr){
   return out;
 }
 
+// MLB's "innings pitched" is outs notation, not decimal: .1 = 1 out (⅓ inning),
+// .2 = 2 outs (⅔ inning) — NOT tenths. parseFloat("6.1") is 6.1, not the true 6.333.
+function _mlbIpToDecimal(raw){
+  const v = parseFloat(raw) || 0;
+  const whole = Math.floor(v);
+  const outs = Math.round((v - whole) * 10);   // the digit after the dot IS the outs count
+  return whole + outs / 3;
+}
+
 // Fetch one game's boxscore and return an array of stat objects mapped to OUR ranks.
 async function mlbFetchBox(gamePk){
   const url = `${MLB_API_BASE}/game/${gamePk}/boxscore`;
@@ -8267,11 +8304,12 @@ async function mlbFetchBox(gamePk){
       if (isP && (pit.inningsPitched != null)){
         results.push({
           rank: rp.rank, name: full,
-          ip: parseFloat(pit.inningsPitched) || 0,
+          ip: _mlbIpToDecimal(pit.inningsPitched),
           kp: pit.strikeOuts || 0,
           er: pit.earnedRuns || 0,
           bb: pit.baseOnBalls || 0,
           h:  pit.hits || 0,
+          hr: pit.homeRuns || 0,
           role: rp.role
         });
       } else if (!isP && (bat.atBats != null || bat.baseOnBalls != null)){
@@ -8317,6 +8355,9 @@ async function mlbFetchBoxes(gamePks){
         h: add('h'), hr: add('hr'), rbi: add('rbi'), ab: add('ab'), k: add('k'), bb: add('bb'),
         // pitcher counting stats (harmless for hitters - undefined→0)
         ip: add('ip'), kp: add('kp'), er: add('er'),
+        // fielding stats (harmless for pitchers - undefined→0); pos keeps the later game's value
+        errors: add('errors'), dp: add('dp'), assists: add('assists'), putouts: add('putouts'), cs: add('cs'),
+        pos: st.pos || prior.pos,
         _doubleheader: true,
       };
     });
@@ -8353,6 +8394,11 @@ async function mlbTick(isFinal=false){
         const stat = statMap[p.rank];
         if (!stat) return;
         writeMLBStatLineOfficial(p, stat, today, !!liveStatMap[p.rank]);
+        // Record today as this SP's last start, for the anticipation-drift mechanic.
+        if (p.role === 'SP' && stat.ip > 0 && pitcherLastStart[p.rank] !== today) {
+          pitcherLastStart[p.rank] = today;
+          _savePitcherLastStart();
+        }
       });
     }
 
@@ -8509,7 +8555,7 @@ function writeMLBStatLineOfficial(p, st, dateStr, isLive){
     lastNight[p.rank] = {
       played:true, date:dateStr, live:!!isLive, mlbRole:p.role,
       pts: st.kp||0, reb: st.er||0, ast: 0, min: st.ip||0, tov: 0,
-      bb: st.bb||0, stl: st.bb||0, fg: `${st.ip||0} IP`, fg3: `${st.kp||0} K`, h: st.h||0
+      bb: st.bb||0, stl: st.bb||0, fg: `${st.ip||0} IP`, fg3: `${st.kp||0} K`, h: st.h||0, blk: st.hr||0
     };
   } else {
     const h = st.h||0, ab = st.ab||0, hr = st.hr||0;
@@ -9111,7 +9157,11 @@ function _savePitcherLastStart() {
 // or final line move by that line; players with no game sit at base (+ any pitcher
 // anticipation, itself derived). Replaces the old compounding drift mutation.
 function applyPitcherAnticipation() {
-  deriveAllMLB();
+  // Was deriveAllMLB() → resolveMLBStats(), a retired ESPN-era name matcher with no
+  // accent stripping (unlike mlbTick's _normName path) that could silently drop
+  // accented names. ENGINE.deriveAll() already reads the correctly-populated
+  // window._engineStats that mlbTick maintains, so route straight through it.
+  ENGINE.deriveAll();
 }
 
 // ── SINGLE canonical MLB stat-line writer ──────────────────────────────────
@@ -10287,11 +10337,18 @@ async function fetchGolfLiveStats(isFinal=false) {
     const byName = {};
     for (const ev of eventsToProcess) {
       const evLive = ev.status?.type?.state === 'in';
-      // This event's date (used as the round date).
-      let evDate = today;
-      const rawDate = ev.competitions?.[0]?.date || ev.date || ev.endDate;
-      if (rawDate) { const d = new Date(rawDate); if (!isNaN(d)) evDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-      if (evLive) evDate = today;
+      // This event's date (used as the round date) - ALWAYS today, the local calendar
+      // date this poll is running. Used to fall back to ev.competitions[0].date/ev.date
+      // once the event left the 'in' state, but that's the tournament's static START
+      // date (Thursday) - the instant the final round finishes and the event flips to
+      // completed, evDate jumped BACKWARD to Thursday, which already equalled round 1's
+      // stored history key. That made the "prior date" lookup below come up empty
+      // (nothing is < Thursday when Thursday is the earliest key), so hasPrior went
+      // false and the round score got set to the whole tournament's cumulative total
+      // instead of just the final round's delta - and it overwrote round 1's history
+      // entry in the process. Keeping this as today keeps it monotonically increasing
+      // across all 4 rounds so the delta math (below) stays correct through the finish.
+      const evDate = today;
 
       const comp = ev.competitions?.[0];
       const competitors = comp?.competitors || ev.competitors || [];
@@ -12010,11 +12067,66 @@ async function loadPricesFromFirestore() {
   }
 }
 
+let moversRange = '1D';   // '1D' | '1W' | '1M'
+function setMoversRange(r){
+  moversRange = r;
+  document.querySelectorAll('#movers-range .movers-range-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.range === r);
+  });
+  updateMovers();
+}
+
+// Movers over a fixed lookback window (1W/1M), diffed off the closes[] history rather
+// than "today's slate" - every player in the league is eligible, not just those who
+// played today, since a week/month move isn't tied to tonight's games.
+function buildFromRange(days){
+  const leaguePlayers = currentLeague === 'MLB' ? mlbPlayers
+                      : currentLeague === 'GOLF' ? golfPlayers
+                      : nbaPlayers;
+  const baselineDate = localDateStr(days);
+  return leaguePlayers.map(p => {
+    const c = closes[p.rank] || {};
+    const dates = Object.keys(c).filter(d => c[d] > 0).sort();
+    if (!dates.length) return null;
+    const latestDate = dates[dates.length - 1];
+    const latestClose = c[latestDate];
+    const priorDates = dates.filter(d => d <= baselineDate);
+    // If we don't have a close as far back as the window, fall back to the earliest
+    // close on file rather than skipping the player entirely - a shorter-than-window
+    // history is still real movement, just measured from whenever we started tracking.
+    const baseClose = priorDates.length ? c[priorDates[priorDates.length - 1]] : c[dates[0]];
+    if (!(baseClose > 0)) return null;
+    const current = (liveP[p.rank] > 0) ? liveP[p.rank] : latestClose;
+    const pct = (current - baseClose) / baseClose * 100;
+    return { rank: p.rank, name: p.name, pct };
+  })
+  .filter(m => m && Math.abs(m.pct) > 0.5)
+  .sort((a,b) => Math.abs(b.pct) - Math.abs(a.pct))
+  .slice(0, 10);
+}
+
 function updateMovers(){
   const leaguePlayers = currentLeague === 'MLB' ? mlbPlayers
                       : currentLeague === 'GOLF' ? golfPlayers
                       : nbaPlayers;
   let sorted = [];
+
+  if (moversRange !== '1D') {
+    sorted = buildFromRange(moversRange === '1W' ? 7 : 30);
+    const moversHeader = document.getElementById('movers-header');
+    if (moversHeader) moversHeader.textContent = moversRange === '1W' ? '1 Week' : '1 Month';
+    const moversHtml = sorted.map(p=>`
+      <div class="mover-item" onclick="selectPlayerFromList(${p.rank})" style="cursor:pointer">
+        <span class="mover-name">${p.name.split(' ').pop()}</span>
+        <span class="mover-price">${fmt(liveP[p.rank])}</span>
+        <span class="mover-pct ${p.pct>=0?'up':'down'}">${fmtP(p.pct)}</span>
+      </div>`).join('');
+    const scrollEl = document.getElementById('movers-scroll');
+    scrollEl.innerHTML = sorted.length ? moversHtml + moversHtml
+      : '<div class="mover-item"><span class="mover-name" style="color:var(--muted)">No movers yet</span></div>';
+    scrollEl.classList.toggle('ticking', sorted.length > 0);
+    return;
+  }
 
   const todayStr = localDateStr();
   const ydStr = localDateStr(1);
@@ -12852,21 +12964,21 @@ function flashHero(up){
 //  VIEWS
 // ═══════════════════════════════════════════
 function showView(v,el){
-  ['market','portfolio','leaderboard','schedule','feed','profile'].forEach(n=>{
+  ['market','portfolio','leaderboard','schedule','chat','profile'].forEach(n=>{
     const el2 = document.getElementById('view-'+n);
     if (el2) el2.style.display = n===v ? 'flex' : 'none';
   });
   document.querySelectorAll('.nav-tab').forEach(e=>e.classList.remove('active'));
   if (el) el.classList.add('active');
   // League switcher only makes sense while looking at the player market -
-  // it has nothing to do with Portfolio/Leaders/Schedule/Feed/Profile.
+  // it has nothing to do with Portfolio/Leaders/Schedule/Chat/Profile.
   const leagueBtn = document.getElementById('league-btn');
   if (leagueBtn) leagueBtn.style.display = (v==='market') ? '' : 'none';
   if(v==='portfolio')buildPortfolio();
   if(v==='leaderboard') buildLeaderboardFirebase();
   if(v==='market')setTimeout(()=>drawMain(),30);
   if(v==='schedule') loadSchedule();
-  if(v==='feed') showFeedView();
+  if(v==='chat') showChatView();
   if(v==='profile') renderProfileView();
 }
 
@@ -14734,9 +14846,10 @@ function initFirebase() {
     }
   });
 
-  // Start feed listener immediately - it's public read, no auth needed
-  // Small delay to let Firestore connection settle
+  // Start the trade log + chat listeners immediately - both are public read, no auth
+  // needed. Small delay to let Firestore connection settle.
   setTimeout(startFeedListener, 500);
+  setTimeout(startChatListener, 500);
 
   // ONE-TIME: reset Firestore inflated prices
   if (!localStorage.getItem('ax_fs_price_reset_v3') && db) {
@@ -15317,10 +15430,13 @@ async function resetPriceData() {
 //  USER LEADERBOARD
 // ═══════════════════════════════════════════
 // ═══════════════════════════════════════════
-//  GLOBAL ACTIVITY FEED
+//  TRADE LOG (background) - powers the Chat tab's "Share Trade" picker
 // ═══════════════════════════════════════════
+// Keeps a small rolling window of recent trades across all users so Chat can offer
+// the signed-in user's own recent buys/sells without a dedicated per-user Firestore
+// query (and the composite index that would need). No UI reads this directly.
 let _feedListener = null;
-let _feedItems = [];   // cache so re-opening view is instant
+let _feedItems = [];
 const FEED_LIMIT = 50;
 
 function startFeedListener() {
@@ -15334,162 +15450,213 @@ function startFeedListener() {
     );
     _feedListener = window._fbOnSnapshot(q, (snap) => {
       _feedItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // If feed view is currently visible, re-render live
-      if (document.getElementById('view-feed')?.style.display !== 'none') {
-        renderFeed();
-      }
-      // Badge the tab with a dot if there's a new trade and feed isn't open
-      if (document.getElementById('view-feed')?.style.display === 'none') {
-        const tab = document.getElementById('nav-feed-tab');
-        if (tab && !tab.querySelector('.feed-dot')) {
+    }, (err) => {
+      console.warn('Trade log listener error:', err.message);
+      _feedListener = null;
+    });
+  } catch(e) {
+    console.warn('Could not start trade log listener:', e.message);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  GLOBAL CHAT
+// ═══════════════════════════════════════════
+// Its own Firestore collection (not the "comments" collection used by per-player and
+// per-challenge chat) - those pull the WHOLE collection client-side before filtering
+// by playerRank/challengeId, a scale wart that's fine at their volume but not for a
+// main-nav chat with much higher traffic. A plain orderBy query here avoids that.
+let _chatListener = null;
+let _chatItems = [];
+const CHAT_LIMIT = 100;
+let _tradePickerOpen = false;
+let _chatTradeCandidates = [];
+
+function startChatListener() {
+  if (!db || !window._fbOnSnapshot || !window._fbQuery || !window._fbCollection) return;
+  if (_chatListener) return; // already running
+  try {
+    const q = window._fbQuery(
+      window._fbCollection(db, 'globalChat'),
+      window._fbOrderBy('createdAt', 'desc'),
+      window._fbLimit(CHAT_LIMIT)
+    );
+    _chatListener = window._fbOnSnapshot(q, (snap) => {
+      _chatItems = snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse();
+      if (document.getElementById('view-chat')?.style.display !== 'none') {
+        renderChat();
+      } else {
+        const tab = document.getElementById('nav-chat-tab');
+        if (tab && !tab.querySelector('.chat-dot')) {
           const dot = document.createElement('span');
-          dot.className = 'feed-dot';
+          dot.className = 'chat-dot';
           dot.style.cssText = 'display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:4px;vertical-align:middle;';
           tab.appendChild(dot);
         }
       }
     }, (err) => {
-      console.warn('Feed listener error:', err.message);
-      _feedListener = null;
+      console.warn('Chat listener error:', err.message);
+      _chatListener = null;
     });
-    console.log('Activity feed listener started');
   } catch(e) {
-    console.warn('Could not start feed listener:', e.message);
+    console.warn('Could not start chat listener:', e.message);
   }
 }
 
-function showFeedView() {
-  // Clear new-trade badge dot
-  const tab = document.getElementById('nav-feed-tab');
-  if (tab) { const dot = tab.querySelector('.feed-dot'); if (dot) dot.remove(); }
+function showChatView() {
+  const tab = document.getElementById('nav-chat-tab');
+  if (tab) { const dot = tab.querySelector('.chat-dot'); if (dot) dot.remove(); }
 
-  if (_feedItems.length) {
-    renderFeed();
-    return;
+  const inputArea = document.getElementById('gchat-input-area');
+  const signinPrompt = document.getElementById('gchat-signin-prompt');
+  if (currentUser) {
+    if (inputArea) inputArea.style.display = 'flex';
+    if (signinPrompt) signinPrompt.style.display = 'none';
+  } else {
+    if (inputArea) inputArea.style.display = 'none';
+    if (signinPrompt) signinPrompt.style.display = 'block';
   }
 
-  // Show loading while we wait
-  const el = document.getElementById('feed-list');
-  if (el) el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Loading feed…</div>';
+  if (_chatItems.length) { renderChat(); return; }
 
-  // Try to start listener - if db not ready yet, poll until it is
+  const el = document.getElementById('gchat-messages');
+  if (el) el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Loading chat…</div>';
+
   const _tryStart = (attemptsLeft) => {
-    if (_feedItems.length) return; // already got data
+    if (_chatItems.length) return;
     if (db) {
-      startFeedListener();
-      // Also do a one-shot fetch for immediate display while listener connects
-      if (!_feedItems.length && window._fbGetDocs && window._fbQuery && window._fbCollection && window._fbOrderBy && window._fbLimit) {
+      startChatListener();
+      if (!_chatItems.length && window._fbGetDocs && window._fbQuery && window._fbCollection && window._fbOrderBy && window._fbLimit) {
         window._fbGetDocs(window._fbQuery(
-          window._fbCollection(db, 'trades'),
-          window._fbOrderBy('ts', 'desc'),
-          window._fbLimit(FEED_LIMIT)
+          window._fbCollection(db, 'globalChat'),
+          window._fbOrderBy('createdAt', 'desc'),
+          window._fbLimit(CHAT_LIMIT)
         )).then(snap => {
-          if (_feedItems.length) return; // listener already delivered
-          _feedItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          if (document.getElementById('view-feed')?.style.display !== 'none') renderFeed();
+          if (_chatItems.length) return; // listener already delivered
+          _chatItems = snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse();
+          if (document.getElementById('view-chat')?.style.display !== 'none') renderChat();
         }).catch(e => {
-          console.warn('Feed fetch failed:', e.message);
-          if (!_feedItems.length) {
+          console.warn('Chat fetch failed:', e.message);
+          if (!_chatItems.length) {
             const isAuth = e.code === 'permission-denied' || e.message?.includes('permission') || e.message?.includes('Missing or insufficient');
             if (el) el.innerHTML = isAuth
-              ? '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Sign in to see the trade feed</div>'
-              : `<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Feed unavailable - ${e.message || 'unknown error'}</div>`;
+              ? '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Sign in to see chat</div>'
+              : `<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Chat unavailable - ${e.message || 'unknown error'}</div>`;
           }
         });
       }
     } else if (attemptsLeft > 0) {
       setTimeout(() => _tryStart(attemptsLeft - 1), 800);
     } else {
-      if (el && !_feedItems.length) el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Feed unavailable - Firebase not ready</div>';
+      if (el && !_chatItems.length) el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Chat unavailable - Firebase not ready</div>';
     }
   };
   _tryStart(8); // retry up to 8 times (~6.4s total)
 }
 
-function renderFeed() {
-  const el = document.getElementById('feed-list');
+function renderChat() {
+  const el = document.getElementById('gchat-messages');
   if (!el) return;
-  if (!_feedItems.length) {
-    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">No trades yet. Someone has to make the first move.</div>';
+  if (!_chatItems.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">No messages yet. Say something.</div>';
     return;
   }
 
-  const leagueTag = t => {
-    let lg = t.league;
-    if (!lg && typeof t.rank === 'number') lg = t.rank >= 3001 ? 'NFL' : t.rank >= 2001 ? 'GOLF' : t.rank >= 1001 ? 'MLB' : 'NBA';
-    return `<span class="fx-lg">${lg || ''}</span>`;
-  };
-  const shortName = n => {
-    const parts = String(n || 'Anonymous').trim().split(/\s+/);
-    return parts.length > 1 ? parts[0] + ' ' + parts[parts.length-1][0] + '.' : parts[0];
-  };
-  const fmtK = v => v >= 1000 ? '$' + (v/1000).toFixed(v >= 10000 ? 0 : 1) + 'K' : '$' + Math.round(v).toLocaleString();
-  // The verb carries the size. No two rows read alike unless the trades really were alike.
-  const verbFor = g => g.type === 'buy'
-    ? (g.value >= 10000 ? 'went all in on' : g.value >= 2500 ? 'loaded up on' : g.value >= 500 ? 'bought' : 'picked up')
-    : (g.value >= 10000 ? 'dumped' : g.value >= 2500 ? 'sold off' : 'sold');
-  const dayLbl = ts => {
-    if (!ts) return '';
-    const d = new Date(ts), now = new Date();
-    const day = d.toDateString();
-    if (day === now.toDateString()) return 'TODAY';
-    if (day === new Date(Date.now() - 86400000).toDateString()) return 'YESTERDAY';
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase();
-  };
-  const avaFor = t => t.photoURL
-    ? `<img class="feed-ava" src="${t.photoURL}" onerror="this.style.display='none';this.nextSibling.style.display='flex'" alt="">
-       <div class="feed-ava-init" style="display:none;background:${t.avatarColor||'#4caf50'}">${(t.displayName||'?')[0].toUpperCase()}</div>`
-    : `<div class="feed-ava-init" style="background:${t.avatarColor||'#4caf50'}">${(t.displayName||'?')[0].toUpperCase()}</div>`;
+  const avaFor = m => m.photoURL
+    ? `<img class="comment-ava" src="${m.photoURL}" onerror="this.style.display='none';this.nextSibling.style.display='flex'" alt="">
+       <div class="comment-ava-init" style="display:none;background:${m.avatarColor||'#4caf50'}">${(m.displayName||'?')[0].toUpperCase()}</div>`
+    : `<div class="comment-ava-init" style="background:${m.avatarColor||'#4caf50'}">${(m.displayName||'?')[0].toUpperCase()}</div>`;
 
-  // Collapse consecutive runs of the same trader hammering the same player the same
-  // direction into ONE row with a multiplier. Four identical buys read as one story
-  // ("bought x4"), not four copies of the same card.
-  const grouped = [];
-  _feedItems.forEach(t => {
-    const last = grouped[grouped.length - 1];
-    if (last && last.displayName === t.displayName && last.rank === t.rank && last.type === t.type) {
-      last.count++;
-      last.shares += (t.shares || 0);
-      last.value  += (t.price || 0) * (t.shares || 0);
-      last.ts = Math.max(last.ts || 0, t.ts || 0);
-    } else {
-      grouped.push({ ...t, count: 1, shares: t.shares || 0, value: (t.price || 0) * (t.shares || 0) });
-    }
-  });
-
-  // Top moves: the three biggest of the last 24h get a featured strip.
-  const top = grouped
-    .filter(g => g.value > 0 && (g.ts || 0) > Date.now() - 86400000)
-    .sort((a, b) => b.value - a.value).slice(0, 3);
-  let topHtml = '';
-  if (top.length) {
-    topHtml = `<div class="fx-top-lbl">TOP MOVES · 24H</div><div class="fx-top">` + top.map(g =>
-      `<div class="fx-top-card" onclick="goMarket(${g.rank})">
-        <div class="fx-top-val">${fmtK(g.value)}</div>
-        <div class="fx-top-who">${escHtml(shortName(g.displayName))} ${g.type === 'buy' ? '→' : '↘'} ${escHtml(g.playerName || '')}</div>
-      </div>`).join('') + `</div>`;
-  }
-
-  let lastDay = null;
-  const rows = grouped.map(g => {
-    const isBuy = g.type === 'buy';
-    const dl = dayLbl(g.ts);
-    const divider = dl !== lastDay ? `<div class="fx-day">${dl}</div>` : '';
-    lastDay = dl;
-    const whale = g.value >= 10000;
-    const mult = g.count > 1 ? ` <span class="fx-x">×${g.count}</span>` : '';
-    const avgP = g.shares ? (g.value / g.shares) : 0;
-    return `${divider}<div class="fx-row" onclick="goMarket(${g.rank})">
-      ${avaFor(g)}
-      <div class="fx-body">
-        <div class="fx-line"><b>${escHtml(shortName(g.displayName))}</b> ${verbFor(g)} <b>${escHtml(g.playerName || '')}</b> ${leagueTag(g)}${mult}</div>
-        <div class="fx-sub">${g.shares} share${g.shares !== 1 ? 's' : ''}${avgP ? ' @ $' + avgP.toFixed(2) : ''} · ${feedTimeAgo(g.ts)}</div>
-      </div>
-      <div class="fx-val ${whale ? 'whale' : isBuy ? 'buy' : 'sell'}">${g.value ? fmtK(g.value) : ''}</div>
-    </div>`;
+  el.innerHTML = _chatItems.map(m => {
+    const isOwn = currentUser && m.uid === currentUser.uid;
+    const ts = m.createdAt?.toMillis ? m.createdAt.toMillis() : (m.ts || 0);
+    const tradeCard = (m.kind === 'trade' && m.trade) ? `
+      <div class="chat-trade-card" onclick="goMarket(${m.trade.rank})">
+        <span class="chat-trade-type ${m.trade.type}">${m.trade.type === 'buy' ? 'BOUGHT' : 'SOLD'}</span>
+        <span class="chat-trade-name">${escHtml(m.trade.playerName||'')}</span>
+        <span class="chat-trade-sub">${m.trade.shares} sh @ $${Number(m.trade.price||0).toFixed(2)}</span>
+      </div>` : '';
+    return `
+      <div class="comment-card ${isOwn?'own':''}">
+        <div class="comment-header">
+          ${avaFor(m)}
+          <span class="comment-name">${escHtml(m.displayName||'Trader')}</span>
+          <span class="comment-time">${feedTimeAgo(ts)}</span>
+        </div>
+        ${m.text ? `<div class="comment-body">${escHtml(m.text)}</div>` : ''}
+        ${tradeCard}
+      </div>`;
   }).join('');
+  el.scrollTop = el.scrollHeight;
+}
 
-  el.innerHTML = topHtml + rows;
+async function sendChatMessage() {
+  if (!currentUser || !db) { showToast('Sign in to chat'); return; }
+  const input = document.getElementById('gchat-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  if (text.length > 280) { showToast('Keep it under 280 chars'); return; }
+
+  input.value = '';
+  input.style.height = 'auto';
+  try {
+    await window._fbAddDoc(window._fbCollection(db, 'globalChat'), {
+      uid: currentUser.uid,
+      displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
+      photoURL: currentUser.photoURL || null,
+      avatarColor: userProfile?.avatarColor || '#4caf50',
+      text,
+      kind: 'text',
+      createdAt: window._fbServerTimestamp(),
+    });
+  } catch(e) {
+    showToast('Failed to send: ' + (e.code || e.message));
+    input.value = text; // restore on failure
+  }
+}
+
+// Lets a user post one of their own recent trades into chat as a card - "show off
+// trades" - without hand-typing it. Pulled from the trade log cache (_feedItems),
+// filtered client-side to this user, so it needs no extra Firestore query/index.
+function toggleTradePicker() {
+  if (!currentUser) { showToast('Sign in to share a trade'); return; }
+  const picker = document.getElementById('gchat-trade-picker');
+  if (!picker) return;
+  _tradePickerOpen = !_tradePickerOpen;
+  if (!_tradePickerOpen) { picker.style.display = 'none'; return; }
+
+  _chatTradeCandidates = _feedItems.filter(t => t.uid === currentUser.uid).slice(0, 5);
+  picker.innerHTML = _chatTradeCandidates.length
+    ? _chatTradeCandidates.map((t, i) => `
+        <div class="chat-trade-pick" onclick="postTradeToChat(${i})">
+          <span class="chat-trade-type ${t.type}">${t.type === 'buy' ? 'BOUGHT' : 'SOLD'}</span>
+          <span class="chat-trade-name">${escHtml(t.playerName||'')}</span>
+          <span class="chat-trade-sub">${t.shares} sh @ $${Number(t.price||0).toFixed(2)} · ${feedTimeAgo(t.ts)}</span>
+        </div>`).join('')
+    : '<div style="padding:8px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">No recent trades yet - go make one.</div>';
+  picker.style.display = 'flex';
+}
+
+async function postTradeToChat(idx) {
+  const t = _chatTradeCandidates[idx];
+  if (!t || !currentUser || !db) return;
+  const picker = document.getElementById('gchat-trade-picker');
+  if (picker) { picker.style.display = 'none'; _tradePickerOpen = false; }
+  try {
+    await window._fbAddDoc(window._fbCollection(db, 'globalChat'), {
+      uid: currentUser.uid,
+      displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
+      photoURL: currentUser.photoURL || null,
+      avatarColor: userProfile?.avatarColor || '#4caf50',
+      text: '',
+      kind: 'trade',
+      trade: { rank: t.rank, type: t.type, shares: t.shares, price: t.price, playerName: t.playerName || '' },
+      createdAt: window._fbServerTimestamp(),
+    });
+  } catch(e) {
+    showToast('Failed to share trade: ' + (e.code || e.message));
+  }
 }
 
 function feedTimeAgo(ts) {
@@ -16903,7 +17070,6 @@ async function loadLast10(rank) {
 
                 if ((p.role === 'SP' || p.role === 'RP') && isPitchingBlock) {
                   const ip = get('IP');
-                  console.log(`[g10] pitcher match: ${p.name} ip="${ip}" in game ${ev.id}`);
                   if (!ip || ip === '—' || ip === '0.0') continue;
                   found = {
                     date: `${yyyy}-${mm}-${dd}`, opp: oppAbbr,
@@ -17607,28 +17773,28 @@ window.addEventListener('DOMContentLoaded', function() {
   </div>
   <div class="drawer-section-label">Active Season</div>
   <div class="league-option active" data-league="NBA" onclick="switchLeague(&#39;NBA&#39;)">
-    <div class="lo-icon"><img src="assets/leagues/nba.png" alt="NBA"></div>
+    <div class="lo-icon"><img src="assets/leagues/nba.png" alt="NBA" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="lo-fallback">NBA</span></div>
     <div class="lo-info">
       <div class="lo-name">NBA</div>
       <div class="lo-sub">250 players · Live prices</div>
     </div>
   </div>
   <div class="league-option" data-league="MLB" onclick="switchLeague(&#39;MLB&#39;)">
-    <div class="lo-icon"><img src="assets/leagues/mlb.png" alt="MLB"></div>
+    <div class="lo-icon"><img src="assets/leagues/mlb.png" alt="MLB" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="lo-fallback">MLB</span></div>
     <div class="lo-info">
       <div class="lo-name">MLB</div>
       <div class="lo-sub">250 players · Season in progress</div>
     </div>
   </div>
   <div class="league-option" data-league="GOLF" onclick="switchLeague(&#39;GOLF&#39;)">
-    <div class="lo-icon"><img src="assets/leagues/PGA.png" alt="PGA Tour"></div>
+    <div class="lo-icon"><img src="assets/leagues/PGA.png" alt="PGA Tour" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="lo-fallback">PGA</span></div>
     <div class="lo-info">
       <div class="lo-name">PGA Tour</div>
       <div class="lo-sub">115 golfers · Live prices</div>
     </div>
   </div>
   <div class="league-option" data-league="NFL" onclick="switchLeague(&#39;NFL&#39;)">
-    <div class="lo-icon"><img src="assets/leagues/NFL.png" alt="NFL"></div>
+    <div class="lo-icon"><img src="assets/leagues/NFL.png" alt="NFL" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="lo-fallback">NFL</span></div>
     <div class="lo-info">
       <div class="lo-name">NFL</div>
       <div class="lo-sub">408 players · Season starts Sept</div>
@@ -17636,7 +17802,7 @@ window.addEventListener('DOMContentLoaded', function() {
   </div>
   <div class="drawer-section-label" style="margin-top:8px">Coming Soon</div>
   <div class="league-option" style="opacity:.45;cursor:default;">
-    <div class="lo-icon"><img src="assets/leagues/NHL.png" alt="NHL"></div>
+    <div class="lo-icon"><img src="assets/leagues/NHL.png" alt="NHL" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="lo-fallback">NHL</span></div>
     <div class="lo-info">
       <div class="lo-name">NHL</div>
       <div class="lo-sub">Coming soon</div>
