@@ -429,7 +429,15 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .chat-trade-type.buy{color:var(--green);background:#12d47e18;}
 .chat-trade-type.sell{color:var(--red);background:#f5445f18;}
 .chat-trade-name{font-family:var(--font-mono);font-size:11px;color:var(--fg);font-weight:700;}
-.chat-trade-sub{font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-left:auto;}
+.chat-trade-sub{font-family:var(--font-mono);font-size:9px;color:var(--muted);}
+.chat-trade-pct{font-family:var(--font-mono);font-size:10px;font-weight:700;margin-left:auto;flex-shrink:0;}
+.chat-trade-pct.up{color:var(--green);}
+.chat-trade-pct.down{color:var(--red);}
+.chat-mention{color:var(--green);font-weight:700;}
+.comment-name.clickable{cursor:pointer;}
+.comment-name.clickable:hover{text-decoration:underline;}
+.mention-pick{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;transition:background .12s;font-family:var(--font-mono);font-size:11px;}
+.mention-pick:hover,.mention-pick.sel{background:var(--bg);}
 .g10-table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:10px;}
 .g10-table th{color:var(--muted);font-weight:400;padding:3px 6px;text-align:right;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);}
 .g10-table th:first-child{text-align:left;}
@@ -487,8 +495,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 
 /* ── User leaderboard ── */
 .ulb-tabs{display:flex;gap:8px;margin-bottom:16px;}
-.ulb-tab{font-family:var(--font-mono);font-size:10px;padding:5px 14px;border-radius:4px;border:1px solid var(--hairline);color:var(--muted);cursor:pointer;}
+.ulb-tab{font-family:var(--font-mono);font-size:10px;padding:5px 14px;border-radius:4px;border:1px solid var(--hairline);color:var(--muted);cursor:pointer;position:relative;}
 .ulb-tab.active{background:var(--green);color:#000;border-color:var(--green);}
+.friends-req-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--red);margin-left:4px;vertical-align:middle;}
+.friend-status-badge{font-family:var(--font-mono);font-size:9px;color:var(--muted);white-space:nowrap;}
 .ulb-card{background:var(--card);border:1px solid var(--hairline);border-radius:8px;padding:14px 18px;display:flex;align-items:center;gap:14px;margin-bottom:8px;transition:background .12s;}
 .ulb-card:hover{background:var(--card);}
 .ulb-rank{font-family:var(--font-display);font-size:28px;width:36px;color:var(--muted);text-align:center;}
@@ -5567,9 +5577,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   <div id="gchat-signin-prompt" style="display:none;padding:14px 20px;text-align:center;color:var(--muted);font-family:var(--font-mono);font-size:10px;border-top:1px solid var(--border2);flex-shrink:0;">Sign in to join the chat</div>
   <div id="gchat-input-area" style="display:none;padding:10px 14px;border-top:1px solid var(--border2);flex-shrink:0;flex-direction:column;gap:8px;">
     <div id="gchat-trade-picker" style="display:none;flex-direction:column;gap:4px;background:var(--card);border:1px solid var(--hairline);border-radius:8px;padding:8px;max-height:160px;overflow-y:auto;"></div>
-    <div style="display:flex;gap:8px;align-items:flex-end;">
+    <div style="display:flex;gap:8px;align-items:flex-end;position:relative;">
+      <div id="gchat-mention-dropdown" style="display:none;position:absolute;bottom:100%;left:44px;right:0;margin-bottom:6px;background:var(--card);border:1px solid var(--hairline);border-radius:8px;max-height:160px;overflow-y:auto;z-index:20;"></div>
       <button class="nbtn" onclick="toggleTradePicker()" title="Share a recent trade" style="flex-shrink:0;">Share Trade</button>
-      <textarea id="gchat-input" rows="1" maxlength="280" placeholder="Talk trades, mention games…" style="flex:1;background:var(--bg);border:1px solid var(--hairline);border-radius:8px;padding:8px 10px;color:var(--fg);font-family:var(--font-mono);font-size:11px;resize:none;max-height:100px;" onkeydown="if(event.key==='Enter'&amp;&amp;!event.shiftKey){event.preventDefault();sendChatMessage();}"></textarea>
+      <textarea id="gchat-input" rows="1" maxlength="280" placeholder="Talk trades, @mention friends, mention games…" style="flex:1;background:var(--bg);border:1px solid var(--hairline);border-radius:8px;padding:8px 10px;color:var(--fg);font-family:var(--font-mono);font-size:11px;resize:none;max-height:100px;" oninput="onChatInputChange(this)" onkeydown="onChatInputKeydown(event)"></textarea>
       <button class="nbtn" onclick="sendChatMessage()" style="flex-shrink:0;">Send</button>
     </div>
   </div>
@@ -14905,9 +14916,13 @@ async function handleAuthChange(user) {
     buildLeaderboardFirebase();
     // Re-render challenge so join button appears now that user is signed in
     if (typeof buildWeeklyChallenge === 'function') buildWeeklyChallenge();
+    // Needed even outside the Friends tab - powers @ mention autocomplete in Chat
+    // and the friend-status check on chat usernames/leaderboard rows.
+    startFriendsListener();
   } else {
     userProfile = null;
     updateAuthUI();
+    stopFriendsListener();
   }
 }
 
@@ -15536,7 +15551,7 @@ function renderChat() {
        <div class="comment-ava-init" style="display:none;background:${m.avatarColor||'#4caf50'}">${(m.displayName||'?')[0].toUpperCase()}</div>`
     : `<div class="comment-ava-init" style="background:${m.avatarColor||'#4caf50'}">${(m.displayName||'?')[0].toUpperCase()}</div>`;
 
-  el.innerHTML = _chatItems.map(m => {
+  el.innerHTML = _chatItems.map((m, i) => {
     const isOwn = currentUser && m.uid === currentUser.uid;
     const ts = m.createdAt?.toMillis ? m.createdAt.toMillis() : (m.ts || 0);
     const tradeCard = (m.kind === 'trade' && m.trade) ? `
@@ -15544,20 +15559,31 @@ function renderChat() {
         <span class="chat-trade-type ${m.trade.type}">${m.trade.type === 'buy' ? 'BOUGHT' : 'SOLD'}</span>
         <span class="chat-trade-name">${escHtml(m.trade.playerName||'')}</span>
         <span class="chat-trade-sub">${m.trade.shares} sh @ $${Number(m.trade.price||0).toFixed(2)}</span>
+        ${m.trade.pct != null ? `<span class="chat-trade-pct ${m.trade.pct>=0?'up':'down'}">${fmtP(m.trade.pct)}</span>` : ''}
       </div>` : '';
+    // Clicking a username sends a friend request (click your own = no-op).
+    const nameHtml = isOwn
+      ? escHtml(m.displayName||'Trader')
+      : `<span class="comment-name clickable" title="Add as friend" onclick="addFriendFromChatIdx(${i})">${escHtml(m.displayName||'Trader')}</span>`;
     return `
       <div class="comment-card ${isOwn?'own':''}">
         <div class="comment-header">
           ${avaFor(m)}
-          <span class="comment-name">${escHtml(m.displayName||'Trader')}</span>
+          ${isOwn ? `<span class="comment-name">${nameHtml}</span>` : nameHtml}
           <span class="comment-time">${feedTimeAgo(ts)}</span>
         </div>
-        ${m.text ? `<div class="comment-body">${escHtml(censorText(m.text))}</div>` : ''}
+        ${m.text ? `<div class="comment-body">${_highlightMentions(escHtml(censorText(m.text)), m.mentions)}</div>` : ''}
         ${tradeCard}
         ${isOwn ? `<div class="comment-actions"><span class="comment-delete" onclick="deleteChatMessage('${m.id}')">delete</span></div>` : ''}
       </div>`;
   }).join('');
   el.scrollTop = el.scrollHeight;
+}
+
+function addFriendFromChatIdx(i){
+  const m = _chatItems[i];
+  if (!m) return;
+  addFriendFromChat(m.uid, m.displayName, m.photoURL, m.avatarColor);
 }
 
 async function deleteChatMessage(msgId) {
@@ -15572,9 +15598,17 @@ async function sendChatMessage() {
   if (!currentUser || !db) { showToast('Sign in to chat'); return; }
   const input = document.getElementById('gchat-input');
   if (!input) return;
+  const dd = document.getElementById('gchat-mention-dropdown');
+  if (dd) dd.style.display = 'none';
+  _mentionCandidates = [];
   const text = input.value.trim();
   if (!text) return;
   if (text.length > 280) { showToast('Keep it under 280 chars'); return; }
+
+  // Only keep mentions whose "@Name" text is still actually present - guards
+  // against a stale queued mention surviving manual edits to the composed text.
+  const mentions = _pendingMentions.filter(m => text.includes('@' + m.displayName));
+  _pendingMentions = [];
 
   input.value = '';
   input.style.height = 'auto';
@@ -15586,6 +15620,7 @@ async function sendChatMessage() {
       avatarColor: userProfile?.avatarColor || '#4caf50',
       text: censorText(text),
       kind: 'text',
+      mentions,
       createdAt: window._fbServerTimestamp(),
     });
   } catch(e) {
@@ -15606,12 +15641,16 @@ function toggleTradePicker() {
 
   _chatTradeCandidates = _feedItems.filter(t => t.uid === currentUser.uid).slice(0, 5);
   picker.innerHTML = _chatTradeCandidates.length
-    ? _chatTradeCandidates.map((t, i) => `
+    ? _chatTradeCandidates.map((t, i) => {
+        const pct = ENGINE.pct(t.rank, 1);
+        return `
         <div class="chat-trade-pick" onclick="postTradeToChat(${i})">
           <span class="chat-trade-type ${t.type}">${t.type === 'buy' ? 'BOUGHT' : 'SOLD'}</span>
           <span class="chat-trade-name">${escHtml(t.playerName||'')}</span>
           <span class="chat-trade-sub">${t.shares} sh @ $${Number(t.price||0).toFixed(2)} · ${feedTimeAgo(t.ts)}</span>
-        </div>`).join('')
+          <span class="chat-trade-pct ${pct>=0?'up':'down'}">${fmtP(pct)}</span>
+        </div>`;
+      }).join('')
     : '<div style="padding:8px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">No recent trades yet - go make one.</div>';
   picker.style.display = 'flex';
 }
@@ -15629,7 +15668,7 @@ async function postTradeToChat(idx) {
       avatarColor: userProfile?.avatarColor || '#4caf50',
       text: '',
       kind: 'trade',
-      trade: { rank: t.rank, type: t.type, shares: t.shares, price: t.price, playerName: t.playerName || '' },
+      trade: { rank: t.rank, type: t.type, shares: t.shares, price: t.price, playerName: t.playerName || '', pct: ENGINE.pct(t.rank, 1) },
       createdAt: window._fbServerTimestamp(),
     });
   } catch(e) {
@@ -16091,6 +16130,336 @@ async function deleteComment(commentId, rank) {
   } catch(e) { showToast('Delete failed: ' + (e.code || e.message)); }
 }
 
+// ═══════════════════════════════════════════
+//  FRIENDS
+// ═══════════════════════════════════════════
+// One doc per pair in `friendships`, id = the two uids sorted+joined. There's no
+// "declined" status on purpose - declining/cancelling/unfriending are all just a
+// delete, so a stale terminal doc never blocks a later re-request either way.
+let _friendshipsListener = null;
+let _friendships = [];        // raw docs: {id, users, requestedBy, status, userInfo}
+let _myFriends = [];          // [{uid, displayName, photoURL, avatarColor, friendshipId}]
+let _incomingRequests = [];   // same shape - status pending, requestedBy !== me
+let _outgoingRequests = [];   // same shape - status pending, requestedBy === me
+
+function _friendshipId(a, b){ return [a, b].sort().join('_'); }
+
+function startFriendsListener() {
+  if (!db || !currentUser || !window._fbOnSnapshot || !window._fbQuery || !window._fbWhere) return;
+  if (_friendshipsListener) return; // already running
+  try {
+    const q = window._fbQuery(
+      window._fbCollection(db, 'friendships'),
+      window._fbWhere('users', 'array-contains', currentUser.uid)
+    );
+    _friendshipsListener = window._fbOnSnapshot(q, snap => {
+      _friendships = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      _rebuildFriendLists();
+    }, err => { console.warn('Friends listener error:', err.message); _friendshipsListener = null; });
+  } catch(e) { console.warn('Could not start friends listener:', e.message); }
+}
+
+function stopFriendsListener() {
+  if (_friendshipsListener) { _friendshipsListener(); _friendshipsListener = null; }
+  _friendships = []; _myFriends = []; _incomingRequests = []; _outgoingRequests = [];
+}
+
+function _rebuildFriendLists(){
+  if (!currentUser) return;
+  const me = currentUser.uid;
+  _myFriends = []; _incomingRequests = []; _outgoingRequests = [];
+  _friendships.forEach(f => {
+    const otherUid = (f.users||[]).find(u => u !== me);
+    if (!otherUid) return;
+    const info = (f.userInfo && f.userInfo[otherUid]) || {};
+    const entry = { uid: otherUid, displayName: info.displayName || 'Trader', photoURL: info.photoURL || null, avatarColor: info.avatarColor || '#4caf50', friendshipId: f.id };
+    if (f.status === 'accepted') _myFriends.push(entry);
+    else if (f.status === 'pending') {
+      if (f.requestedBy === me) _outgoingRequests.push(entry);
+      else _incomingRequests.push(entry);
+    }
+  });
+  const dot = document.getElementById('friends-req-dot');
+  if (dot) dot.style.display = _incomingRequests.length ? 'inline-block' : 'none';
+  if (document.getElementById('friends-requests-panel')) renderFriendsRequestsPanel();
+  if (window._lbTab === 'friends' && document.getElementById('view-leaderboard')?.style.display !== 'none') {
+    _renderFriendsLbList();
+  }
+}
+
+function friendStatusWith(uid){
+  if (!currentUser) return 'none';
+  if (uid === currentUser.uid) return 'self';
+  if (_myFriends.some(f => f.uid === uid)) return 'friends';
+  if (_outgoingRequests.some(f => f.uid === uid)) return 'outgoing';
+  if (_incomingRequests.some(f => f.uid === uid)) return 'incoming';
+  return 'none';
+}
+
+async function sendFriendRequest(targetUid, targetDisplayName, targetPhotoURL, targetAvatarColor){
+  if (!currentUser || !db) { showToast('Sign in to add friends'); return; }
+  if (targetUid === currentUser.uid) { showToast("That's you!"); return; }
+  const status = friendStatusWith(targetUid);
+  if (status === 'friends')  { showToast('You are already friends'); return; }
+  if (status === 'outgoing') { showToast('Request already sent'); return; }
+  if (status === 'incoming') { showToast('They already sent you a request - accept it below'); return; }
+  const id = _friendshipId(currentUser.uid, targetUid);
+  try {
+    await window._fbSetDoc(window._fbDoc(db, 'friendships', id), {
+      users: [currentUser.uid, targetUid],
+      requestedBy: currentUser.uid,
+      status: 'pending',
+      createdAt: window._fbServerTimestamp(),
+      userInfo: {
+        [currentUser.uid]: {
+          displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
+          photoURL: currentUser.photoURL || null,
+          avatarColor: userProfile?.avatarColor || '#4caf50',
+        },
+        [targetUid]: {
+          displayName: targetDisplayName || 'Trader',
+          photoURL: targetPhotoURL || null,
+          avatarColor: targetAvatarColor || '#4caf50',
+        },
+      },
+    });
+    showToast(`Friend request sent to ${targetDisplayName || 'trader'}`);
+  } catch(e) { showToast('Could not send request: ' + (e.code || e.message)); }
+}
+
+async function acceptFriendRequest(friendshipId){
+  if (!currentUser || !db) return;
+  try {
+    await window._fbUpdateDoc(window._fbDoc(db, 'friendships', friendshipId), { status: 'accepted' });
+    showToast('Friend added');
+  } catch(e) { showToast('Could not accept: ' + (e.code || e.message)); }
+}
+
+async function removeFriendship(friendshipId){
+  if (!currentUser || !db) return;
+  try {
+    await window._fbDeleteDoc(window._fbDoc(db, 'friendships', friendshipId));
+  } catch(e) { showToast('Could not remove: ' + (e.code || e.message)); }
+}
+
+// Click a username in Chat to add them as a friend directly.
+function addFriendFromChat(uid, displayName, photoURL, avatarColor){
+  if (!currentUser) { showToast('Sign in to add friends'); return; }
+  if (uid === currentUser.uid) return;
+  sendFriendRequest(uid, displayName, photoURL, avatarColor);
+}
+
+function renderFriendsRequestsPanel(){
+  const el = document.getElementById('friends-requests-panel');
+  if (!el) return;
+  if (!_incomingRequests.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Friend requests</div>
+    ${_incomingRequests.map(r => `
+      <div class="ulb-card" style="padding:10px 14px;">
+        ${r.photoURL ? `<img src="${r.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${r.avatarColor}">${(r.displayName||'?')[0].toUpperCase()}</div>`}
+        <div class="ulb-info"><div class="ulb-name">${escHtml(r.displayName)}</div></div>
+        <button class="nbtn" style="border-color:var(--green);color:var(--green);" onclick="acceptFriendRequest('${r.friendshipId}')">Accept</button>
+        <button class="nbtn" onclick="removeFriendship('${r.friendshipId}')">Decline</button>
+      </div>`).join('')}
+    <div style="height:16px"></div>`;
+}
+
+let _friendSearchResults = [];
+let _friendSearchDebounce = null;
+function searchFriendCandidates(qstr){
+  clearTimeout(_friendSearchDebounce);
+  const el = document.getElementById('friend-search-results');
+  if (!el) return;
+  const q = qstr.trim();
+  if (!q) { el.innerHTML = ''; return; }
+  _friendSearchDebounce = setTimeout(async () => {
+    el.innerHTML = '<div class="g10-loading">Searching…</div>';
+    try {
+      // Firestore prefix-range trick - case-sensitive (a known v1 limitation).
+      const qq = window._fbQuery(
+        window._fbCollection(db, 'users'),
+        window._fbOrderBy('displayName'),
+        window._fbWhere('displayName', '>=', q),
+        window._fbWhere('displayName', '<=', q + ''),
+        window._fbLimit(10)
+      );
+      const snap = await window._fbGetDocs(qq);
+      _friendSearchResults = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(u => u.uid !== currentUser.uid);
+      if (!_friendSearchResults.length) { el.innerHTML = '<div class="g10-loading">No traders found</div>'; return; }
+      el.innerHTML = _friendSearchResults.map((u, i) => {
+        const status = friendStatusWith(u.uid);
+        const action = status === 'friends'  ? `<span class="friend-status-badge" style="color:var(--green);">Friends ✓</span>`
+          : status === 'outgoing' ? `<span class="friend-status-badge">Pending</span>`
+          : status === 'incoming' ? `<button class="nbtn" style="border-color:var(--green);color:var(--green);" onclick="acceptFriendRequest('${_friendshipId(currentUser.uid,u.uid)}')">Accept</button>`
+          : `<button class="nbtn" onclick="sendFriendRequestFromSearch(${i})">Add</button>`;
+        return `<div class="ulb-card" style="padding:8px 12px;">
+          ${u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`}
+          <div class="ulb-info"><div class="ulb-name">${escHtml(u.displayName||'Trader')}</div></div>
+          ${action}
+        </div>`;
+      }).join('');
+    } catch(e) {
+      el.innerHTML = `<div class="g10-loading" style="color:var(--red)">Search failed: ${e.code || e.message}</div>`;
+    }
+  }, 350);
+}
+
+function sendFriendRequestFromSearch(i){
+  const u = _friendSearchResults[i];
+  if (!u) return;
+  sendFriendRequest(u.uid, u.displayName, u.photoURL, u.avatarColor);
+}
+
+let _globalLbUsers = [];
+function sendFriendRequestFromGlobalLb(i){
+  const u = _globalLbUsers[i];
+  if (!u) return;
+  sendFriendRequest(u.uid, u.displayName, u.photoURL, u.avatarColor);
+}
+
+async function renderFriendsLeaderboard(){
+  const el = document.getElementById('lb-tab-content');
+  if (!el) return;
+
+  if (!currentUser) {
+    el.innerHTML = `<div class="g10-loading" style="cursor:pointer;" onclick="openProfile()">Sign in to add friends and see your friends leaderboard →</div>`;
+    return;
+  }
+
+  startFriendsListener();
+
+  el.innerHTML = `
+    <div id="friends-requests-panel"></div>
+    <div style="margin-bottom:16px;">
+      <input id="friend-search-input" type="text" placeholder="Search traders by name…" oninput="searchFriendCandidates(this.value)"
+        style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--hairline);border-radius:8px;padding:9px 12px;color:var(--fg);font-family:var(--font-mono);font-size:11px;">
+      <div id="friend-search-results" style="margin-top:6px;"></div>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:20px;">Ranked by % return - you and your friends only</div>
+    <div id="friends-lb-list"><div class="g10-loading">Loading…</div></div>`;
+
+  renderFriendsRequestsPanel();
+  await _renderFriendsLbList();
+}
+
+async function _renderFriendsLbList(){
+  const el = document.getElementById('friends-lb-list');
+  if (!el) return;
+  if (!_myFriends.length) {
+    el.innerHTML = `<div class="g10-loading">No friends yet - search above to add some.</div>`;
+    return;
+  }
+  try {
+    const uids = _myFriends.map(f => f.uid);
+    const docs = await Promise.all(uids.map(uid => window._fbGetDoc(window._fbDoc(db, 'users', uid)).catch(() => null)));
+    let users = docs.map((snap, i) => (snap && snap.exists()) ? { uid: uids[i], ...snap.data() } : { uid: uids[i], ..._myFriends[i], returnPct: 0, portfolioValue: 100000 });
+    if (userProfile) users.push({ uid: currentUser.uid, ...userProfile });
+    users.sort((a, b) => (b.returnPct || 0) - (a.returnPct || 0));
+    el.innerHTML = users.map((u, i) => {
+      const isYou = u.uid === currentUser.uid;
+      const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+      const ret = u.returnPct || 0;
+      const avatar = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
+      return `<div class="ulb-card ${isYou?'ulb-you':''}">
+        <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
+        <div class="ulb-info">
+          <div class="ulb-name">${escHtml(u.displayName||'Trader')} ${isYou?'<span style="color:var(--green);font-size:9px;">(you)</span>':''}</div>
+          <div class="ulb-sub">Portfolio: $${(u.portfolioValue||100000).toLocaleString()}</div>
+        </div>
+        <div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>
+        ${!isYou ? `<span class="comment-delete" style="margin-left:4px;" onclick="removeFriendship('${_friendshipId(currentUser.uid,u.uid)}')">remove</span>` : ''}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = `<div class="g10-loading" style="color:var(--red)">Error: ${e.code || e.message}</div>`;
+  }
+}
+
+// ── @ mention autocomplete (Chat, friends only) ─────────────────────────────
+let _pendingMentions = [];      // [{uid, displayName}] queued for the next send
+let _mentionDropdownIdx = -1;   // keyboard-selected row in the open dropdown
+let _mentionCandidates = [];    // friends currently matching the active @query
+let _mentionTokenStart = -1;    // index of the '@' that's currently being composed
+
+function _activeMentionQuery(input){
+  const v = input.value, pos = input.selectionStart;
+  const upTo = v.slice(0, pos);
+  const at = upTo.lastIndexOf('@');
+  if (at === -1) return null;
+  const between = upTo.slice(at + 1);
+  if (/\s/.test(between)) return null;   // '@' was part of an earlier, already-finished token
+  return { start: at, query: between };
+}
+
+function onChatInputChange(input){
+  const dd = document.getElementById('gchat-mention-dropdown');
+  if (!dd) return;
+  const active = _activeMentionQuery(input);
+  if (!active || !_myFriends.length) { dd.style.display = 'none'; _mentionTokenStart = -1; return; }
+  _mentionTokenStart = active.start;
+  const q = active.query.toLowerCase();
+  _mentionCandidates = _myFriends.filter(f => f.displayName.toLowerCase().includes(q)).slice(0, 6);
+  _mentionDropdownIdx = _mentionCandidates.length ? 0 : -1;
+  if (!_mentionCandidates.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = _mentionCandidates.map((f, i) => `
+    <div class="mention-pick ${i===0?'sel':''}" data-i="${i}" onmousedown="event.preventDefault();pickMention(${i})">
+      ${f.photoURL ? `<img class="comment-ava" src="${f.photoURL}">` : `<div class="comment-ava-init" style="background:${f.avatarColor}">${(f.displayName||'?')[0].toUpperCase()}</div>`}
+      <span>${escHtml(f.displayName)}</span>
+    </div>`).join('');
+  dd.style.display = 'block';
+}
+
+function onChatInputKeydown(event){
+  const dd = document.getElementById('gchat-mention-dropdown');
+  const ddOpen = dd && dd.style.display !== 'none' && _mentionCandidates.length;
+  if (ddOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+    event.preventDefault();
+    _mentionDropdownIdx = event.key === 'ArrowDown'
+      ? (_mentionDropdownIdx + 1) % _mentionCandidates.length
+      : (_mentionDropdownIdx - 1 + _mentionCandidates.length) % _mentionCandidates.length;
+    dd.querySelectorAll('.mention-pick').forEach((el,i) => el.classList.toggle('sel', i === _mentionDropdownIdx));
+    return;
+  }
+  if (ddOpen && (event.key === 'Enter' || event.key === 'Tab') && _mentionDropdownIdx >= 0) {
+    event.preventDefault();
+    pickMention(_mentionDropdownIdx);
+    return;
+  }
+  if (ddOpen && event.key === 'Escape') { dd.style.display = 'none'; _mentionCandidates = []; return; }
+  if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendChatMessage(); }
+}
+
+function pickMention(i){
+  const f = _mentionCandidates[i];
+  const input = document.getElementById('gchat-input');
+  const dd = document.getElementById('gchat-mention-dropdown');
+  if (!f || !input || _mentionTokenStart < 0) return;
+  const before = input.value.slice(0, _mentionTokenStart);
+  const cursorWas = input.selectionStart;
+  const after = input.value.slice(cursorWas);
+  const insert = '@' + f.displayName + ' ';
+  input.value = before + insert + after;
+  const newPos = (before + insert).length;
+  input.setSelectionRange(newPos, newPos);
+  input.focus();
+  if (!_pendingMentions.some(m => m.uid === f.uid)) _pendingMentions.push({ uid: f.uid, displayName: f.displayName });
+  if (dd) dd.style.display = 'none';
+  _mentionCandidates = []; _mentionTokenStart = -1;
+}
+
+function _highlightMentions(escapedText, mentions){
+  if (!mentions || !mentions.length) return escapedText;
+  let out = escapedText;
+  mentions.forEach(m => {
+    const nameEsc = escHtml(m.displayName || '');
+    if (!nameEsc) return;
+    const token = '@' + nameEsc;
+    out = out.split(token).join(`<span class="chat-mention">${token}</span>`);
+  });
+  return out;
+}
+
 async function buildLeaderboardFirebase() {
   const inner = document.getElementById('lb-view-inner');
   if (!inner) return;
@@ -16107,12 +16476,15 @@ async function buildLeaderboardFirebase() {
     </div>
     <div class="ulb-tabs" style="margin-bottom:16px;">
       <div class="ulb-tab ${activeTab==='global'?'active':''}" onclick="switchLbTab('global')">Global</div>
+      <div class="ulb-tab ${activeTab==='friends'?'active':''}" onclick="switchLbTab('friends')">Friends<span class="friends-req-dot" id="friends-req-dot" style="display:${_incomingRequests.length?'inline-block':'none'};"></span></div>
       <div class="ulb-tab ${activeTab==='challenge'?'active':''}" onclick="switchLbTab('challenge')">Challenges</div>
     </div>
     <div id="lb-tab-content"></div>`;
 
   if (activeTab === 'global') {
     await renderGlobalLeaderboard();
+  } else if (activeTab === 'friends') {
+    await renderFriendsLeaderboard();
   } else {
     await renderChallengeTab();
   }
@@ -16177,18 +16549,25 @@ async function renderGlobalLeaderboard() {
     const currentInList = users.find(u => u.uid === currentUser.uid);
     if (!currentInList && userProfile) users = [...users, userProfile].sort((a, b) => (b.returnPct || 0) - (a.returnPct || 0));
     if (!users.length) { document.getElementById('ulb-list').innerHTML = `<div class="g10-loading">No traders yet - be the first!</div>`; return; }
+    _globalLbUsers = users;
     document.getElementById('ulb-list').innerHTML = users.map((u, i) => {
       const isYou = currentUser && u.uid === currentUser.uid;
       const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
       const ret = u.returnPct || 0;
       const avatar = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
+      const status = currentUser ? friendStatusWith(u.uid) : 'none';
+      const friendAction = isYou ? '' : status === 'friends' ? `<span class="friend-status-badge" style="color:var(--green);">Friends ✓</span>`
+        : status === 'outgoing' ? `<span class="friend-status-badge">Pending</span>`
+        : status === 'incoming' ? `<button class="nbtn" style="border-color:var(--green);color:var(--green);" onclick="acceptFriendRequest('${_friendshipId(currentUser.uid,u.uid)}')">Accept</button>`
+        : `<button class="nbtn" onclick="sendFriendRequestFromGlobalLb(${i})">+ Add</button>`;
       return `<div class="ulb-card ${isYou?'ulb-you':''}">
         <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
         <div class="ulb-info">
-          <div class="ulb-name">${u.displayName||'Anonymous'} ${isYou?'<span style="color:var(--green);font-size:9px;">(you)</span>':''}</div>
+          <div class="ulb-name">${escHtml(u.displayName||'Anonymous')} ${isYou?'<span style="color:var(--green);font-size:9px;">(you)</span>':''}</div>
           <div class="ulb-sub">Portfolio: $${(u.portfolioValue||100000).toLocaleString()}</div>
         </div>
         <div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>
+        ${friendAction}
       </div>`;
     }).join('');
   } catch(e) {
