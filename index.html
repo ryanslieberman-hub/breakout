@@ -8137,7 +8137,28 @@ const ENGINE = (() => {
       if (stat){
         price(p, stat);                        // live/final line → derive from it
       } else if (todayClose > 0 && ln && ln.date === today && ln.played){
-        const [lo, hi] = band(p);              // real finalized game earlier today
+        // real finalized game earlier today. Sanity-check todayClose before trusting it -
+        // but against the player's OWN recent close history, not the static statPrice
+        // band. finalize() clears window._engineStats the moment a game locks in, so
+        // EVERY tick after that (this branch) re-validates the close it just wrote. A
+        // player who's genuinely traded well past their preseason statPrice band (a
+        // season of real gains, common for anyone good) had that real, just-finalized
+        // close rejected and deleted here on the very next tick - snapping the price
+        // (and the 1D/All % badges) back to flat right when the game ended. finalize()
+        // itself already caps day-over-day moves to +/-15% of the prior close, so any
+        // close it actually wrote should sit near that prior close - a much wider band
+        // here still catches genuine corruption without punishing real drift. Only fall
+        // back to the statPrice band when there's no prior close yet to compare against.
+        const priorDates = closes[p.rank]
+          ? Object.keys(closes[p.rank]).filter(d => d < today && closes[p.rank][d] > 0).sort()
+          : [];
+        let lo, hi;
+        if (priorDates.length) {
+          const prevClose = closes[p.rank][priorDates[priorDates.length - 1]];
+          lo = prevClose * 0.5; hi = prevClose * 2.0;
+        } else {
+          [lo, hi] = band(p);
+        }
         if (todayClose >= lo && todayClose <= hi){
           liveP[p.rank] = todayClose;
           const base = baseFor(p);
