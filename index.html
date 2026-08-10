@@ -15585,9 +15585,18 @@ function renderChat() {
         </div>
         ${m.text ? `<div class="comment-body">${escHtml(m.text)}</div>` : ''}
         ${tradeCard}
+        ${isOwn ? `<div class="comment-actions"><span class="comment-delete" onclick="deleteChatMessage('${m.id}')">delete</span></div>` : ''}
       </div>`;
   }).join('');
   el.scrollTop = el.scrollHeight;
+}
+
+async function deleteChatMessage(msgId) {
+  if (!currentUser || !db) return;
+  if (!confirm('Delete this message?')) return;
+  try {
+    await window._fbDeleteDoc(window._fbDoc(db, 'globalChat', msgId));
+  } catch(e) { showToast('Delete failed: ' + (e.code || e.message)); }
 }
 
 async function sendChatMessage() {
