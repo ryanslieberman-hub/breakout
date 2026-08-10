@@ -498,7 +498,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .ulb-tab{font-family:var(--font-mono);font-size:10px;padding:5px 14px;border-radius:4px;border:1px solid var(--hairline);color:var(--muted);cursor:pointer;position:relative;}
 .ulb-tab.active{background:var(--green);color:#000;border-color:var(--green);}
 .friends-req-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--red);margin-left:4px;vertical-align:middle;}
-.friend-status-badge{font-family:var(--font-mono);font-size:9px;color:var(--muted);white-space:nowrap;}
+/* Same box model as .nbtn (padding/border/radius) so swapping between the "+ Add"
+   button and this post-click state doesn't visibly resize/shift the row - only the
+   border is invisible, everything else about the footprint matches. */
+.friend-status-badge{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap;padding:5px 12px;border:1px solid transparent;border-radius:6px;display:inline-flex;align-items:center;gap:5px;}
 .ulb-card{background:var(--card);border:1px solid var(--hairline);border-radius:8px;padding:14px 18px;display:flex;align-items:center;gap:14px;margin-bottom:8px;transition:background .12s;}
 .ulb-card:hover{background:var(--card);}
 .ulb-rank{font-family:var(--font-display);font-size:28px;width:36px;color:var(--muted);text-align:center;}
@@ -661,6 +664,12 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .profile-ava-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:20px;}
 .profile-ava{width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--card);border:2px solid var(--border2);}
 .profile-stat-row{display:flex;gap:10px;margin-bottom:24px;}
+/* 2x2 for the Social stats (Friends/Added/Global Rank/Friends Rank) - a 4-across flex
+   row (like the 3-stat Cash/Total/P&L row above) squeezes each cell to ~1/4 of a
+   480px-max column, which wraps "Global Rank"/"Friends Rank" onto two lines while the
+   short labels stay on one - an uneven, lopsided row. Two columns gives every label
+   enough width to sit on one line. */
+.profile-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px;}
 .profile-stat{flex:1;background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:12px 14px;}
 .profile-stat-lbl{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
 .profile-stat-val{font-family:var(--font-mono);font-size:16px;font-variant-numeric:tabular-nums;}
@@ -771,7 +780,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .trend-tab.active{border-color:var(--red);color:var(--red);background:rgba(245,68,95,.07);}
 .trend-range{display:flex;gap:6px;margin-top:8px;}
 .trend-range-btn{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border:1px solid var(--hairline);background:transparent;color:var(--muted);cursor:pointer;border-radius:6px;transition:all .12s;}
-.trend-range-btn.active{border-color:var(--green);color:var(--green);background:rgba(18,212,126,.07);}
+.trend-range-btn.active{border-color:var(--red);color:var(--red);background:rgba(245,68,95,.07);}
 .trending-grid{flex:1;overflow-y:auto;padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-content:start;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
 .trending-grid::-webkit-scrollbar{width:4px;}
 .trending-grid::-webkit-scrollbar-thumb{background:var(--border2);}
@@ -15133,7 +15142,7 @@ function renderProfileView() {
            </div>`}
 
       <div class="profile-section-lbl">Social</div>
-      <div class="profile-stat-row" id="profile-social-stats">
+      <div class="profile-stat-grid" id="profile-social-stats">
         <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('friends')"><div class="profile-stat-lbl">Friends</div><div class="profile-stat-val">${_myFriends.length}</div></div>
         <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('friends')"><div class="profile-stat-lbl">Added</div><div class="profile-stat-val">${_outgoingRequests.length}</div></div>
         <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('global')"><div class="profile-stat-lbl">Global Rank</div><div class="profile-stat-val" id="profile-global-rank">…</div></div>
