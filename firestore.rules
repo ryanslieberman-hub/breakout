@@ -120,6 +120,27 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
+    // Username reservations - one doc per lowercase username, doc ID IS the
+    // username, so "claim" is just create-if-doesn't-exist. `allow update: if false`
+    // means a client trying to setDoc() an ALREADY-CLAIMED username hits the update
+    // rule instead of create (Firestore's own create/update split is based on
+    // whether the doc exists) and gets rejected - the standard Firestore pattern for
+    // enforcing uniqueness without a Cloud Function. users/{uid}.usernameLower is
+    // the denormalized copy search queries against; nothing here cross-checks that
+    // it actually matches a doc the caller owns here - that's a display-only
+    // convenience, not a security boundary, so it isn't worth the added rule
+    // complexity (same reasoning as displayName/avatarColor elsewhere).
+    match /usernames/{uname} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && uname == uname.lower()
+        && uname.size() >= 3 && uname.size() <= 20
+        && uname.matches('^[a-z0-9_]+$');
+      allow update: if false;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
     // Friendships (mutual, request/accept). One doc per pair, id is the two uids
     // sorted and joined so a client never creates a duplicate/reverse-direction doc.
     // There is no "declined" state on purpose - declining a request, cancelling a

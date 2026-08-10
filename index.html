@@ -14849,14 +14849,21 @@ function initFirebase() {
 }
 
 function updateSettingsAccount() {
-  // Update account info in settings panel if it exists
-  const el = document.getElementById('settings-account');
+  // Update account info in settings panel if it exists. Targets #settings-account-inner -
+  // #settings-account (what this used to look up) doesn't exist anywhere in the DOM, so
+  // this was a silent no-op before; fixed while adding the username control below.
+  const el = document.getElementById('settings-account-inner');
   if (!el) return;
-  if (currentUser) {
-    el.innerHTML = `<span style="color:var(--green)">${currentUser.displayName || currentUser.email}</span>`;
-  } else {
+  if (!currentUser) {
     el.innerHTML = `<span style="color:var(--muted)">Not signed in</span>`;
+    return;
   }
+  const usernameHtml = userProfile?.username
+    ? `<span style="color:var(--green)">@${escHtml(userProfile.username)}</span> <span class="comment-reply" onclick="promptChangeUsername()">change</span>`
+    : `<span class="comment-reply" onclick="promptChangeUsername()">set a username</span>`;
+  el.innerHTML = `
+    <div style="color:var(--green)">${escHtml(currentUser.displayName || currentUser.email || 'Trader')}</div>
+    <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:4px;">${usernameHtml}</div>`;
 }
 
 async function handleAuthChange(user) {
@@ -16144,6 +16151,51 @@ let _outgoingRequests = [];   // same shape - status pending, requestedBy === me
 
 function _friendshipId(a, b){ return [a, b].sort().join('_'); }
 
+// ── Username (needed so friend search works without depending on Google display
+// names, which aren't unique and aren't reliably searchable case-insensitively) ──
+function _normalizeUsername(raw){
+  return String(raw||'').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+}
+
+async function claimUsername(rawInput){
+  if (!currentUser || !db) { showToast('Sign in first'); return false; }
+  const lower = _normalizeUsername(rawInput);
+  if (lower.length < 3 || lower.length > 20) { showToast('Username must be 3-20 characters (letters, numbers, _)'); return false; }
+  if (lower === userProfile?.usernameLower) { showToast('That\'s already your username'); return false; }
+  try {
+    await window._fbSetDoc(window._fbDoc(db, 'usernames', lower), {
+      uid: currentUser.uid,
+      createdAt: window._fbServerTimestamp(),
+    });
+  } catch(e) {
+    showToast(e.code === 'permission-denied' ? 'That username is taken' : 'Could not claim username: ' + (e.code || e.message));
+    return false;
+  }
+  // Release the old reservation, best-effort - failing here just leaves an orphaned
+  // claim on the old name rather than breaking the rename the user asked for.
+  const oldLower = userProfile?.usernameLower;
+  if (oldLower && oldLower !== lower) {
+    try { await window._fbDeleteDoc(window._fbDoc(db, 'usernames', oldLower)); } catch(e){}
+  }
+  try {
+    await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), { username: rawInput.trim(), usernameLower: lower }, { merge: true });
+    userProfile = { ...userProfile, username: rawInput.trim(), usernameLower: lower };
+    showToast('Username set: @' + lower);
+    updateSettingsAccount();
+    if (document.getElementById('friends-username-banner')) renderFriendsLeaderboard();
+    return true;
+  } catch(e) {
+    showToast('Claimed but could not save to profile: ' + (e.code || e.message));
+    return false;
+  }
+}
+
+function promptChangeUsername(){
+  const next = prompt('New username (3-20 chars, letters/numbers/_):', userProfile?.username || '');
+  if (next == null) return;   // cancelled
+  claimUsername(next);
+}
+
 function startFriendsListener() {
   if (!db || !currentUser || !window._fbOnSnapshot || !window._fbQuery || !window._fbWhere) return;
   if (_friendshipsListener) return; // already running
@@ -16271,22 +16323,25 @@ function searchFriendCandidates(qstr){
   clearTimeout(_friendSearchDebounce);
   const el = document.getElementById('friend-search-results');
   if (!el) return;
-  const q = qstr.trim();
+  // Search by username, not display name - Google display names aren't unique and
+  // aren't searchable case-insensitively without a duplicated-lowercase-copy hack.
+  // usernameLower already IS that lowercase copy, so the search itself is naturally
+  // case-insensitive regardless of how the user types it.
+  const q = _normalizeUsername(qstr.replace(/^@/, ''));
   if (!q) { el.innerHTML = ''; return; }
   _friendSearchDebounce = setTimeout(async () => {
     el.innerHTML = '<div class="g10-loading">Searching…</div>';
     try {
-      // Firestore prefix-range trick - case-sensitive (a known v1 limitation).
       const qq = window._fbQuery(
         window._fbCollection(db, 'users'),
-        window._fbOrderBy('displayName'),
-        window._fbWhere('displayName', '>=', q),
-        window._fbWhere('displayName', '<=', q + ''),
+        window._fbOrderBy('usernameLower'),
+        window._fbWhere('usernameLower', '>=', q),
+        window._fbWhere('usernameLower', '<=', q + ''),
         window._fbLimit(10)
       );
       const snap = await window._fbGetDocs(qq);
       _friendSearchResults = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(u => u.uid !== currentUser.uid);
-      if (!_friendSearchResults.length) { el.innerHTML = '<div class="g10-loading">No traders found</div>'; return; }
+      if (!_friendSearchResults.length) { el.innerHTML = '<div class="g10-loading">No traders found with that username</div>'; return; }
       el.innerHTML = _friendSearchResults.map((u, i) => {
         const status = friendStatusWith(u.uid);
         const action = status === 'friends'  ? `<span class="friend-status-badge" style="color:var(--green);">Friends ✓</span>`
@@ -16295,7 +16350,7 @@ function searchFriendCandidates(qstr){
           : `<button class="nbtn" onclick="sendFriendRequestFromSearch(${i})">Add</button>`;
         return `<div class="ulb-card" style="padding:8px 12px;">
           ${u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`}
-          <div class="ulb-info"><div class="ulb-name">${escHtml(u.displayName||'Trader')}</div></div>
+          <div class="ulb-info"><div class="ulb-name">${escHtml(u.displayName||'Trader')}</div><div class="ulb-sub">@${escHtml(u.username||u.usernameLower)}</div></div>
           ${action}
         </div>`;
       }).join('');
@@ -16329,10 +16384,26 @@ async function renderFriendsLeaderboard(){
 
   startFriendsListener();
 
+  const usernameBannerHtml = userProfile?.username
+    ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-family:var(--font-mono);font-size:10px;color:var(--muted);">
+         Your username: <span style="color:var(--green);">@${escHtml(userProfile.username)}</span>
+         <span class="comment-reply" onclick="promptChangeUsername()">change</span>
+       </div>`
+    : `<div style="background:var(--card);border:1px solid var(--hairline);border-radius:8px;padding:12px 14px;margin-bottom:14px;">
+         <div style="font-family:var(--font-mono);font-size:10px;color:var(--fg);margin-bottom:8px;">Set a username so friends can actually find you - display names aren't unique or searchable.</div>
+         <div style="display:flex;gap:8px;">
+           <input id="username-claim-input" type="text" placeholder="e.g. ryanl" maxlength="20"
+             style="flex:1;background:var(--bg);border:1px solid var(--hairline);border-radius:6px;padding:8px 10px;color:var(--fg);font-family:var(--font-mono);font-size:11px;box-sizing:border-box;"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();claimUsername(document.getElementById('username-claim-input').value);}">
+           <button class="nbtn" style="border-color:var(--green);color:var(--green);flex-shrink:0;" onclick="claimUsername(document.getElementById('username-claim-input').value)">Save</button>
+         </div>
+       </div>`;
+
   el.innerHTML = `
+    <div id="friends-username-banner">${usernameBannerHtml}</div>
     <div id="friends-requests-panel"></div>
     <div style="margin-bottom:16px;">
-      <input id="friend-search-input" type="text" placeholder="Search traders by name…" oninput="searchFriendCandidates(this.value)"
+      <input id="friend-search-input" type="text" placeholder="Search by username (e.g. ryanl)…" oninput="searchFriendCandidates(this.value)"
         style="width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--hairline);border-radius:8px;padding:9px 12px;color:var(--fg);font-family:var(--font-mono);font-size:11px;">
       <div id="friend-search-results" style="margin-top:6px;"></div>
     </div>
