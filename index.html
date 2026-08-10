@@ -15119,6 +15119,27 @@ function renderProfileView() {
         <div class="profile-stat"><div class="profile-stat-lbl">Total Value</div><div class="profile-stat-val">${fmt(total)}</div></div>
         <div class="profile-stat"><div class="profile-stat-lbl">P&amp;L</div><div class="profile-stat-val" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${fmtP(pnlPct)}</div></div>
       </div>
+
+      <label style="font-family:var(--font-mono);font-size:9px;color:var(--muted);display:block;margin-bottom:4px;">Username</label>
+      ${p.username
+        ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;font-family:var(--font-mono);font-size:12px;">
+             <span style="color:var(--green);">@${escHtml(p.username)}</span>
+             <span class="comment-reply" onclick="promptChangeUsername()">change</span>
+           </div>`
+        : `<div style="display:flex;gap:8px;margin-bottom:16px;">
+             <input class="profile-input" id="profile-username-inp" maxlength="20" placeholder="e.g. ryanl" style="margin-bottom:0;"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();claimUsername(document.getElementById('profile-username-inp').value);}">
+             <button class="profile-btn primary" style="flex-shrink:0;" onclick="claimUsername(document.getElementById('profile-username-inp').value)">Save</button>
+           </div>`}
+
+      <div class="profile-section-lbl">Social</div>
+      <div class="profile-stat-row" id="profile-social-stats">
+        <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('friends')"><div class="profile-stat-lbl">Friends</div><div class="profile-stat-val">${_myFriends.length}</div></div>
+        <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('friends')"><div class="profile-stat-lbl">Added</div><div class="profile-stat-val">${_outgoingRequests.length}</div></div>
+        <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('global')"><div class="profile-stat-lbl">Global Rank</div><div class="profile-stat-val" id="profile-global-rank">…</div></div>
+        <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('friends')"><div class="profile-stat-lbl">Friends Rank</div><div class="profile-stat-val" id="profile-friends-rank">…</div></div>
+      </div>
+
       <label style="font-family:var(--font-mono);font-size:9px;color:var(--muted);display:block;margin-bottom:4px;">Display Name</label>
       <input class="profile-input" id="disp-name-inp" value="${p.displayName||''}" maxlength="24" placeholder="Your name...">
       <label style="font-family:var(--font-mono);font-size:9px;color:var(--muted);display:block;margin-bottom:4px;">Avatar Color</label>
@@ -15147,7 +15168,47 @@ function renderProfileView() {
         <button class="profile-btn danger" style="width:100%;" onclick="signOutUser()">Sign Out</button>
       </div>`;
     refreshConnectStatusUI();
+    startFriendsListener();  // no-op if already running - ensures Friends/Added counts are live
+    refreshProfileRanks();
   }
+}
+
+// Jumps to the Leaderboard view already on the requested sub-tab, rather than landing
+// on whatever tab was last open (which is usually not the one the stat you clicked was
+// even about).
+function goToLeaderboardTab(tab){
+  window._lbTab = tab;
+  showView('leaderboard', document.querySelector('.nav-tab[onclick*="leaderboard"]'));
+}
+
+// Profile's Global/Friends rank numbers - computed the same way the leaderboards
+// themselves rank (sort by returnPct), but as a lightweight one-off fetch rather than
+// rendering either full leaderboard. Best-effort: leaves the "…" placeholder on failure
+// rather than showing a wrong number.
+async function refreshProfileRanks(){
+  if (!currentUser || !db) return;
+  const globalEl = document.getElementById('profile-global-rank');
+  const friendsEl = document.getElementById('profile-friends-rank');
+  try {
+    const snap = await window._fbGetDocsFromServer(window._fbQuery(window._fbCollection(db, 'users'), window._fbLimit(100)));
+    let users = snap.docs.map(d => ({ uid: d.id, ...d.data() })).sort((a,b) => (b.returnPct||0)-(a.returnPct||0));
+    const seen = new Set();
+    users = users.filter(u => seen.has(u.uid) ? false : (seen.add(u.uid), true));
+    if (!users.some(u => u.uid === currentUser.uid) && userProfile) users = [...users, userProfile].sort((a,b) => (b.returnPct||0)-(a.returnPct||0));
+    const idx = users.findIndex(u => u.uid === currentUser.uid);
+    if (globalEl) globalEl.textContent = idx >= 0 ? `#${idx+1}` : '—';
+  } catch(e) { if (globalEl) globalEl.textContent = '—'; }
+
+  try {
+    if (!_myFriends.length) { if (friendsEl) friendsEl.textContent = '—'; return; }
+    const uids = _myFriends.map(f => f.uid);
+    const docs = await Promise.all(uids.map(uid => window._fbGetDoc(window._fbDoc(db, 'users', uid)).catch(() => null)));
+    let fUsers = docs.map((snap,i) => (snap && snap.exists()) ? { uid: uids[i], ...snap.data() } : { uid: uids[i], returnPct: 0 });
+    if (userProfile) fUsers.push({ uid: currentUser.uid, ...userProfile });
+    fUsers.sort((a,b) => (b.returnPct||0)-(a.returnPct||0));
+    const fIdx = fUsers.findIndex(u => u.uid === currentUser.uid);
+    if (friendsEl) friendsEl.textContent = fIdx >= 0 ? `#${fIdx+1}` : '—';
+  } catch(e) { if (friendsEl) friendsEl.textContent = '—'; }
 }
 
 // Cached payout-account state, so the challenge tab can show a warning without
@@ -16238,6 +16299,7 @@ function _rebuildFriendLists(){
     _renderFriendsLbList();
   }
   refreshFriendActionButtons();
+  if (document.getElementById('profile-social-stats')) renderProfileView();
 }
 
 // Redraws whichever friend-action surfaces are currently on screen from already-
