@@ -15604,7 +15604,7 @@ function renderChat() {
           <span class="comment-name">${escHtml(m.displayName||'Trader')}</span>
           <span class="comment-time">${feedTimeAgo(ts)}</span>
         </div>
-        ${m.text ? `<div class="comment-body">${escHtml(m.text)}</div>` : ''}
+        ${m.text ? `<div class="comment-body">${escHtml(censorText(m.text))}</div>` : ''}
         ${tradeCard}
         ${isOwn ? `<div class="comment-actions"><span class="comment-delete" onclick="deleteChatMessage('${m.id}')">delete</span></div>` : ''}
       </div>`;
@@ -15636,7 +15636,7 @@ async function sendChatMessage() {
       displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
       photoURL: currentUser.photoURL || null,
       avatarColor: userProfile?.avatarColor || '#4caf50',
-      text,
+      text: censorText(text),
       kind: 'text',
       createdAt: window._fbServerTimestamp(),
     });
@@ -15700,6 +15700,32 @@ function feedTimeAgo(ts) {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Racial-slur filter for user-generated text (chat + comments) ──────────────────
+// Case-insensitive, and normalizes common leetspeak/spacing evasions (e.g. "n1gg3r",
+// "n-i-g-g-e-r") before testing so simple tricks don't slip past it undetected. Not
+// exhaustive - covers the most commonly recognized English-language slurs. Applied
+// both when a message is SENT (so stored data stays clean) and when it's RENDERED
+// (so anything that predates this filter, or reaches Firestore some other way, still
+// displays censored).
+const _SLUR_ROOTS = [
+  'nigger','nigga','chink','spic','spick','gook','kike','wetback','coon','beaner',
+  'paki','towelhead','sandnigger','raghead','jigaboo','porchmonkey','tarbaby',
+  'wop','dago','redskin','injun','cracker','honky','abo',
+];
+function _normalizeForSlurCheck(s){
+  return String(s||'')
+    .toLowerCase()
+    .replace(/[@4]/g,'a').replace(/3/g,'e').replace(/[1!|]/g,'i').replace(/0/g,'o').replace(/[5$]/g,'s')
+    .replace(/[^a-z]/g,'');   // strip spaces/punctuation so spaced-out evasion collapses
+}
+function containsSlur(text){
+  const norm = _normalizeForSlurCheck(text);
+  return _SLUR_ROOTS.some(root => norm.includes(root));
+}
+function censorText(text){
+  return containsSlur(text) ? '***' : text;
 }
 
 
@@ -15966,10 +15992,10 @@ function renderComments(comments) {
       <div class="comment-card ${isOwn?'own':''} ${isReply?'is-reply':''}" id="cmt-${c.id}">
         <div class="comment-header">
           ${avatar}
-          <span class="comment-name">${c.displayName||'Trader'}</span>
+          <span class="comment-name">${escHtml(c.displayName||'Trader')}</span>
           <span class="comment-time">${timeAgo(c.createdAt)}</span>
         </div>
-        <div class="comment-body">${c.text}</div>
+        <div class="comment-body">${escHtml(censorText(c.text))}</div>
         <div class="comment-actions">
           <span class="comment-like ${likedByMe?'liked':''}" onclick="likeComment('${c.id}',${selRank})">
             ${likedByMe?'♥':'♡'} ${c.likes||0}
@@ -16075,7 +16101,7 @@ async function postComment() {
   try {
     await window._fbAddDoc(window._fbCollection(db, 'comments'), {
       playerRank: selRank,
-      text,
+      text: censorText(text),
       uid: currentUser.uid,
       displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
       photoURL: currentUser.photoURL || null,
@@ -16985,10 +17011,10 @@ async function loadChallengeChat(challengeId) {
           ${ava}
           <div class="wc-msg-body">
             <div class="wc-msg-header">
-              <span class="wc-msg-name">${m.displayName||'Anonymous'}</span>
+              <span class="wc-msg-name">${escHtml(m.displayName||'Anonymous')}</span>
               <span class="wc-msg-time">${fmtTime(m.createdAt||m.ts||0)}</span>
             </div>
-            <div class="wc-msg-text">${(m.text||'').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+            <div class="wc-msg-text">${escHtml(censorText(m.text||''))}</div>
           </div>
         </div>`;
       }).join('');
@@ -17014,7 +17040,7 @@ async function sendChallengeChat(challengeId) {
       displayName: currentUser.displayName || 'Anonymous',
       photoURL: currentUser.photoURL || null,
       avatarColor: userProfile?.avatarColor || '#4caf50',
-      text,
+      text: censorText(text),
       createdAt: Date.now(),
     });
   } catch(e) {
