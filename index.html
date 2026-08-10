@@ -121,10 +121,6 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 /* ── MOVERS BAR ── */
 .movers-bar{height:32px;flex-shrink:0;display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--dim);overflow:hidden;padding:0 20px;}
 .movers-label{font-family:var(--font-mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-right:16px;flex-shrink:0;}
-.movers-range{display:flex;align-items:center;gap:2px;margin-right:16px;flex-shrink:0;}
-.movers-range-btn{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 7px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer;border-radius:4px;transition:all .15s;}
-.movers-range-btn:hover{color:var(--text);}
-.movers-range-btn.active{color:var(--green);border-color:var(--hairline);background:var(--bg);}
 /* The label needs to stay put and unfaded, so the mask/clip lives on this
    viewport rather than on .movers-bar itself - same two-layer structure as
    the onboarding ticker (.ob-ticker / .ob-ticker-track). */
@@ -763,6 +759,9 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .trending-tabs{display:flex;gap:6px;margin-top:12px;}
 .trend-tab{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:4px 12px;border:1px solid var(--hairline);background:transparent;color:var(--muted);cursor:pointer;border-radius:6px;transition:all .12s;}
 .trend-tab.active{border-color:var(--red);color:var(--red);background:rgba(245,68,95,.07);}
+.trend-range{display:flex;gap:6px;margin-top:8px;}
+.trend-range-btn{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border:1px solid var(--hairline);background:transparent;color:var(--muted);cursor:pointer;border-radius:6px;transition:all .12s;}
+.trend-range-btn.active{border-color:var(--green);color:var(--green);background:rgba(18,212,126,.07);}
 .trending-grid{flex:1;overflow-y:auto;padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-content:start;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
 .trending-grid::-webkit-scrollbar{width:4px;}
 .trending-grid::-webkit-scrollbar-thumb{background:var(--border2);}
@@ -1458,11 +1457,6 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 <!-- MOVERS BAR -->
 <div class="movers-bar">
   <div class="movers-label" id="movers-header">Today</div>
-  <div class="movers-range" id="movers-range">
-    <button class="movers-range-btn active" data-range="1D" onclick="setMoversRange('1D')">1D</button>
-    <button class="movers-range-btn" data-range="1W" onclick="setMoversRange('1W')">1W</button>
-    <button class="movers-range-btn" data-range="1M" onclick="setMoversRange('1M')">1M</button>
-  </div>
   <div class="movers-viewport">
   <div class="movers-scroll" id="movers-scroll">
     <div class="mover-item" onclick="selectPlayerFromList(85)" style="cursor:pointer">
@@ -12088,66 +12082,11 @@ async function loadPricesFromFirestore() {
   }
 }
 
-let moversRange = '1D';   // '1D' | '1W' | '1M'
-function setMoversRange(r){
-  moversRange = r;
-  document.querySelectorAll('#movers-range .movers-range-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.range === r);
-  });
-  updateMovers();
-}
-
-// Movers over a fixed lookback window (1W/1M), diffed off the closes[] history rather
-// than "today's slate" - every player in the league is eligible, not just those who
-// played today, since a week/month move isn't tied to tonight's games.
-function buildFromRange(days){
-  const leaguePlayers = currentLeague === 'MLB' ? mlbPlayers
-                      : currentLeague === 'GOLF' ? golfPlayers
-                      : nbaPlayers;
-  const baselineDate = localDateStr(days);
-  return leaguePlayers.map(p => {
-    const c = closes[p.rank] || {};
-    const dates = Object.keys(c).filter(d => c[d] > 0).sort();
-    if (!dates.length) return null;
-    const latestDate = dates[dates.length - 1];
-    const latestClose = c[latestDate];
-    const priorDates = dates.filter(d => d <= baselineDate);
-    // If we don't have a close as far back as the window, fall back to the earliest
-    // close on file rather than skipping the player entirely - a shorter-than-window
-    // history is still real movement, just measured from whenever we started tracking.
-    const baseClose = priorDates.length ? c[priorDates[priorDates.length - 1]] : c[dates[0]];
-    if (!(baseClose > 0)) return null;
-    const current = (liveP[p.rank] > 0) ? liveP[p.rank] : latestClose;
-    const pct = (current - baseClose) / baseClose * 100;
-    return { rank: p.rank, name: p.name, pct };
-  })
-  .filter(m => m && Math.abs(m.pct) > 0.5)
-  .sort((a,b) => Math.abs(b.pct) - Math.abs(a.pct))
-  .slice(0, 10);
-}
-
 function updateMovers(){
   const leaguePlayers = currentLeague === 'MLB' ? mlbPlayers
                       : currentLeague === 'GOLF' ? golfPlayers
                       : nbaPlayers;
   let sorted = [];
-
-  if (moversRange !== '1D') {
-    sorted = buildFromRange(moversRange === '1W' ? 7 : 30);
-    const moversHeader = document.getElementById('movers-header');
-    if (moversHeader) moversHeader.textContent = moversRange === '1W' ? '1 Week' : '1 Month';
-    const moversHtml = sorted.map(p=>`
-      <div class="mover-item" onclick="selectPlayerFromList(${p.rank})" style="cursor:pointer">
-        <span class="mover-name">${p.name.split(' ').pop()}</span>
-        <span class="mover-price">${fmt(liveP[p.rank])}</span>
-        <span class="mover-pct ${p.pct>=0?'up':'down'}">${fmtP(p.pct)}</span>
-      </div>`).join('');
-    const scrollEl = document.getElementById('movers-scroll');
-    scrollEl.innerHTML = sorted.length ? moversHtml + moversHtml
-      : '<div class="mover-item"><span class="mover-name" style="color:var(--muted)">No movers yet</span></div>';
-    scrollEl.classList.toggle('ticking', sorted.length > 0);
-    return;
-  }
 
   const todayStr = localDateStr();
   const ydStr = localDateStr(1);
@@ -13229,11 +13168,20 @@ function playerAvatarEl(rank, sizeClass, p){
 //  TRENDING / HIGH VOLUME VIEW
 // ═══════════════════════════════════════════
 let activeTrendTab = 'volume';
+let trendRange = 1;   // 1=1D, 7=1W, 30=1M - matches ENGINE.pct's range argument
 
 function setTrendTab(tab, el){
   activeTrendTab = tab;
   document.querySelectorAll('.trend-tab').forEach(e=>e.classList.remove('active'));
   el.classList.add('active');
+  renderTrending();
+}
+
+function setTrendRange(days, el){
+  trendRange = days;
+  document.querySelectorAll('#trend-range .trend-range-btn').forEach(b=>{
+    b.classList.toggle('active', +b.dataset.range === days);
+  });
   renderTrending();
 }
 
@@ -13247,19 +13195,19 @@ function renderTrending(){
   let sorted = [];
 
   if(activeTrendTab === 'volume'){
-    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: getTodayPct(p.rank)}))
+    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: ENGINE.pct(p.rank, trendRange)}))
       .sort((a,b)=>b.vol - a.vol).slice(0,limit);
   } else if(activeTrendTab === 'gainers'){
-    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: getTodayPct(p.rank)}))
+    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: ENGINE.pct(p.rank, trendRange)}))
       .sort((a,b)=>b.pct - a.pct).slice(0,limit);
   } else if(activeTrendTab === 'losers'){
-    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: getTodayPct(p.rank)}))
+    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: ENGINE.pct(p.rank, trendRange)}))
       .sort((a,b)=>a.pct - b.pct).slice(0,limit);
   } else if(activeTrendTab === 'buzz'){
-    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: getTodayPct(p.rank), buzzScore: dem[p.rank]||0}))
+    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: ENGINE.pct(p.rank, trendRange), buzzScore: dem[p.rank]||0}))
       .sort((a,b)=>b.buzzScore - a.buzzScore).slice(0,limit);
   } else if(activeTrendTab === 'watchlisted'){
-    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: getTodayPct(p.rank)}))
+    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: ENGINE.pct(p.rank, trendRange)}))
       .filter(p=>watchlist.has(p.rank))
       .sort((a,b)=>Math.abs(b.pct) - Math.abs(a.pct));
     if(!sorted.length){
@@ -16200,6 +16148,11 @@ async function renderGlobalLeaderboard() {
         <div class="trend-tab ${activeTrendTab==='losers'?'active':''}" id="ttab-losers" onclick="setTrendTab('losers',this)">Top Losers</div>
         <div class="trend-tab ${activeTrendTab==='buzz'?'active':''}" id="ttab-buzz" onclick="setTrendTab('buzz',this)">Buzz Score</div>
         <div class="trend-tab ${activeTrendTab==='watchlisted'?'active':''}" id="ttab-watchlisted" onclick="setTrendTab('watchlisted',this)" style="display:inline-flex;align-items:center;gap:5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Most Watched</div>
+      </div>
+      <div class="trend-range" id="trend-range">
+        <button class="trend-range-btn ${trendRange===1?'active':''}" data-range="1" onclick="setTrendRange(1,this)">1D</button>
+        <button class="trend-range-btn ${trendRange===7?'active':''}" data-range="7" onclick="setTrendRange(7,this)">1W</button>
+        <button class="trend-range-btn ${trendRange===30?'active':''}" data-range="30" onclick="setTrendRange(30,this)">1M</button>
       </div>
     </div>
     <div class="trending-grid" id="trending-grid" style="flex:none;overflow:visible;padding:0;"></div>`;
