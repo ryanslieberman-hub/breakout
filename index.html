@@ -16237,6 +16237,16 @@ function _rebuildFriendLists(){
   if (window._lbTab === 'friends' && document.getElementById('view-leaderboard')?.style.display !== 'none') {
     _renderFriendsLbList();
   }
+  refreshFriendActionButtons();
+}
+
+// Redraws whichever friend-action surfaces are currently on screen from already-
+// fetched data (no refetch) - called right after a local, optimistic _friendships
+// mutation so a click flips its button (Add -> Added, etc.) instantly instead of
+// waiting on the friendships listener's network round-trip.
+function refreshFriendActionButtons(){
+  if (document.getElementById('ulb-list') && _globalLbUsers.length) _renderGlobalLbRows();
+  if (document.getElementById('friend-search-results') && _friendSearchResults.length) _renderFriendSearchRows();
 }
 
 function friendStatusWith(uid){
@@ -16256,25 +16266,31 @@ async function sendFriendRequest(targetUid, targetDisplayName, targetPhotoURL, t
   if (status === 'outgoing') { showToast('Request already sent'); return; }
   if (status === 'incoming') { showToast('They already sent you a request - accept it below'); return; }
   const id = _friendshipId(currentUser.uid, targetUid);
-  try {
-    await window._fbSetDoc(window._fbDoc(db, 'friendships', id), {
-      users: [currentUser.uid, targetUid],
-      requestedBy: currentUser.uid,
-      status: 'pending',
-      createdAt: window._fbServerTimestamp(),
-      userInfo: {
-        [currentUser.uid]: {
-          displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
-          photoURL: currentUser.photoURL || null,
-          avatarColor: userProfile?.avatarColor || '#4caf50',
-        },
-        [targetUid]: {
-          displayName: targetDisplayName || 'Trader',
-          photoURL: targetPhotoURL || null,
-          avatarColor: targetAvatarColor || '#4caf50',
-        },
+  const doc = {
+    users: [currentUser.uid, targetUid],
+    requestedBy: currentUser.uid,
+    status: 'pending',
+    createdAt: window._fbServerTimestamp(),
+    userInfo: {
+      [currentUser.uid]: {
+        displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
+        photoURL: currentUser.photoURL || null,
+        avatarColor: userProfile?.avatarColor || '#4caf50',
       },
-    });
+      [targetUid]: {
+        displayName: targetDisplayName || 'Trader',
+        photoURL: targetPhotoURL || null,
+        avatarColor: targetAvatarColor || '#4caf50',
+      },
+    },
+  };
+  try {
+    await window._fbSetDoc(window._fbDoc(db, 'friendships', id), doc);
+    // Optimistic local update - the button flips to "Added" immediately rather than
+    // waiting on the friendships listener's snapshot round-trip. The real snapshot
+    // reconciles this same id when it arrives (a no-op update, same shape).
+    _friendships = _friendships.filter(f => f.id !== id).concat([{ id, ...doc, createdAt: Date.now() }]);
+    _rebuildFriendLists();
     showToast(`Friend request sent to ${targetDisplayName || 'trader'}`);
   } catch(e) { showToast('Could not send request: ' + (e.code || e.message)); }
 }
@@ -16283,6 +16299,9 @@ async function acceptFriendRequest(friendshipId){
   if (!currentUser || !db) return;
   try {
     await window._fbUpdateDoc(window._fbDoc(db, 'friendships', friendshipId), { status: 'accepted' });
+    const f = _friendships.find(x => x.id === friendshipId);
+    if (f) f.status = 'accepted';
+    _rebuildFriendLists();
     showToast('Friend added');
   } catch(e) { showToast('Could not accept: ' + (e.code || e.message)); }
 }
@@ -16291,6 +16310,8 @@ async function removeFriendship(friendshipId){
   if (!currentUser || !db) return;
   try {
     await window._fbDeleteDoc(window._fbDoc(db, 'friendships', friendshipId));
+    _friendships = _friendships.filter(f => f.id !== friendshipId);
+    _rebuildFriendLists();
   } catch(e) { showToast('Could not remove: ' + (e.code || e.message)); }
 }
 
@@ -16342,22 +16363,30 @@ function searchFriendCandidates(qstr){
       const snap = await window._fbGetDocs(qq);
       _friendSearchResults = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(u => u.uid !== currentUser.uid);
       if (!_friendSearchResults.length) { el.innerHTML = '<div class="g10-loading">No traders found with that username</div>'; return; }
-      el.innerHTML = _friendSearchResults.map((u, i) => {
-        const status = friendStatusWith(u.uid);
-        const action = status === 'friends'  ? `<span class="friend-status-badge" style="color:var(--green);">Friends ✓</span>`
-          : status === 'outgoing' ? `<span class="friend-status-badge">Pending</span>`
-          : status === 'incoming' ? `<button class="nbtn" style="border-color:var(--green);color:var(--green);" onclick="acceptFriendRequest('${_friendshipId(currentUser.uid,u.uid)}')">Accept</button>`
-          : `<button class="nbtn" onclick="sendFriendRequestFromSearch(${i})">Add</button>`;
-        return `<div class="ulb-card" style="padding:8px 12px;">
-          ${u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`}
-          <div class="ulb-info"><div class="ulb-name">${escHtml(u.displayName||'Trader')}</div><div class="ulb-sub">@${escHtml(u.username||u.usernameLower)}</div></div>
-          ${action}
-        </div>`;
-      }).join('');
+      _renderFriendSearchRows();
     } catch(e) {
       el.innerHTML = `<div class="g10-loading" style="color:var(--red)">Search failed: ${e.code || e.message}</div>`;
     }
   }, 350);
+}
+
+// Split out so a friend-status change can redraw instantly from the already-fetched
+// _friendSearchResults, same reasoning as _renderGlobalLbRows.
+function _renderFriendSearchRows(){
+  const el = document.getElementById('friend-search-results');
+  if (!el) return;
+  el.innerHTML = _friendSearchResults.map((u, i) => {
+    const status = friendStatusWith(u.uid);
+    const action = status === 'friends'  ? `<span class="friend-status-badge" style="color:var(--green);">Friends ✓</span>`
+      : status === 'outgoing' ? `<span class="friend-status-badge" style="color:var(--green);">Added ✓</span>`
+      : status === 'incoming' ? `<button class="nbtn" style="border-color:var(--green);color:var(--green);" onclick="acceptFriendRequest('${_friendshipId(currentUser.uid,u.uid)}')">Accept</button>`
+      : `<button class="nbtn" onclick="sendFriendRequestFromSearch(${i})">Add</button>`;
+    return `<div class="ulb-card" style="padding:8px 12px;">
+      ${u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`}
+      <div class="ulb-info"><div class="ulb-name">${escHtml(u.displayName||'Trader')}</div><div class="ulb-sub">@${escHtml(u.username||u.usernameLower)}</div></div>
+      ${action}
+    </div>`;
+  }).join('');
 }
 
 function sendFriendRequestFromSearch(i){
@@ -16535,8 +16564,11 @@ async function buildLeaderboardFirebase() {
   const inner = document.getElementById('lb-view-inner');
   if (!inner) return;
 
-  // Determine active tab (persist across refreshes)
-  const activeTab = window._lbTab || 'global';
+  // Determine active tab (persist across refreshes). Challenges is hidden for now
+  // (see switchLbTab) - if a stale value from before that got persisted, fall back
+  // to global rather than rendering a tab with no button to select it.
+  let activeTab = window._lbTab || 'global';
+  if (activeTab === 'challenge') { activeTab = 'global'; window._lbTab = 'global'; }
 
   inner.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
@@ -16548,16 +16580,13 @@ async function buildLeaderboardFirebase() {
     <div class="ulb-tabs" style="margin-bottom:16px;">
       <div class="ulb-tab ${activeTab==='global'?'active':''}" onclick="switchLbTab('global')">Global</div>
       <div class="ulb-tab ${activeTab==='friends'?'active':''}" onclick="switchLbTab('friends')">Friends<span class="friends-req-dot" id="friends-req-dot" style="display:${_incomingRequests.length?'inline-block':'none'};"></span></div>
-      <div class="ulb-tab ${activeTab==='challenge'?'active':''}" onclick="switchLbTab('challenge')">Challenges</div>
     </div>
     <div id="lb-tab-content"></div>`;
 
-  if (activeTab === 'global') {
-    await renderGlobalLeaderboard();
-  } else if (activeTab === 'friends') {
+  if (activeTab === 'friends') {
     await renderFriendsLeaderboard();
   } else {
-    await renderChallengeTab();
+    await renderGlobalLeaderboard();
   }
 }
 
@@ -16621,30 +16650,40 @@ async function renderGlobalLeaderboard() {
     if (!currentInList && userProfile) users = [...users, userProfile].sort((a, b) => (b.returnPct || 0) - (a.returnPct || 0));
     if (!users.length) { document.getElementById('ulb-list').innerHTML = `<div class="g10-loading">No traders yet - be the first!</div>`; return; }
     _globalLbUsers = users;
-    document.getElementById('ulb-list').innerHTML = users.map((u, i) => {
-      const isYou = currentUser && u.uid === currentUser.uid;
-      const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
-      const ret = u.returnPct || 0;
-      const avatar = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
-      const status = currentUser ? friendStatusWith(u.uid) : 'none';
-      const friendAction = isYou ? '' : status === 'friends' ? `<span class="friend-status-badge" style="color:var(--green);">Friends ✓</span>`
-        : status === 'outgoing' ? `<span class="friend-status-badge">Pending</span>`
-        : status === 'incoming' ? `<button class="nbtn" style="border-color:var(--green);color:var(--green);" onclick="acceptFriendRequest('${_friendshipId(currentUser.uid,u.uid)}')">Accept</button>`
-        : `<button class="nbtn" onclick="sendFriendRequestFromGlobalLb(${i})">+ Add</button>`;
-      return `<div class="ulb-card ${isYou?'ulb-you':''}">
-        <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
-        <div class="ulb-info">
-          <div class="ulb-name">${escHtml(u.displayName||'Anonymous')} ${isYou?'<span style="color:var(--green);font-size:9px;">(you)</span>':''}</div>
-          <div class="ulb-sub">Portfolio: $${(u.portfolioValue||100000).toLocaleString()}</div>
-        </div>
-        <div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>
-        ${friendAction}
-      </div>`;
-    }).join('');
+    _renderGlobalLbRows();
   } catch(e) {
     console.error('Leaderboard error:', e);
     document.getElementById('ulb-list').innerHTML = `<div class="g10-loading" style="color:var(--red)">Error: ${e.code || e.message}<br><span style="font-size:8px;opacity:.7;">Check browser console for details</span></div>`;
   }
+}
+
+// Split out from renderGlobalLeaderboard so a friend-status change (Add/Accept) can
+// redraw just the rows - instantly, from the already-fetched _globalLbUsers - instead
+// of waiting on the friendships listener's network round-trip before the button
+// updates, or worse, a full leaderboard refetch.
+function _renderGlobalLbRows(){
+  const el = document.getElementById('ulb-list');
+  if (!el) return;
+  el.innerHTML = _globalLbUsers.map((u, i) => {
+    const isYou = currentUser && u.uid === currentUser.uid;
+    const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+    const ret = u.returnPct || 0;
+    const avatar = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
+    const status = currentUser ? friendStatusWith(u.uid) : 'none';
+    const friendAction = isYou ? '' : status === 'friends' ? `<span class="friend-status-badge" style="color:var(--green);">Friends ✓</span>`
+      : status === 'outgoing' ? `<span class="friend-status-badge" style="color:var(--green);">Added ✓</span>`
+      : status === 'incoming' ? `<button class="nbtn" style="border-color:var(--green);color:var(--green);" onclick="acceptFriendRequest('${_friendshipId(currentUser.uid,u.uid)}')">Accept</button>`
+      : `<button class="nbtn" onclick="sendFriendRequestFromGlobalLb(${i})">+ Add</button>`;
+    return `<div class="ulb-card ${isYou?'ulb-you':''}">
+      <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
+      <div class="ulb-info">
+        <div class="ulb-name">${escHtml(u.displayName||'Anonymous')} ${isYou?'<span style="color:var(--green);font-size:9px;">(you)</span>':''}</div>
+        <div class="ulb-sub">Portfolio: $${(u.portfolioValue||100000).toLocaleString()}</div>
+      </div>
+      <div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>
+      ${friendAction}
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════
