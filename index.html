@@ -12945,7 +12945,19 @@ function flashHero(up){
 // ═══════════════════════════════════════════
 //  VIEWS
 // ═══════════════════════════════════════════
+// Where a Market visit came from, so a "back" control can return you to the tab you
+// actually left (e.g. Schedule) instead of always dropping you at the plain player
+// list. Set by goMarketFrom(); cleared by any navigation away from Market, so it
+// never lingers into an unrelated later visit.
+let _marketOrigin = null;
+
 function showView(v,el){
+  if (v !== 'market') _marketOrigin = null;
+  // Keep the back button's label/handler in sync with _marketOrigin even when Market
+  // is reopened some other way (e.g. the nav tab directly) - otherwise it could keep
+  // showing a stale "Back to Schedule" from an earlier visit after that context has
+  // already been cleared above, or vice versa.
+  else if (typeof updateMarketBackButton === 'function') updateMarketBackButton();
   ['market','portfolio','leaderboard','schedule','chat','profile'].forEach(n=>{
     const el2 = document.getElementById('view-'+n);
     if (el2) el2.style.display = n===v ? 'flex' : 'none';
@@ -12987,6 +12999,37 @@ function goMarket(rank){
   if (rank) selRank = rank;
   showView('market', document.querySelectorAll('.nav-tab')[0]);
   if (rank) selectPlayerFromList(rank);
+}
+
+// Same as goMarket(), but remembers which tab you're jumping from so the back
+// control can return you there directly (Schedule -> a player -> back to Schedule),
+// instead of always dropping you at the plain player list regardless of origin.
+function goMarketFrom(origin, rank){
+  goMarket(rank);
+  _marketOrigin = origin;
+  updateMarketBackButton();
+}
+
+// Repurposes the existing "All players" back button: when the current Market visit
+// came from Schedule, it relabels to "Back to Schedule" and is force-shown even on
+// desktop (where it's normally mobile-only, since desktop has nothing to go back to
+// for the ordinary list/detail case - but returning to Schedule is relevant there too).
+function updateMarketBackButton(){
+  const btn = document.getElementById('mobile-back');
+  if (!btn) return;
+  if (_marketOrigin === 'schedule') {
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg> Back to Schedule';
+    btn.onclick = backToSchedule;
+    btn.style.display = 'flex';
+  } else {
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg> All players';
+    btn.onclick = closePlayerDetail;
+    btn.style.display = ''; // back to the CSS default (mobile-only)
+  }
+}
+
+function backToSchedule(){
+  showView('schedule', document.querySelector('.nav-tab[onclick*="schedule"]'));
 }
 
 // ═══════════════════════════════════════════
@@ -15971,7 +16014,7 @@ async function loadSchedule() {
             ${ourGolfers.map(({p, standing}) => {
               const toParStr = standing.toPar == null ? '—' : standing.toPar === 0 ? 'E' : (standing.toPar > 0 ? '+' : '') + standing.toPar;
               const thruStr = standing.thru ? ` · thru ${standing.thru}` : '';
-              return `<div class="sched-player-chip" onclick="goMarket(${p.rank})">
+              return `<div class="sched-player-chip" onclick="goMarketFrom('schedule',${p.rank})">
                 <div class="sched-player-tier" style="background:${TIER_COLOR[p.tier]}22;color:${TIER_COLOR[p.tier]};border:1px solid ${TIER_COLOR[p.tier]}44;">${p.tier}</div>
                 <span class="sched-player-name">${standing.pos ? standing.pos + ' ' : ''}${p.name.split(' ').pop()} ${toParStr}${thruStr}</span>
               </div>`;
@@ -16051,7 +16094,7 @@ async function loadSchedule() {
             ${gamePlayers.map(p => {
               const pct = getTodayPct(p.rank);
               const pctStr = Math.abs(pct) > 0.1 ? `<span class="sched-player-pct" style="color:${pct>=0?'var(--green)':'var(--red)'};">${pct>=0?'+':''}${pct.toFixed(1)}%</span>` : '';
-              return `<div class="sched-player-chip" onclick="goMarket(${p.rank})">
+              return `<div class="sched-player-chip" onclick="goMarketFrom('schedule',${p.rank})">
                 <div class="sched-player-tier" style="background:${TIER_COLOR[p.tier]}22;color:${TIER_COLOR[p.tier]};border:1px solid ${TIER_COLOR[p.tier]}44;">${p.tier}</div>
                 <span class="sched-player-name">${p.name.split(' ').pop()}</span>
                 ${pctStr}
