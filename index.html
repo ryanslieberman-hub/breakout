@@ -434,6 +434,8 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .chat-trade-pct.up{color:var(--green);}
 .chat-trade-pct.down{color:var(--red);}
 .chat-mention{color:var(--green);font-weight:700;}
+.chat-reply-preview{font-family:var(--font-mono);font-size:9.5px;color:var(--muted);padding:5px 8px;margin-top:2px;border-left:2px solid var(--hairline);background:var(--bg);border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chat-reply-preview b{color:var(--fg);}
 .comment-name.clickable{cursor:pointer;}
 .comment-name.clickable:hover{text-decoration:underline;}
 .mention-pick{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;transition:background .12s;font-family:var(--font-mono);font-size:11px;}
@@ -15759,6 +15761,9 @@ function renderChat() {
        <div class="comment-ava-init" style="display:none;background:${m.avatarColor||'#4caf50'}">${(m.displayName||'?')[0].toUpperCase()}</div>`
     : `<div class="comment-ava-init" style="background:${m.avatarColor||'#4caf50'}">${(m.displayName||'?')[0].toUpperCase()}</div>`;
 
+  const byId = {};
+  _chatItems.forEach(x => { byId[x.id] = x; });
+
   el.innerHTML = _chatItems.map((m, i) => {
     const isOwn = currentUser && m.uid === currentUser.uid;
     const ts = m.createdAt?.toMillis ? m.createdAt.toMillis() : (m.ts || 0);
@@ -15776,6 +15781,14 @@ function renderChat() {
     const nameHtml = isOwn
       ? escHtml(label)
       : `<span class="comment-name clickable" title="Add as friend" onclick="addFriendFromChatIdx(${i})">${escHtml(label)}</span>`;
+    const original = m.replyTo ? byId[m.replyTo] : null;
+    const replyPreview = original ? (() => {
+      const origLabel = original.username ? '@' + original.username : (original.displayName || 'Trader');
+      const snippet = original.kind === 'trade' && original.trade
+        ? `${original.trade.type === 'buy' ? 'bought' : 'sold'} ${original.trade.playerName || ''}`
+        : (original.text || '');
+      return `<div class="chat-reply-preview">↩ <b>${escHtml(origLabel)}</b>: ${escHtml(snippet.slice(0, 80))}</div>`;
+    })() : '';
     return `
       <div class="comment-card ${isOwn?'own':''}">
         <div class="comment-header">
@@ -15783,9 +15796,13 @@ function renderChat() {
           ${isOwn ? `<span class="comment-name">${nameHtml}</span>` : nameHtml}
           <span class="comment-time">${feedTimeAgo(ts)}</span>
         </div>
+        ${replyPreview}
         ${m.text ? `<div class="comment-body">${_highlightMentions(escHtml(censorText(m.text)), m.mentions)}</div>` : ''}
         ${tradeCard}
-        ${isOwn ? `<div class="comment-actions"><span class="comment-delete" onclick="deleteChatMessage('${m.id}')">delete</span></div>` : ''}
+        <div class="comment-actions">
+          <span class="comment-reply" onclick="replyToChatMessage(${i})">↩ reply</span>
+          ${isOwn ? `<span class="comment-delete" onclick="deleteChatMessage('${m.id}')">delete</span>` : ''}
+        </div>
       </div>`;
   }).join('');
   el.scrollTop = el.scrollHeight;
@@ -15795,6 +15812,54 @@ function addFriendFromChatIdx(i){
   const m = _chatItems[i];
   if (!m) return;
   addFriendFromChat(m.uid, m.displayName, m.photoURL, m.avatarColor);
+}
+
+// ── Reply (tags the original sender, shows a "replying to" bar, and carries a
+// replyTo reference so the sent message can show a small quoted preview) ──────
+let _chatReplyTo = null;   // message id being replied to
+function replyToChatMessage(i){
+  if (!currentUser) { showToast('Sign in to reply'); return; }
+  const m = _chatItems[i];
+  const input = document.getElementById('gchat-input');
+  if (!m || !input) return;
+
+  _chatReplyTo = m.id;
+  const tagName = m.username ? m.username : (m.displayName || 'Trader');
+  const isSelf = m.uid === currentUser.uid;
+  if (!isSelf) {
+    // Prepend rather than insert at cursor - a reply's tag reads naturally at the
+    // start, and this is a fresh compose action, not mid-sentence editing.
+    input.value = input.value.startsWith('@' + tagName + ' ') ? input.value : `@${tagName} ${input.value}`;
+    // Store whichever string actually got inserted, username or fallback name - the
+    // send-time highlight match is a plain "@" + this field, so it has to agree with
+    // the literal text above regardless of which case this was.
+    if (!_pendingMentions.some(p => p.uid === m.uid)) {
+      _pendingMentions.push({ uid: m.uid, displayName: tagName });
+    }
+  }
+
+  let bar = document.getElementById('gchat-reply-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'gchat-reply-bar';
+    bar.style.cssText = "display:flex;align-items:center;gap:8px;padding:5px 10px;margin-bottom:6px;"
+      + "background:var(--card);border-left:2px solid var(--green);border-radius:4px;"
+      + "font-family:var(--font-mono);font-size:10px;color:var(--muted);";
+    const area = document.getElementById('gchat-input-area');
+    area.insertBefore(bar, area.firstChild);
+  }
+  const who = m.username ? '@' + m.username : (m.displayName || 'Trader');
+  bar.innerHTML = `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">↩ replying to <b style="color:var(--fg)">${escHtml(who)}</b></span>`
+    + `<span onclick="cancelChatReply()" style="cursor:pointer;padding:0 4px;display:inline-flex;align-items:center;" title="Cancel reply" aria-label="Cancel reply"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span>`;
+  bar.style.display = 'flex';
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+function cancelChatReply(){
+  _chatReplyTo = null;
+  const bar = document.getElementById('gchat-reply-bar');
+  if (bar) bar.style.display = 'none';
 }
 
 async function deleteChatMessage(msgId) {
@@ -15820,6 +15885,8 @@ async function sendChatMessage() {
   // against a stale queued mention surviving manual edits to the composed text.
   const mentions = _pendingMentions.filter(m => text.includes('@' + m.displayName));
   _pendingMentions = [];
+  const replyTo = _chatReplyTo;
+  cancelChatReply();
 
   input.value = '';
   input.style.height = 'auto';
@@ -15833,11 +15900,13 @@ async function sendChatMessage() {
       text: censorText(text),
       kind: 'text',
       mentions,
+      replyTo: replyTo || null,
       createdAt: window._fbServerTimestamp(),
     });
   } catch(e) {
     showToast('Failed to send: ' + (e.code || e.message));
     input.value = text; // restore on failure
+    if (replyTo) { _chatReplyTo = replyTo; } // put the reply context back so it isn't silently lost
   }
 }
 
