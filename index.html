@@ -663,6 +663,8 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .profile-title{font-family:var(--font-display);font-size:30px;letter-spacing:1px;margin-bottom:20px;}
 .profile-ava-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:20px;}
 .profile-ava{width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--card);border:2px solid var(--border2);}
+.profile-ava-edit{position:absolute;bottom:-2px;right:-2px;width:26px;height:26px;border-radius:50%;background:var(--green);color:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid var(--bg);transition:transform .12s;}
+.profile-ava-edit:hover{transform:scale(1.08);}
 .profile-stat-row{display:flex;gap:10px;margin-bottom:24px;}
 /* 2x2 for the Social stats (Friends/Added/Global Rank/Friends Rank) - a 4-across flex
    row (like the 3-stat Cash/Total/P&L row above) squeezes each cell to ~1/4 of a
@@ -15117,10 +15119,20 @@ function renderProfileView() {
     inner.innerHTML = `
       <div class="profile-title">Your <span style="color:var(--green)">Profile</span></div>
       <div class="profile-ava-wrap">
-        ${p.photoURL
-          ? `<img class="profile-ava" src="${p.photoURL}" alt="">`
-          : `<div class="profile-ava" style="background:${p.avatarColor};display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:32px;color:#fff;">${(p.displayName||'?')[0].toUpperCase()}</div>`
-        }
+        <div style="position:relative;">
+          ${p.photoURL
+            ? `<img class="profile-ava" src="${p.photoURL}" alt="">`
+            : `<div class="profile-ava" style="background:${p.avatarColor};display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:32px;color:#fff;">${(p.displayName||'?')[0].toUpperCase()}</div>`
+          }
+          <div class="profile-ava-edit" title="Change photo" onclick="document.getElementById('avatar-file-input').click()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          </div>
+        </div>
+        <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="handleAvatarFileChange(event)">
+        <div style="display:flex;gap:10px;font-family:var(--font-mono);font-size:9px;">
+          <span class="comment-reply" onclick="document.getElementById('avatar-file-input').click()">change photo</span>
+          ${p.customPhoto ? `<span class="comment-reply" onclick="removeCustomAvatar()">remove</span>` : ''}
+        </div>
         <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);">${currentUser.email}</div>
       </div>
       <div class="profile-stat-row">
@@ -15323,6 +15335,64 @@ function selectAvatarColor(c) {
   document.querySelectorAll('[id^="avc-"]').forEach(el => {
     el.style.borderColor = el.id === 'avc-' + c.replace('#','') ? '#fff' : 'transparent';
   });
+}
+
+// No Firebase Storage in this app - stores the resized photo directly as a data URL
+// on users/{uid}.photoURL, the exact same field every avatar everywhere already reads
+// (comments, chat, leaderboards, the hero panel), so nothing else needs to change to
+// pick it up. Center-cropped to a square and downscaled small enough (128px, JPEG
+// ~0.75 quality) that it stays a few KB - nowhere near Firestore's 1MiB doc limit even
+// though it rides along on every read of that profile.
+function handleAvatarFileChange(event){
+  const file = event.target.files && event.target.files[0];
+  event.target.value = ''; // allow re-selecting the same file again later
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { showToast('Please choose an image file'); return; }
+  if (file.size > 8 * 1024 * 1024) { showToast('Image too large - please choose one under 8MB'); return; }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const SIZE = 128;
+      const canvas = document.createElement('canvas');
+      canvas.width = SIZE; canvas.height = SIZE;
+      const ctx = canvas.getContext('2d');
+      const side = Math.min(img.naturalWidth, img.naturalHeight);
+      const sx = (img.naturalWidth - side) / 2, sy = (img.naturalHeight - side) / 2;
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, SIZE, SIZE);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      if (dataUrl.length > 500000) { showToast('Could not compress that image small enough - try a different one'); return; }
+      saveCustomAvatar(dataUrl);
+    };
+    img.onerror = () => showToast('Could not read that image');
+    img.src = reader.result;
+  };
+  reader.onerror = () => showToast('Could not read that file');
+  reader.readAsDataURL(file);
+}
+
+async function saveCustomAvatar(dataUrl){
+  if (!currentUser || !db) { showToast('Sign in first'); return; }
+  try {
+    await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), { photoURL: dataUrl, customPhoto: true }, { merge: true });
+    userProfile = { ...userProfile, photoURL: dataUrl, customPhoto: true };
+    showToast('Profile photo updated');
+    renderProfileView();
+    updateAuthUI();
+  } catch(e) { showToast('Could not save photo: ' + (e.code || e.message)); }
+}
+
+async function removeCustomAvatar(){
+  if (!currentUser || !db) return;
+  const fallback = currentUser.photoURL || null;
+  try {
+    await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), { photoURL: fallback, customPhoto: false }, { merge: true });
+    userProfile = { ...userProfile, photoURL: fallback, customPhoto: false };
+    showToast('Reverted to default photo');
+    renderProfileView();
+    updateAuthUI();
+  } catch(e) { showToast('Could not remove photo: ' + (e.code || e.message)); }
 }
 
 async function saveProfile() {
@@ -15638,10 +15708,13 @@ function renderChat() {
         <span class="chat-trade-sub">${m.trade.shares} sh @ $${Number(m.trade.price||0).toFixed(2)}</span>
         ${m.trade.pct != null ? `<span class="chat-trade-pct ${m.trade.pct>=0?'up':'down'}">${fmtP(m.trade.pct)}</span>` : ''}
       </div>` : '';
+    // Username, not first/last name - falls back to display name for anyone who
+    // hasn't claimed one yet (older messages, or a user pre-dating usernames).
+    const label = m.username ? '@' + m.username : (m.displayName || 'Trader');
     // Clicking a username sends a friend request (click your own = no-op).
     const nameHtml = isOwn
-      ? escHtml(m.displayName||'Trader')
-      : `<span class="comment-name clickable" title="Add as friend" onclick="addFriendFromChatIdx(${i})">${escHtml(m.displayName||'Trader')}</span>`;
+      ? escHtml(label)
+      : `<span class="comment-name clickable" title="Add as friend" onclick="addFriendFromChatIdx(${i})">${escHtml(label)}</span>`;
     return `
       <div class="comment-card ${isOwn?'own':''}">
         <div class="comment-header">
@@ -15693,6 +15766,7 @@ async function sendChatMessage() {
     await window._fbAddDoc(window._fbCollection(db, 'globalChat'), {
       uid: currentUser.uid,
       displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
+      username: userProfile?.username || null,
       photoURL: currentUser.photoURL || null,
       avatarColor: userProfile?.avatarColor || '#4caf50',
       text: censorText(text),
@@ -15741,6 +15815,7 @@ async function postTradeToChat(idx) {
     await window._fbAddDoc(window._fbCollection(db, 'globalChat'), {
       uid: currentUser.uid,
       displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
+      username: userProfile?.username || null,
       photoURL: currentUser.photoURL || null,
       avatarColor: userProfile?.avatarColor || '#4caf50',
       text: '',
