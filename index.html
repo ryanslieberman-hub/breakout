@@ -1452,7 +1452,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 <nav>
   <div class="logo" style="display:flex;align-items:center;gap:8px;"><h1 class="wordmark">Breakout</h1><button id="league-btn" onclick="openLeagueDrawer()" style="display:inline-flex;align-items:center;gap:4px;"><span id="league-label">NBA</span><span style="display:inline-flex;color:var(--muted)"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></button></div>
   <div class="nav-tabs" role="tablist" aria-label="Views">
-  <button type="button" class="nav-tab active" onclick="showView(&#39;market&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 L10 11 L14 14 L20 6"/><path d="M15 6 L20 6 L20 11"/></svg><span class="tab-label-full">Market</span><span class="tab-label-mobile">Market</span></button>
+  <button type="button" class="nav-tab active" onclick="goToMarketTop()"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 L10 11 L14 14 L20 6"/><path d="M15 6 L20 6 L20 11"/></svg><span class="tab-label-full">Market</span><span class="tab-label-mobile">Market</span></button>
   <button type="button" class="nav-tab" id="nav-portfolio-tab" onclick="showView(&#39;portfolio&#39;,this)" style="display:none"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M8 8 V6 a2 2 0 0 1 2-2 h4 a2 2 0 0 1 2 2 V8"/></svg><span class="tab-label-full">Portfolio</span><span class="tab-label-mobile">Portfolio</span></button>
   <button type="button" class="nav-tab" onclick="showView(&#39;leaderboard&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21 h8"/><path d="M12 17 v4"/><path d="M7 4 h10 v6 a5 5 0 0 1-10 0 Z"/><path d="M7 6 H4 a1 1 0 0 0-1 1 v1 a3 3 0 0 0 3 3"/><path d="M17 6 h3 a1 1 0 0 1 1 1 v1 a3 3 0 0 1-3 3"/></svg><span class="tab-label-full">Leaderboard</span><span class="tab-label-mobile">Leaders</span></button>
   <button type="button" class="nav-tab" id="nav-schedule-tab" onclick="showView(&#39;schedule&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10 h18"/><path d="M8 3 v4"/><path d="M16 3 v4"/></svg><span class="tab-label-full">Schedule</span><span class="tab-label-mobile">Schedule</span></button>
@@ -13030,6 +13030,18 @@ function updateMarketBackButton(){
 
 function backToSchedule(){
   showView('schedule', document.querySelector('.nav-tab[onclick*="schedule"]'));
+}
+
+// Clicking the Market nav tab itself should land on the top of the market, not
+// wherever selRank happened to be left (e.g. still on a specific player you drilled
+// into from Schedule earlier). goMarket()/goMarketFrom() intentionally keep selRank
+// as-is when jumping to a SPECIFIC player from elsewhere - this is the plain "go to
+// Market" entry point, so it resets deliberately.
+function goToMarketTop(){
+  if (players.length) selectPlayer(players[0].rank);
+  closePlayerDetail(); // no-op on desktop; on mobile, lands on the list, not a detail
+  _marketOrigin = null; // a fresh Market visit, not "coming from" anywhere specific
+  showView('market', document.querySelectorAll('.nav-tab')[0]);
 }
 
 // ═══════════════════════════════════════════
