@@ -14957,7 +14957,11 @@ async function handleAuthChange(user) {
       const snap = await window._fbGetDoc(ref);
       if (snap.exists()) {
         const stored = snap.data();
-        userProfile = { ...userProfile, ...stored, displayName: user.displayName || stored.displayName, photoURL: user.photoURL || stored.photoURL };
+        // A self-uploaded photo must win over Google's - otherwise every fresh sign-in
+        // (including a plain page reload) prefers user.photoURL and overwrites the
+        // custom one right back to the Google photo, below AND in Firestore.
+        const photoURL = stored.customPhoto ? stored.photoURL : (user.photoURL || stored.photoURL);
+        userProfile = { ...userProfile, ...stored, displayName: user.displayName || stored.displayName, photoURL };
       } else {
         // Brand new user - write immediately so they appear on leaderboard
         await window._fbSetDoc(ref, userProfile);
@@ -14971,7 +14975,9 @@ async function handleAuthChange(user) {
       const val = portVal();
       const ret = Math.round(((val - START_VALUE) / START_VALUE) * 1000) / 10;
       userProfile.displayName = user.displayName || userProfile.displayName;
-      userProfile.photoURL = user.photoURL || null;
+      // Same rule as above - never let this clobber a self-uploaded photo, since this
+      // object gets written straight back to Firestore two lines down.
+      if (!userProfile.customPhoto) userProfile.photoURL = user.photoURL || null;
       userProfile.portfolioValue = Math.round(val);
       userProfile.returnPct = ret;
       await window._fbSetDoc(ref, userProfile);
@@ -15822,7 +15828,7 @@ async function sendChatMessage() {
       uid: currentUser.uid,
       displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
       username: userProfile?.username || null,
-      photoURL: currentUser.photoURL || null,
+      photoURL: userProfile?.photoURL || currentUser.photoURL || null,
       avatarColor: userProfile?.avatarColor || '#4caf50',
       text: censorText(text),
       kind: 'text',
@@ -15871,7 +15877,7 @@ async function postTradeToChat(idx) {
       uid: currentUser.uid,
       displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
       username: userProfile?.username || null,
-      photoURL: currentUser.photoURL || null,
+      photoURL: userProfile?.photoURL || currentUser.photoURL || null,
       avatarColor: userProfile?.avatarColor || '#4caf50',
       text: '',
       kind: 'trade',
@@ -16298,7 +16304,7 @@ async function postComment() {
       text: censorText(text),
       uid: currentUser.uid,
       displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
-      photoURL: currentUser.photoURL || null,
+      photoURL: userProfile?.photoURL || currentUser.photoURL || null,
       avatarColor: userProfile?.avatarColor || '#4caf50',
       createdAt: window._fbServerTimestamp(),
       likes: 0,
@@ -16475,7 +16481,7 @@ async function sendFriendRequest(targetUid, targetDisplayName, targetPhotoURL, t
     userInfo: {
       [currentUser.uid]: {
         displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
-        photoURL: currentUser.photoURL || null,
+        photoURL: userProfile?.photoURL || currentUser.photoURL || null,
         avatarColor: userProfile?.avatarColor || '#4caf50',
       },
       [targetUid]: {
@@ -17680,8 +17686,8 @@ async function sendChallengeChat(challengeId) {
     await window._fbAddDoc(window._fbCollection(db, 'comments'), {
       challengeId,
       uid: currentUser.uid,
-      displayName: currentUser.displayName || 'Anonymous',
-      photoURL: currentUser.photoURL || null,
+      displayName: userProfile?.displayName || currentUser.displayName || 'Anonymous',
+      photoURL: userProfile?.photoURL || currentUser.photoURL || null,
       avatarColor: userProfile?.avatarColor || '#4caf50',
       text: censorText(text),
       createdAt: Date.now(),
