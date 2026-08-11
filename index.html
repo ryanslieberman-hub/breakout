@@ -15224,17 +15224,8 @@ function renderProfileView() {
         <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('friends')"><div class="profile-stat-lbl">Friends Rank</div><div class="profile-stat-val" id="profile-friends-rank">…</div></div>
       </div>
 
-      <label style="font-family:var(--font-mono);font-size:9px;color:var(--muted);display:block;margin-bottom:4px;">Display Name</label>
-      <input class="profile-input" id="disp-name-inp" value="${p.displayName||''}" maxlength="24" placeholder="Your name...">
-      <label style="font-family:var(--font-mono);font-size:9px;color:var(--muted);display:block;margin-bottom:4px;">Avatar Color</label>
-      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-        ${['#e91e63','#9c27b0','#3f51b5','#2196f3','#00bcd4','#4caf50','#ff9800','#ff5722'].map(c=>
-          `<div onclick="selectAvatarColor('${c}')" style="width:28px;height:28px;border-radius:50%;background:${c};cursor:pointer;border:2px solid ${c===p.avatarColor?'#fff':'transparent'};transition:border .12s;" id="avc-${c.replace('#','')}"></div>`
-        ).join('')}
-      </div>
       <div class="profile-row">
-        <button class="profile-btn primary" onclick="saveProfile()">Save Profile</button>
-        <button class="profile-btn secondary" onclick="saveCloudPortfolio()">Save Portfolio️</button>
+        <button class="profile-btn secondary" style="width:100%;" onclick="saveCloudPortfolio()">Save Portfolio️</button>
       </div>
       <div class="profile-section-lbl">Account</div>
       <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:12px;">Signed in with Google as ${currentUser.email}</div>
@@ -15393,13 +15384,6 @@ function renderPayoutBanner() {
     </div>`;
 }
 
-function selectAvatarColor(c) {
-  if (userProfile) userProfile.avatarColor = c;
-  document.querySelectorAll('[id^="avc-"]').forEach(el => {
-    el.style.borderColor = el.id === 'avc-' + c.replace('#','') ? '#fff' : 'transparent';
-  });
-}
-
 // No Firebase Storage in this app - stores the resized photo directly as a data URL
 // on users/{uid}.photoURL, the exact same field every avatar everywhere already reads
 // (comments, chat, leaderboards, the hero panel), so nothing else needs to change to
@@ -15456,22 +15440,6 @@ async function removeCustomAvatar(){
     renderProfileView();
     updateAuthUI();
   } catch(e) { showToast('Could not remove photo: ' + (e.code || e.message)); }
-}
-
-async function saveProfile() {
-  if (!currentUser || !db) { showToast('Not signed in'); return; }
-  const name = document.getElementById('disp-name-inp')?.value.trim();
-  if (!name) { showToast('Name cannot be empty'); return; }
-  try {
-    userProfile.displayName = name;
-    await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), userProfile, { merge: true });
-    updateAuthUI();
-    closeProfile();
-    showToast('Profile saved');
-  } catch(e) {
-    console.error('saveProfile error:', e);
-    showToast('Save failed: ' + (e.code || e.message));
-  }
 }
 
 async function signInWithGoogle() {
