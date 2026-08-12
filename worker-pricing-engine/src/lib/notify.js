@@ -1,45 +1,39 @@
 // Looks up who to notify and fires the pushes. Two entry points:
-//   notifyHoldersOfPlayer - "you own a player that just moved a lot"
-//   notifyPortfolioSummary - "here's how your whole portfolio did today"
-// Both go uid -> pushTokens -> sendPush, and both prune tokens FCM reports
-// as UNREGISTERED so a dead token doesn't get retried forever.
-import { firestoreQuery, firestoreDeleteDoc } from './firestore.js';
+//   notifyAllTokens - "a player just moved a lot" (market-wide, not holder-scoped)
+//   notifyUid       - "here's how your own portfolio did today"
+// Both prune tokens FCM reports as UNREGISTERED so a dead token doesn't get
+// retried forever.
+import { firestoreQuery, firestoreListCollection, firestoreDeleteDoc } from './firestore.js';
 import { sendPush } from './push.js';
 
-async function tokensForUid(env, uid) {
-  const rows = await firestoreQuery(env, 'pushTokens', [{ field: 'uid', op: 'EQUAL', value: uid }]);
-  return rows.map(r => r.id);
-}
-
-async function sendToUid(env, uid, notification, data) {
-  const tokens = await tokensForUid(env, uid);
-  for (const token of tokens) {
-    try {
-      await sendPush(env, token, { ...notification, data });
-    } catch (e) {
-      if (e.unregistered) {
-        await firestoreDeleteDoc(env, `pushTokens/${token}`).catch(() => {});
-      } else {
-        console.error(`push to uid ${uid} failed:`, e.message);
-      }
+async function sendToToken(env, token, notification, data) {
+  try {
+    await sendPush(env, token, { ...notification, data });
+    return true;
+  } catch (e) {
+    if (e.unregistered) {
+      await firestoreDeleteDoc(env, `pushTokens/${token}`).catch(() => {});
+    } else {
+      console.error(`push to token ${token.slice(0, 12)}... failed:`, e.message);
     }
+    return false;
   }
 }
 
-// portfolios/{uid}.holdings is keyed by the player's global rank (see
-// index.js docPath) - `holdings.<rank>.shares > 0` is a single-field filter
-// on a concrete field path, so it's covered by Firestore's automatic
-// single-field indexes without needing a composite index defined anywhere.
-export async function notifyHoldersOfPlayer(env, rank, notification) {
-  const holders = await firestoreQuery(env, 'portfolios', [
-    { field: `holdings.${rank}.shares`, op: 'GREATER_THAN', value: 0 },
-  ]);
-  for (const holder of holders) {
-    await sendToUid(env, holder.id, notification, { rank: String(rank) });
+// Market-wide alerts (big/fast price moves) go to every registered device,
+// not just holders - every pushTokens doc is already tied to a signed-in
+// user (see index.html's enablePushNotifications), so this is exactly
+// "everyone who opted in", no join against portfolios/users needed.
+export async function notifyAllTokens(env, notification, data) {
+  const tokens = await firestoreListCollection(env, 'pushTokens');
+  let sent = 0;
+  for (const t of tokens) {
+    if (await sendToToken(env, t.id, notification, data)) sent++;
   }
-  return holders.length;
+  return sent;
 }
 
 export async function notifyUid(env, uid, notification, data) {
-  await sendToUid(env, uid, notification, data);
+  const tokens = await firestoreQuery(env, 'pushTokens', [{ field: 'uid', op: 'EQUAL', value: uid }]);
+  for (const t of tokens) await sendToToken(env, t.id, notification, data);
 }

@@ -15,28 +15,67 @@ import * as nfl from './nfl.js';
 import {
   firestoreBatchGetDocs, firestoreBatchWriteDocs, firestoreListCollection, firestorePatchDoc,
 } from './lib/firestore.js';
-import { notifyHoldersOfPlayer, notifyUid } from './lib/notify.js';
+import { notifyAllTokens, notifyUid } from './lib/notify.js';
 
 const TZ = 'America/New_York';
 
-// A single game/round moving a player's price by this much (see engine.js's
-// `perf`, the same-day fractional move off today's base) is worth pushing to
-// holders. Chosen so an average solid game doesn't trigger it but a
-// standout one does - see engine.js's per-tier UP/DOWN scalars for context.
-const BIG_MOVE_THRESHOLD = 0.07;
+// Two distinct kinds of "worth telling everyone about" move, both market-wide
+// (not just holders - a stock-app-style "TICKER up 10% today" alert is
+// interesting to anyone watching the market, not only people who own it):
+//   - DAY: cumulative move off today's opening base (engine.js's `perf`),
+//     deduped to once per player per day via bigMoveDate.
+//   - FAST: a sharp move within a ~30 min window even if the day-total isn't
+//     there yet (a slow grind to 10% over 6 hours isn't the same signal as
+//     7% in 30 min) - deduped with a cooldown via fastMoveNotifiedAt so a
+//     move that stays elevated across several 15-min ticks doesn't re-fire
+//     every tick.
+const DAY_MOVE_THRESHOLD = 0.10;
+const FAST_MOVE_THRESHOLD = 0.07;
+const FAST_MOVE_LOOKBACK_MS = 25 * 60 * 1000; // ticks run every 15 min, so "~30 min ago" lands 2 ticks back
+const FAST_MOVE_HISTORY_MS = 65 * 60 * 1000;
+const FAST_MOVE_COOLDOWN_MS = 30 * 60 * 1000;
 
-// Formats and fires one push per big mover, and reports back how many
-// distinct players actually reached at least one holder (for tick stats).
-async function announceBigMovers(env, movers) {
+// Figures out whether this tick's price for one player crosses either
+// threshold, and returns both the mover events (for notification) and the
+// state fields to merge into this player's Firestore write (dedup markers +
+// trimmed value history) - callers just Object.assign the fields in.
+export function detectMovers({ rank, name, perf, value, st, dateKey, now }) {
+  const events = [];
+  const fields = {};
+
+  if (Math.abs(perf) >= DAY_MOVE_THRESHOLD && st.bigMoveDate !== dateKey) {
+    fields.bigMoveDate = dateKey;
+    events.push({ kind: 'day', rank, name, pct: perf, value });
+  }
+
+  const history = Array.isArray(st.recentValues) ? st.recentValues : [];
+  const ref = [...history].reverse().find(e => now - e.t >= FAST_MOVE_LOOKBACK_MS);
+  if (ref && ref.value > 0) {
+    const fastPct = (value - ref.value) / ref.value;
+    const cooledDown = !st.fastMoveNotifiedAt || (now - st.fastMoveNotifiedAt) >= FAST_MOVE_COOLDOWN_MS;
+    if (Math.abs(fastPct) >= FAST_MOVE_THRESHOLD && cooledDown) {
+      fields.fastMoveNotifiedAt = now;
+      events.push({ kind: 'fast', rank, name, pct: fastPct, value });
+    }
+  }
+  fields.recentValues = [...history, { t: now, value }].filter(e => now - e.t <= FAST_MOVE_HISTORY_MS);
+
+  return { events, fields };
+}
+
+// Formats and fires one push per mover event, broadcast to every opted-in
+// device. Returns how many devices got at least one push (for tick stats).
+async function announceMovers(env, movers) {
   let notified = 0;
   for (const m of movers) {
-    const direction = m.perf >= 0 ? 'up' : 'down';
-    const pct = (Math.abs(m.perf) * 100).toFixed(1);
-    const holders = await notifyHoldersOfPlayer(env, m.rank, {
-      title: `${m.name} is ${direction} ${pct}%`,
-      body: `Now $${m.value.toFixed(2)} - you hold shares.`,
-    });
-    if (holders > 0) notified++;
+    const direction = m.pct >= 0 ? 'up' : 'down';
+    const pct = (Math.abs(m.pct) * 100).toFixed(1);
+    const windowText = m.kind === 'fast' ? 'in the last 30 min' : 'today';
+    const sent = await notifyAllTokens(env, {
+      title: `${m.name} is ${direction} ${pct}% ${windowText}`,
+      body: `Now $${m.value.toFixed(2)}`,
+    }, { rank: String(m.rank), kind: `${m.kind}_move` });
+    notified += sent;
   }
   return notified;
 }
@@ -71,7 +110,7 @@ function defaultState(league, player) {
   return {
     rank: player.rank, tier: player.tier,
     statPrice: statPriceFor(league, player),
-    base: null, closes: {}, bigMoveDate: null,
+    base: null, closes: {}, bigMoveDate: null, recentValues: [], fastMoveNotifiedAt: null,
     // league-specific baseline fields carried through as-is
     ppg: player.ppg, rpg: player.rpg, apg: player.apg, // nba
     avg: player.avg, hr: player.hr, rbi: player.rbi, ops: player.ops, // mlb hitter
@@ -128,7 +167,8 @@ async function tickNba(env, today) {
 
   // Phase 3: compute every update in memory.
   const updates = [];
-  const bigMovers = [];
+  const movers = [];
+  const now = Date.now();
   let finalized = 0;
   for (const { player, stat, isFinal } of toProcess) {
     const st = states[player.rank];
@@ -137,17 +177,16 @@ async function tickNba(env, today) {
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
     const fields = { base: newBaseRecord, tier: st.tier, statPrice: st.statPrice, ppg: st.ppg, rpg: st.rpg, apg: st.apg };
     if (isFinal) { fields.closes = { ...st.closes, [today]: finalize(value, today, st.closes) }; finalized++; }
-    if (Math.abs(perf) >= BIG_MOVE_THRESHOLD && st.bigMoveDate !== today) {
-      fields.bigMoveDate = today;
-      bigMovers.push({ rank: player.rank, name: player.name, perf, value });
-    }
+    const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: today, now });
+    Object.assign(fields, moveFields);
+    movers.push(...events);
     updates.push({ path: docPath('nba', player.rank), fields });
   }
 
   // Phase 4: one batched write.
   await firestoreBatchWriteDocs(env, updates);
-  const notified = await announceBigMovers(env, bigMovers);
-  return { league: 'nba', games: events.length, processed: toProcess.length, finalized, bigMovers: bigMovers.length, notified };
+  const notified = await announceMovers(env, movers);
+  return { league: 'nba', games: events.length, processed: toProcess.length, finalized, movers: movers.length, notified };
 }
 
 export async function runNbaDailyRefresh(env) {
@@ -189,7 +228,8 @@ async function tickMlb(env, today) {
   const states = await loadStatesBatch(env, 'mlb', toProcess.map(t => t.player));
 
   const updates = [];
-  const bigMovers = [];
+  const movers = [];
+  const now = Date.now();
   let finalized = 0;
   for (const { player, stat } of toProcess) {
     const st = states[player.rank];
@@ -203,16 +243,15 @@ async function tickMlb(env, today) {
     };
     if (isPitcher && stat.ip >= 1) fields.pitcherLastStart = today;
     if (isFinal) { fields.closes = { ...st.closes, [today]: finalize(value, today, st.closes) }; finalized++; }
-    if (Math.abs(perf) >= BIG_MOVE_THRESHOLD && st.bigMoveDate !== today) {
-      fields.bigMoveDate = today;
-      bigMovers.push({ rank: player.rank, name: player.name, perf, value });
-    }
+    const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: today, now });
+    Object.assign(fields, moveFields);
+    movers.push(...events);
     updates.push({ path: docPath('mlb', player.rank), fields });
   }
 
   await firestoreBatchWriteDocs(env, updates);
-  const notified = await announceBigMovers(env, bigMovers);
-  return { league: 'mlb', games: gamePks.length, processed: toProcess.length, finalized, bigMovers: bigMovers.length, notified };
+  const notified = await announceMovers(env, movers);
+  return { league: 'mlb', games: gamePks.length, processed: toProcess.length, finalized, movers: movers.length, notified };
 }
 
 export async function runMlbDailyRefresh(env) {
@@ -258,7 +297,8 @@ async function tickGolf(env, today) {
   const fieldAvg = golf.computeFieldAverage(byName, rankByNorm, cumHxByRank);
 
   const updates = [];
-  const bigMovers = [];
+  const movers = [];
+  const now = Date.now();
   let finalized = 0;
   for (const player of tracked) {
     const rec = byName[golf.normalizeName(player.name)];
@@ -271,16 +311,15 @@ async function tickGolf(env, today) {
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
     const fields = { base: newBaseRecord, cumHx: derived.updatedHx, tier: st.tier, statPrice: st.statPrice };
     if (isComplete) { fields.closes = { ...st.closes, [derived.date]: finalize(value, derived.date, st.closes) }; finalized++; }
-    if (Math.abs(perf) >= BIG_MOVE_THRESHOLD && st.bigMoveDate !== derived.date) {
-      fields.bigMoveDate = derived.date;
-      bigMovers.push({ rank: player.rank, name: player.name, perf, value });
-    }
+    const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: derived.date, now });
+    Object.assign(fields, moveFields);
+    movers.push(...events);
     updates.push({ path: docPath('golf', player.rank), fields });
   }
 
   await firestoreBatchWriteDocs(env, updates);
-  const notified = await announceBigMovers(env, bigMovers);
-  return { league: 'golf', players: Object.keys(byName).length, processed: updates.length, finalized, bigMovers: bigMovers.length, notified };
+  const notified = await announceMovers(env, movers);
+  return { league: 'golf', players: Object.keys(byName).length, processed: updates.length, finalized, movers: movers.length, notified };
 }
 
 // ── NFL ──
@@ -321,7 +360,8 @@ async function tickNfl(env, today) {
 
   const states = await loadStatesBatch(env, 'nfl', toProcess);
   const updates = [];
-  const bigMovers = [];
+  const movers = [];
+  const now = Date.now();
   let finalized = 0;
   for (const player of toProcess) {
     const fpts = fptsByRank[player.rank];
@@ -331,16 +371,15 @@ async function tickNfl(env, today) {
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
     const fields = { base: newBaseRecord, tier: st.tier, statPrice: st.statPrice, fpts: st.fpts };
     if (isFinal) { fields.closes = { ...st.closes, [today]: finalize(value, today, st.closes) }; finalized++; }
-    if (Math.abs(perf) >= BIG_MOVE_THRESHOLD && st.bigMoveDate !== today) {
-      fields.bigMoveDate = today;
-      bigMovers.push({ rank: player.rank, name: player.name, perf, value });
-    }
+    const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: today, now });
+    Object.assign(fields, moveFields);
+    movers.push(...events);
     updates.push({ path: docPath('nfl', player.rank), fields });
   }
 
   await firestoreBatchWriteDocs(env, updates);
-  const notified = await announceBigMovers(env, bigMovers);
-  return { league: 'nfl', games: relevant.length, processed: toProcess.length, finalized, bigMovers: bigMovers.length, notified };
+  const notified = await announceMovers(env, movers);
+  return { league: 'nfl', games: relevant.length, processed: toProcess.length, finalized, movers: movers.length, notified };
 }
 
 export async function runGameDayTick(env) {
