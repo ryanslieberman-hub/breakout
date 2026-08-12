@@ -5613,6 +5613,11 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   </div>
 </div>
 
+<!-- PUBLIC PROFILE MODAL -->
+<div class="modal-overlay" id="public-profile-modal" onclick="if(event.target===this)closePublicProfile()">
+  <div class="modal" id="public-profile-content" style="width:400px;"></div>
+</div>
+
 <!-- SETTINGS MODAL -->
 <div class="modal-overlay" id="settings-modal">
   <div class="modal">
@@ -14979,7 +14984,10 @@ async function handleAuthChange(user) {
         const photoURL = stored.customPhoto ? stored.photoURL : (user.photoURL || stored.photoURL);
         userProfile = { ...userProfile, ...stored, displayName: user.displayName || stored.displayName, photoURL };
       } else {
-        // Brand new user - write immediately so they appear on leaderboard
+        // Brand new user - write immediately so they appear on leaderboard. createdAt
+        // powers the "member since" line on public profiles - there's no way to
+        // backfill it for accounts that predate this field, so those just omit the line.
+        userProfile.createdAt = window._fbServerTimestamp();
         await window._fbSetDoc(ref, userProfile);
         console.log('New user created:', userProfile.displayName);
       }
@@ -15238,6 +15246,11 @@ function renderProfileView() {
         <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('friends')"><div class="profile-stat-lbl">Friends Rank</div><div class="profile-stat-val" id="profile-friends-rank">…</div></div>
       </div>
 
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-family:var(--font-mono);font-size:10.5px;color:var(--muted);cursor:pointer;">
+        <input type="checkbox" id="holdings-public-toggle" ${p.showHoldingsPublicly ? 'checked' : ''} onchange="toggleHoldingsPublic(this.checked)">
+        Make my holdings visible on my public profile
+      </label>
+
       <div class="profile-row">
         <button class="profile-btn secondary" style="width:100%;" onclick="saveCloudPortfolio()">Save Portfolio️</button>
       </div>
@@ -15298,6 +15311,110 @@ async function refreshProfileRanks(){
     const fIdx = fUsers.findIndex(u => u.uid === currentUser.uid);
     if (friendsEl) friendsEl.textContent = fIdx >= 0 ? `#${fIdx+1}` : '—';
   } catch(e) { if (friendsEl) friendsEl.textContent = '—'; }
+}
+
+// ═══════════════════════════════════════════
+//  PUBLIC PROFILE
+// ═══════════════════════════════════════════
+function _lookupPlayer(rank){
+  return [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].find(p => p.rank === +rank);
+}
+
+// Username + "member since" are always shown - both are already public elsewhere
+// (leaderboards, chat). Holdings are shown ONLY if the owner opted in via
+// showHoldingsPublicly (off by default) - see the portfolios/{uid} rule change,
+// which is the actual enforcement point, not this UI check.
+async function openPublicProfile(uid){
+  if (!uid || !db) return;
+  const modal = document.getElementById('public-profile-modal');
+  const content = document.getElementById('public-profile-content');
+  if (!modal || !content) return;
+  content.innerHTML = `<div class="g10-loading">Loading…</div>`;
+  modal.classList.add('open');
+  try {
+    const snap = await window._fbGetDoc(window._fbDoc(db, 'users', uid));
+    if (!snap.exists()) { content.innerHTML = `<div class="g10-loading">Trader not found</div>`; return; }
+    const u = { uid, ...snap.data() };
+    const avatar = u.photoURL
+      ? `<img src="${u.photoURL}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;">`
+      : `<div style="width:64px;height:64px;border-radius:50%;background:${u.avatarColor||'#4caf50'};display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:26px;color:#fff;">${(u.displayName||'?')[0].toUpperCase()}</div>`;
+    const nameBlock = u.username
+      ? `<div style="font-family:var(--font-mono);font-size:18px;color:var(--green);">@${escHtml(u.username)}</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px;">${escHtml(u.displayName||'Trader')}</div>`
+      : `<div style="font-family:var(--font-mono);font-size:18px;">${escHtml(u.displayName||'Trader')}</div>`;
+    const joined = u.createdAt?.toMillis ? new Date(u.createdAt.toMillis()) : (u.createdAt?.seconds ? new Date(u.createdAt.seconds*1000) : null);
+    const joinedStr = joined ? `Member since ${joined.toLocaleDateString([], {month:'long', year:'numeric'})}` : null;
+    const ret = u.returnPct || 0;
+    const isSelf = currentUser && currentUser.uid === uid;
+    const status = currentUser && !isSelf ? friendStatusWith(uid) : null;
+    const friendActionHtml = isSelf ? '' : status === 'friends' ? `<span class="friend-status-badge" style="color:var(--green);">Friends ✓</span>`
+      : status === 'outgoing' ? `<span class="friend-status-badge">Request sent</span>`
+      : status === 'incoming' ? `<button class="nbtn" style="border-color:var(--green);color:var(--green);" onclick="acceptFriendRequest('${_friendshipId(currentUser.uid,uid)}')">Accept request</button>`
+      : currentUser ? `<button class="nbtn" onclick="openPublicProfileAddFriend('${uid}')">+ Add friend</button>` : '';
+
+    let holdingsHtml = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:12px 0;">This trader's holdings are private.</div>`;
+    if (u.showHoldingsPublicly) {
+      try {
+        const pSnap = await window._fbGetDoc(window._fbDoc(db, 'portfolios', uid));
+        const holdingsMap = pSnap.exists() ? (pSnap.data().holdings || {}) : {};
+        const rows = Object.entries(holdingsMap)
+          .filter(([,h]) => h && h.shares > 0)
+          .map(([rank,h]) => ({ rank: +rank, shares: h.shares, player: _lookupPlayer(rank) }))
+          .filter(r => r.player)
+          .sort((a,b) => (liveP[b.rank]*b.shares) - (liveP[a.rank]*a.shares));
+        holdingsHtml = rows.length
+          ? rows.map(r => `
+            <div class="ulb-card" style="padding:8px 12px;cursor:pointer;" onclick="closePublicProfile();goMarket(${r.rank})">
+              <div class="ulb-info"><div class="ulb-name" style="font-size:12px;">${escHtml(r.player.name)}</div><div class="ulb-sub">${r.shares} sh</div></div>
+              <div class="ulb-ret pos" style="font-size:12px;">${fmt(liveP[r.rank]*r.shares)}</div>
+            </div>`).join('')
+          : `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:12px 0;">No open positions.</div>`;
+      } catch(e) {
+        holdingsHtml = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--red);text-align:center;padding:12px 0;">Could not load holdings.</div>`;
+      }
+    }
+
+    content.innerHTML = `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:-10px;">
+        <span onclick="closePublicProfile()" style="cursor:pointer;color:var(--muted);font-family:var(--font-mono);font-size:14px;padding:4px;" title="Close" aria-label="Close">✕</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:18px;text-align:center;">
+        ${avatar}
+        ${nameBlock}
+        ${joinedStr ? `<div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);">${joinedStr}</div>` : ''}
+        ${friendActionHtml}
+      </div>
+      <div class="profile-stat-row" style="margin-bottom:18px;">
+        <div class="profile-stat"><div class="profile-stat-lbl">Portfolio</div><div class="profile-stat-val">$${(u.portfolioValue||100000).toLocaleString()}</div></div>
+        <div class="profile-stat"><div class="profile-stat-lbl">Return</div><div class="profile-stat-val" style="color:${ret>=0?'var(--green)':'var(--red)'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div></div>
+      </div>
+      <div class="profile-section-lbl">Holdings</div>
+      <div style="max-height:220px;overflow-y:auto;">${holdingsHtml}</div>`;
+  } catch(e) {
+    content.innerHTML = `<div class="g10-loading" style="color:var(--red)">Could not load profile: ${e.code || e.message}</div>`;
+  }
+}
+
+function closePublicProfile(){
+  document.getElementById('public-profile-modal')?.classList.remove('open');
+}
+
+async function openPublicProfileAddFriend(uid){
+  const snap = await window._fbGetDoc(window._fbDoc(db, 'users', uid)).catch(() => null);
+  const u = snap && snap.exists() ? snap.data() : {};
+  sendFriendRequest(uid, u.displayName, u.photoURL, u.avatarColor, u.username);
+  openPublicProfile(uid); // refresh the modal so the button reflects "Request sent"
+}
+
+async function toggleHoldingsPublic(checked){
+  if (!currentUser || !db) return;
+  try {
+    await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), { showHoldingsPublicly: checked }, { merge: true });
+    userProfile = { ...userProfile, showHoldingsPublicly: checked };
+    showToast(checked ? 'Your holdings are now public' : 'Your holdings are private again');
+  } catch(e) {
+    showToast('Could not update: ' + (e.code || e.message));
+    renderProfileView(); // revert the checkbox visually on failure
+  }
 }
 
 // Cached payout-account state, so the challenge tab can show a warning without
@@ -15738,10 +15855,13 @@ function renderChat() {
     return;
   }
 
-  const avaFor = m => m.photoURL
-    ? `<img class="comment-ava" src="${m.photoURL}" onerror="this.style.display='none';this.nextSibling.style.display='flex'" alt="">
-       <div class="comment-ava-init" style="display:none;background:${m.avatarColor||'#4caf50'}">${(m.displayName||'?')[0].toUpperCase()}</div>`
-    : `<div class="comment-ava-init" style="background:${m.avatarColor||'#4caf50'}">${(m.displayName||'?')[0].toUpperCase()}</div>`;
+  const avaFor = m => {
+    const inner = m.photoURL
+      ? `<img class="comment-ava" src="${m.photoURL}" onerror="this.style.display='none';this.nextSibling.style.display='flex'" alt="">
+         <div class="comment-ava-init" style="display:none;background:${m.avatarColor||'#4caf50'}">${(m.displayName||'?')[0].toUpperCase()}</div>`
+      : `<div class="comment-ava-init" style="background:${m.avatarColor||'#4caf50'}">${(m.displayName||'?')[0].toUpperCase()}</div>`;
+    return `<span onclick="openPublicProfile('${m.uid}')" style="cursor:pointer;">${inner}</span>`;
+  };
 
   const byId = {};
   _chatItems.forEach(x => { byId[x.id] = x; });
@@ -16731,7 +16851,8 @@ async function _renderFriendsLbList(){
       const isYou = u.uid === currentUser.uid;
       const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
       const ret = u.returnPct || 0;
-      const avatar = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
+      const avaInner = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
+      const avatar = `<span onclick="openPublicProfile('${u.uid}')" style="cursor:pointer;">${avaInner}</span>`;
       return `<div class="ulb-card ${isYou?'ulb-you':''}">
         <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
         <div class="ulb-info">
@@ -16950,7 +17071,8 @@ function _renderGlobalLbRows(){
     const isYou = currentUser && u.uid === currentUser.uid;
     const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
     const ret = u.returnPct || 0;
-    const avatar = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
+    const avaInner = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
+    const avatar = `<span onclick="openPublicProfile('${u.uid}')" style="cursor:pointer;">${avaInner}</span>`;
     const status = currentUser ? friendStatusWith(u.uid) : 'none';
     const friendAction = isYou ? '' : status === 'friends' ? `<span class="ulb-friend-icon solid" title="Friends">✓</span>`
       : status === 'outgoing' ? `<span class="ulb-friend-icon outline" title="Request sent">···</span>`
@@ -17645,7 +17767,8 @@ async function renderChallengeDetail(challengeId) {
           const unknown = ret === null;
           const rankCls = unknown ? '' : i===0?'gold':i===1?'silver':i===2?'bronze':'';
           const retCls = unknown ? 'unknown' : ret >= 0 ? 'pos' : 'neg';
-          const avatar = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
+          const avaInner = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
+          const avatar = `<span onclick="openPublicProfile('${u.uid}')" style="cursor:pointer;">${avaInner}</span>`;
           html += `<div class="ulb-card ${isYou?'ulb-you':''}">
             <div class="ulb-rank ${rankCls}">${unknown ? '–' : i+1}</div>${avatar}
             <div class="ulb-info">
