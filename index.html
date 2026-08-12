@@ -12841,13 +12841,14 @@ function updateRangePcts(rank){
     const el = document.getElementById('rb-pct-'+(days===0?'0':days));
     if (!el) return;
 
-    // Use the shared _rangePct so the button matches the header % and the chart.
-    // Show "—" only when there's genuinely no history to measure a longer range.
-    const hasHistory = days === 1 || days === 0 || sortedDates.some(d => d < localDateStr(days)) || sortedDates.length >= 2;
-    if (!hasHistory && !sortedDates.length) { el.textContent = '—'; el.className = 'rb-pct'; return; }
-
-    const pct = _rangePct(rank, days);
-    if (pct === 0 && days !== 1 && sortedDates.length < 2) { el.textContent = '—'; el.className = 'rb-pct'; return; }
+    // A real anchor for THIS range means we have a close that actually predates
+    // the window (so the % reflects real movement over that span). Without one,
+    // don't show "—" - a player who played last night has a real number, just
+    // not a week-old one yet, so fall back to 1D rather than a blank. Range
+    // buttons converge to their real values on their own as closes accumulate
+    // day by day; no special-casing needed once there's enough history.
+    const hasRealAnchor = days === 1 || days === 0 || sortedDates.some(d => d < localDateStr(days));
+    const pct = hasRealAnchor ? _rangePct(rank, days) : _rangePct(rank, 1);
     el.textContent = (pct>=0?'+':'')+pct.toFixed(1)+'%';
     el.className = 'rb-pct '+(pct>=0?'up':'down');
   });
