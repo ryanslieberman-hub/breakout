@@ -2,11 +2,13 @@ name = "breakout-worker-pricing-engine"
 main = "src/index.js"
 compatibility_date = "2025-01-01"
 
-# Game-day tick every 15 min, plus one daily-refresh run at 11:00 UTC (~6-7am
-# ET depending on DST) - the scheduled() handler in src/index.js branches on
-# event.cron to tell them apart.
+# Game-day tick every 15 min, a portfolio-summary push at 8:30 UTC (~3-4am ET
+# - after essentially all games have finished, before the baseline refresh
+# below touches the same data), and one daily-refresh run at 11:00 UTC
+# (~6-7am ET depending on DST) - the scheduled() handler in src/index.js
+# branches on event.cron to tell them apart.
 [triggers]
-crons = ["*/15 * * * *", "0 11 * * *"]
+crons = ["*/15 * * * *", "30 8 * * *", "0 11 * * *"]
 
 # Secrets (set with `wrangler secret put <NAME>`, never in this file):
 #   FIREBASE_SERVICE_ACCOUNT - same Firebase service account JSON as worker-payments

@@ -12,9 +12,34 @@ import { fetchSeasonAverages } from './balldontlie.js';
 import * as mlb from './mlb.js';
 import * as golf from './golf.js';
 import * as nfl from './nfl.js';
-import { firestoreBatchGetDocs, firestoreBatchWriteDocs } from './lib/firestore.js';
+import {
+  firestoreBatchGetDocs, firestoreBatchWriteDocs, firestoreListCollection, firestorePatchDoc,
+} from './lib/firestore.js';
+import { notifyHoldersOfPlayer, notifyUid } from './lib/notify.js';
 
 const TZ = 'America/New_York';
+
+// A single game/round moving a player's price by this much (see engine.js's
+// `perf`, the same-day fractional move off today's base) is worth pushing to
+// holders. Chosen so an average solid game doesn't trigger it but a
+// standout one does - see engine.js's per-tier UP/DOWN scalars for context.
+const BIG_MOVE_THRESHOLD = 0.07;
+
+// Formats and fires one push per big mover, and reports back how many
+// distinct players actually reached at least one holder (for tick stats).
+async function announceBigMovers(env, movers) {
+  let notified = 0;
+  for (const m of movers) {
+    const direction = m.perf >= 0 ? 'up' : 'down';
+    const pct = (Math.abs(m.perf) * 100).toFixed(1);
+    const holders = await notifyHoldersOfPlayer(env, m.rank, {
+      title: `${m.name} is ${direction} ${pct}%`,
+      body: `Now $${m.value.toFixed(2)} - you hold shares.`,
+    });
+    if (holders > 0) notified++;
+  }
+  return notified;
+}
 
 // Fixed-timezone date boundary, replacing the client's device-local-clock
 // localDateStr() - a Worker has no "local" timezone, so this must be
@@ -32,11 +57,21 @@ function docPath(league, rank) {
   return `priceEngine/${league}_${rank}`;
 }
 
+// portfolios/{uid}.holdings is keyed by bare rank (no league prefix) - ranks
+// are globally unique across the four raw rosters (nba 1-285, mlb 1001+,
+// golf 2001+, nfl 3001+), so this is a safe one-time lookup rather than
+// guessing a league from the rank's numeric range.
+const rankToLeague = {};
+for (const p of nbaRaw) rankToLeague[p.rank] = 'nba';
+for (const p of mlbRaw) rankToLeague[p.rank] = 'mlb';
+for (const p of golfRaw) rankToLeague[p.rank] = 'golf';
+for (const p of nflRaw) rankToLeague[p.rank] = 'nfl';
+
 function defaultState(league, player) {
   return {
     rank: player.rank, tier: player.tier,
     statPrice: statPriceFor(league, player),
-    base: null, closes: {},
+    base: null, closes: {}, bigMoveDate: null,
     // league-specific baseline fields carried through as-is
     ppg: player.ppg, rpg: player.rpg, apg: player.apg, // nba
     avg: player.avg, hr: player.hr, rbi: player.rbi, ops: player.ops, // mlb hitter
@@ -93,6 +128,7 @@ async function tickNba(env, today) {
 
   // Phase 3: compute every update in memory.
   const updates = [];
+  const bigMovers = [];
   let finalized = 0;
   for (const { player, stat, isFinal } of toProcess) {
     const st = states[player.rank];
@@ -101,12 +137,17 @@ async function tickNba(env, today) {
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
     const fields = { base: newBaseRecord, tier: st.tier, statPrice: st.statPrice, ppg: st.ppg, rpg: st.rpg, apg: st.apg };
     if (isFinal) { fields.closes = { ...st.closes, [today]: finalize(value, today, st.closes) }; finalized++; }
+    if (Math.abs(perf) >= BIG_MOVE_THRESHOLD && st.bigMoveDate !== today) {
+      fields.bigMoveDate = today;
+      bigMovers.push({ rank: player.rank, name: player.name, perf, value });
+    }
     updates.push({ path: docPath('nba', player.rank), fields });
   }
 
   // Phase 4: one batched write.
   await firestoreBatchWriteDocs(env, updates);
-  return { league: 'nba', games: events.length, processed: toProcess.length, finalized };
+  const notified = await announceBigMovers(env, bigMovers);
+  return { league: 'nba', games: events.length, processed: toProcess.length, finalized, bigMovers: bigMovers.length, notified };
 }
 
 export async function runNbaDailyRefresh(env) {
@@ -148,6 +189,7 @@ async function tickMlb(env, today) {
   const states = await loadStatesBatch(env, 'mlb', toProcess.map(t => t.player));
 
   const updates = [];
+  const bigMovers = [];
   let finalized = 0;
   for (const { player, stat } of toProcess) {
     const st = states[player.rank];
@@ -161,11 +203,16 @@ async function tickMlb(env, today) {
     };
     if (isPitcher && stat.ip >= 1) fields.pitcherLastStart = today;
     if (isFinal) { fields.closes = { ...st.closes, [today]: finalize(value, today, st.closes) }; finalized++; }
+    if (Math.abs(perf) >= BIG_MOVE_THRESHOLD && st.bigMoveDate !== today) {
+      fields.bigMoveDate = today;
+      bigMovers.push({ rank: player.rank, name: player.name, perf, value });
+    }
     updates.push({ path: docPath('mlb', player.rank), fields });
   }
 
   await firestoreBatchWriteDocs(env, updates);
-  return { league: 'mlb', games: gamePks.length, processed: toProcess.length, finalized };
+  const notified = await announceBigMovers(env, bigMovers);
+  return { league: 'mlb', games: gamePks.length, processed: toProcess.length, finalized, bigMovers: bigMovers.length, notified };
 }
 
 export async function runMlbDailyRefresh(env) {
@@ -211,6 +258,7 @@ async function tickGolf(env, today) {
   const fieldAvg = golf.computeFieldAverage(byName, rankByNorm, cumHxByRank);
 
   const updates = [];
+  const bigMovers = [];
   let finalized = 0;
   for (const player of tracked) {
     const rec = byName[golf.normalizeName(player.name)];
@@ -223,11 +271,16 @@ async function tickGolf(env, today) {
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
     const fields = { base: newBaseRecord, cumHx: derived.updatedHx, tier: st.tier, statPrice: st.statPrice };
     if (isComplete) { fields.closes = { ...st.closes, [derived.date]: finalize(value, derived.date, st.closes) }; finalized++; }
+    if (Math.abs(perf) >= BIG_MOVE_THRESHOLD && st.bigMoveDate !== derived.date) {
+      fields.bigMoveDate = derived.date;
+      bigMovers.push({ rank: player.rank, name: player.name, perf, value });
+    }
     updates.push({ path: docPath('golf', player.rank), fields });
   }
 
   await firestoreBatchWriteDocs(env, updates);
-  return { league: 'golf', players: Object.keys(byName).length, processed: updates.length, finalized };
+  const notified = await announceBigMovers(env, bigMovers);
+  return { league: 'golf', players: Object.keys(byName).length, processed: updates.length, finalized, bigMovers: bigMovers.length, notified };
 }
 
 // ── NFL ──
@@ -268,6 +321,7 @@ async function tickNfl(env, today) {
 
   const states = await loadStatesBatch(env, 'nfl', toProcess);
   const updates = [];
+  const bigMovers = [];
   let finalized = 0;
   for (const player of toProcess) {
     const fpts = fptsByRank[player.rank];
@@ -277,11 +331,16 @@ async function tickNfl(env, today) {
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
     const fields = { base: newBaseRecord, tier: st.tier, statPrice: st.statPrice, fpts: st.fpts };
     if (isFinal) { fields.closes = { ...st.closes, [today]: finalize(value, today, st.closes) }; finalized++; }
+    if (Math.abs(perf) >= BIG_MOVE_THRESHOLD && st.bigMoveDate !== today) {
+      fields.bigMoveDate = today;
+      bigMovers.push({ rank: player.rank, name: player.name, perf, value });
+    }
     updates.push({ path: docPath('nfl', player.rank), fields });
   }
 
   await firestoreBatchWriteDocs(env, updates);
-  return { league: 'nfl', games: relevant.length, processed: toProcess.length, finalized };
+  const notified = await announceBigMovers(env, bigMovers);
+  return { league: 'nfl', games: relevant.length, processed: toProcess.length, finalized, bigMovers: bigMovers.length, notified };
 }
 
 export async function runGameDayTick(env) {
@@ -296,6 +355,71 @@ export async function runGameDayTick(env) {
     }
   }
   return { date: today, results };
+}
+
+// Once-daily "here's how your day went" push. Runs after essentially all
+// games have finished (see wrangler.toml's cron comment) so `closes[today]`
+// is set for anyone whose game wrapped; anyone who didn't play today still
+// gets priced off their carried-forward `base`, same as the live app.
+// Idempotent per day - `lastDailySummary.date` guards against a re-run
+// (retry, manual trigger) double-sending the same day's push.
+export async function runPortfolioSummary(env) {
+  const today = easternDateStr(0);
+  const [allPortfolios, users] = await Promise.all([
+    firestoreListCollection(env, 'portfolios'),
+    firestoreListCollection(env, 'users'),
+  ]);
+  // portfolios/{uid} docs get created (default $100k, no holdings) the moment
+  // someone so much as opens the app pre-signup, and outlive that visit even
+  // if they never actually create an account - only summarize real accounts.
+  const realUids = new Set(users.map(u => u.id));
+  const portfolios = allPortfolios.filter(p => realUids.has(p.id));
+  if (!portfolios.length) return { date: today, portfolios: 0, updated: 0 };
+
+  const ranks = new Set();
+  for (const p of portfolios) {
+    for (const [rank, h] of Object.entries(p.holdings || {})) {
+      if (h && h.shares > 0) ranks.add(Number(rank));
+    }
+  }
+  const rankList = [...ranks].filter(r => rankToLeague[r]);
+  const priceDocs = await firestoreBatchGetDocs(env, rankList.map(r => docPath(rankToLeague[r], r)));
+  const priceByRank = {};
+  for (const r of rankList) {
+    const doc = priceDocs[docPath(rankToLeague[r], r)];
+    if (!doc) continue;
+    priceByRank[r] = (doc.closes && doc.closes[today]) ?? doc.base?.price ?? doc.statPrice ?? 0;
+  }
+
+  let updated = 0;
+  for (const portfolio of portfolios) {
+    const uid = portfolio.id;
+    if (portfolio.lastDailySummary?.date === today) continue; // already sent today
+    try {
+      let value = portfolio.cash || 0;
+      for (const [rank, h] of Object.entries(portfolio.holdings || {})) {
+        if (!h || !(h.shares > 0)) continue;
+        value += h.shares * (priceByRank[Number(rank)] || 0);
+      }
+
+      const last = portfolio.lastDailySummary;
+      const amount = `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+      let body = amount;
+      if (last && last.value > 0) {
+        const pct = ((value - last.value) / last.value) * 100;
+        body = `${amount} (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% today)`;
+      }
+
+      await notifyUid(env, uid, { title: 'Your portfolio', body }, { kind: 'portfolio_summary' });
+      await firestorePatchDoc(env, `portfolios/${uid}`, { lastDailySummary: { date: today, value } });
+      updated++;
+    } catch (e) {
+      // One bad portfolio (bad data, a transient Firestore error) shouldn't
+      // sink everyone else's summary for the day - log and move on.
+      console.error(`portfolio summary failed for ${uid}:`, e.message);
+    }
+  }
+  return { date: today, portfolios: portfolios.length, updated };
 }
 
 export async function runDailyRefresh(env) {
@@ -328,6 +452,9 @@ export default {
       if (request.method === 'POST' && url.pathname === '/internal/refresh-baselines') {
         return json(await runDailyRefresh(env));
       }
+      if (request.method === 'POST' && url.pathname === '/internal/portfolio-summary') {
+        return json(await runPortfolioSummary(env));
+      }
       return json({ error: 'Not found' }, 404);
     } catch (e) {
       console.error(e);
@@ -338,6 +465,8 @@ export default {
   async scheduled(event, env, ctx) {
     if (event.cron === '0 11 * * *') {
       ctx.waitUntil(runDailyRefresh(env));
+    } else if (event.cron === '30 8 * * *') {
+      ctx.waitUntil(runPortfolioSummary(env));
     } else {
       ctx.waitUntil(runGameDayTick(env));
     }
