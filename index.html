@@ -14420,55 +14420,17 @@ async function refreshAll() {
 
   _resetStaleDnpStreaks();
 
-  // ONE-TIME: reset inflated prices caused by applyPricingFromLastNight compounding bug
-  if (!localStorage.getItem('ax_price_reset_v3')) {
-    localStorage.setItem('ax_price_reset_v3', '1');
-    ['ax_portfolio','ax_liveP_cache','ax_closes','ax_priceApplied','ax_pregame'].forEach(k => {
-      try { localStorage.removeItem(k); } catch(e) {}
-    });
-    // Also wipe Firestore prices so inflated values don't reload
-    if (db) {
-      const resetPrices = {};
-      [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].forEach(p => { resetPrices[p.rank] = p.statPrice; });
-      window._fbSetDoc(window._fbDoc(db, 'config', 'prices'), {
-        liveP: resetPrices, closes: {}, date: localDateStr(), resetAt: Date.now()
-      }, { merge: false }).catch(() => {});
-      window._fbSetDoc(window._fbDoc(db, 'config', 'priceApplied'), {
-        dates: {}, resetAt: Date.now()
-      }, { merge: false }).catch(() => {});
-    }
-    console.log('[price reset v3] Cleared corrupted closes + Firestore');
-  }
+  // The one-time migrations that used to live here (ax_price_reset_v3 and three
+  // others further down: ax_mlb_reset_v1, ax_pa_reset_v5, ax_fs_price_reset_v3)
+  // were all gated by a PER-DEVICE localStorage flag protecting a merge:false
+  // (full overwrite) write to the SHARED config/prices doc. Every one of them
+  // wiped every player's entire close history for the whole app, and every
+  // fresh device - a new phone, cleared browser data, a reinstalled PWA -
+  // re-triggered them, because the flag lived on the device, not the data.
+  // The bugs they were cleaning up after are long fixed; removed rather than
+  // reworked, since carrying "fix corruption" code as a permanent fixture is
+  // exactly what kept re-creating the corruption.
 
-  // ONE-TIME: reset MLB prices to flat (statPrice), MLB only. mlbTick's yesterday-
-  // backfill (see its comment a few hundred lines up) silently corrupted MLB closes
-  // for roughly a third of the roster by chaining off statPrice instead of a real
-  // prior close whenever it ran before Firestore's price history had loaded.
-  // Version-gated so EVERY client applies this once (not just whichever one runs it
-  // first) - a plain server-side reset alone doesn't stick, because the next client
-  // to load with an un-migrated local cache just re-uploads its own still-corrupted
-  // closes on its normal sync and undoes it.
-  if (localStorage.getItem('ax_mlb_reset_v1') !== 'full') {
-    // Two stages ('local' then 'full') because db often isn't ready yet at this
-    // point in boot - the Firestore half of this reset runs later, in
-    // _backgroundSync(), where dbInst is guaranteed ready and this is properly
-    // awaited BEFORE loadPricesFromFirestore() - otherwise that load can win the
-    // race and merge the still-unreset cloud closes right back into memory,
-    // silently undoing the local half below.
-    localStorage.setItem('ax_mlb_reset_v1', 'local');
-    mlbPlayers.forEach(p => {
-      delete closes[p.rank];
-      liveP[p.rank] = p.statPrice;
-      delete priceHx[p.rank];
-      delete intraday[p.rank];
-      delete lastNight[p.rank];
-      if (ENGINE.BASE && ENGINE.BASE[p.rank]) delete ENGINE.BASE[p.rank];
-    });
-    _saveCloses();
-    _saveLastNight();
-    try { localStorage.setItem('ax_liveP_cache', JSON.stringify(liveP)); } catch(e) {}
-    console.log('[mlb reset v1] Cleared local MLB closes/history - reset to flat statPrice');
-  }
 
   // ONE-TIME: reset every user's portfolio back to the $100K starting state, paired
   // with the MLB price reset above. The actual users/{uid} and portfolios/{uid} docs
@@ -14572,48 +14534,6 @@ async function _backgroundSync() {
   const dbInst = await firestoreReady;
 
   if (dbInst) {
-    // Finish the MLB reset's Firestore half (see refreshAll()'s "local" stage above)
-    // BEFORE loadPricesFromFirestore() runs below - otherwise that load can read the
-    // still-corrupted cloud doc first and merge it right back into memory.
-    if (localStorage.getItem('ax_mlb_reset_v1') === 'local') {
-      try {
-        const ref = window._fbDoc(dbInst, 'config', 'prices');
-        const snap = await window._fbGetDoc(ref);
-        const d = snap.exists() ? snap.data() : {};
-        const closesObj = { ...(d.closes || {}) };
-        const livePObj = { ...(d.liveP || {}) };
-        const todayHxObj = { ...(d.todayHx || {}) };
-        const intradayObj = { ...(d.intraday || {}) };
-        mlbPlayers.forEach(p => {
-          delete closesObj[p.rank];
-          delete todayHxObj[p.rank];
-          delete intradayObj[p.rank];
-          livePObj[p.rank] = p.statPrice;
-        });
-        // merge:false (full overwrite) - a merge:true write can only add/update
-        // fields present in the payload, it can never remove one that's absent,
-        // so this is the only way to actually drop the old corrupted MLB entries
-        // instead of just failing to add new ones alongside them.
-        await window._fbSetDoc(ref, { ...d, closes: closesObj, liveP: livePObj, todayHx: todayHxObj, intraday: intradayObj }, { merge: false });
-
-        const paRef = window._fbDoc(dbInst, 'config', 'priceApplied');
-        const paSnap = await window._fbGetDoc(paRef);
-        const paD = paSnap.exists() ? paSnap.data() : {};
-        const datesObj = { ...(paD.dates || {}) };
-        mlbPlayers.forEach(p => { delete datesObj[p.rank]; });
-        await window._fbSetDoc(paRef, { ...paD, dates: datesObj }, { merge: false });
-
-        const lnRef = window._fbDoc(dbInst, 'config', 'lastNight');
-        const lnSnap = await window._fbGetDoc(lnRef);
-        if (lnSnap.exists() && lnSnap.data().data) {
-          const lnData = { ...lnSnap.data().data };
-          mlbPlayers.forEach(p => { delete lnData[p.rank]; });
-          await window._fbSetDoc(lnRef, { ...lnSnap.data(), data: lnData }, { merge: false });
-        }
-        localStorage.setItem('ax_mlb_reset_v1', 'full');
-        console.log('[mlb reset v1] Cleared cloud MLB closes/history too - fully reset');
-      } catch (e) { console.warn('[mlb reset v1] Firestore reset failed, will retry next load:', e.message); }
-    }
 
     // Fire all Firestore reads simultaneously
     const [cfgSnap, pgSnap] = await Promise.allSettled([
@@ -14698,19 +14618,6 @@ async function _backgroundSync() {
       updateMovers();
     }
 
-    // One-time Firestore reset - clear MLB priceApplied entries so fixed parser re-applies
-    if (localStorage.getItem('ax_pa_reset_v5') === '1' && !localStorage.getItem('ax_pa_fs_reset_v5')) {
-      localStorage.setItem('ax_pa_fs_reset_v5', '1');
-      // Only wipe MLB entries (ranks >= 1001) from the Firestore priceApplied doc
-      window._fbGetDoc(window._fbDoc(dbInst, 'config', 'priceApplied')).then(snap => {
-        if (snap.exists()) {
-          const dates = snap.data().dates || {};
-          const cleaned = {};
-          Object.entries(dates).forEach(([k,v]) => { if (parseInt(k) < 1001) cleaned[k] = v; });
-          window._fbSetDoc(window._fbDoc(dbInst, 'config', 'priceApplied'), { dates: cleaned, resetAt: Date.now() }, { merge:false }).catch(()=>{});
-        }
-      }).catch(()=>{});
-    }
 
     // One-time: purge stale closes from Firestore (old devices wrote March entries that poison 7/30D)
     if (!localStorage.getItem('ax_closes_purge_v2')) {
@@ -14878,19 +14785,6 @@ function initFirebase() {
   setTimeout(startFeedListener, 500);
   setTimeout(startChatListener, 500);
 
-  // ONE-TIME: reset Firestore inflated prices
-  if (!localStorage.getItem('ax_fs_price_reset_v3') && db) {
-    localStorage.setItem('ax_fs_price_reset_v3', '1');
-    const resetPrices = {};
-    [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].forEach(p => { resetPrices[String(p.rank)] = p.statPrice; });
-    window._fbSetDoc(window._fbDoc(db, 'config', 'prices'), {
-      liveP: resetPrices, closes: {}, date: localDateStr(), resetAt: Date.now()
-    }, { merge: false }).catch(() => {});
-    window._fbSetDoc(window._fbDoc(db, 'config', 'priceApplied'), {
-      dates: {}, resetAt: Date.now()
-    }, { merge: false }).catch(() => {});
-    console.log('[price reset v2] Firestore prices reset to statPrice');
-  }
 
   console.log('Firebase ready');
 }
