@@ -11424,7 +11424,14 @@ function updateHero(){
         document.getElementById('ln-stl').className   = 'ln-v ' + (ln.stl >= 2 ? 'great' : 'good');
         document.getElementById('ln-blk').textContent = ln.tov;   // K (strikeouts)
         document.getElementById('ln-blk').className   = 'ln-v ' + (ln.tov >= 3 ? 'bad' : 'good');
-        // Secondary row: H/AB and HR total, hide NBA-only rows
+        // Secondary row: H/AB and HR total, hide NBA-only rows. Must
+        // explicitly re-show fg/3p/min - the pitcher branch above hides them
+        // (pitchers don't use them), and since these are shared DOM elements
+        // reused across every player card, viewing a pitcher then a hitter
+        // left a hitter's real H/AB/HR/AB data rendered but invisible.
+        document.getElementById('ln-row-fg').style.display  = '';
+        document.getElementById('ln-row-3p').style.display  = '';
+        document.getElementById('ln-row-min').style.display = '';
         document.getElementById('ln-fg').textContent  = ln.fg;    // H/AB
         document.getElementById('ln-lbl-fg').textContent = 'H/AB';
         document.getElementById('ln-3p').textContent  = ln.fg3;   // HR line
