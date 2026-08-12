@@ -15674,9 +15674,11 @@ async function enablePushNotifications() {
     showToast('Notifications enabled ✓');
 
     // Foreground messages (app open) - show a toast instead of a system notification.
+    // Pushes are sent data-only (see worker-pricing-engine/src/lib/push.js) so
+    // title/body live under payload.data, not payload.notification.
     window._fbOnMessage(window._fbMessaging, (payload) => {
-      const t = payload.notification?.title || 'Breakout';
-      const b = payload.notification?.body || '';
+      const t = payload.data?.title || 'Breakout';
+      const b = payload.data?.body || '';
       showToast(`${t}: ${b}`);
     });
   } catch(e) {

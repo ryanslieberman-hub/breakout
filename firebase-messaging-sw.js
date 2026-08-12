@@ -17,10 +17,15 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Data-only messages, deliberately - if the FCM payload also carried a
+// `notification` field, the browser auto-displays it in the background AND
+// this handler fires, showing every push twice. One source of truth: the
+// server sends data-only, this handler is the only thing that ever calls
+// showNotification().
 messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title || 'Breakout';
+  const title = payload.data?.title || 'Breakout';
   self.registration.showNotification(title, {
-    body: payload.notification?.body || '',
+    body: payload.data?.body || '',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     data: payload.data || {},
