@@ -11911,6 +11911,19 @@ function syncPricesToFirestore() {
         ).catch(e => {});
       }
 
+      // Write captured golf headshot IDs with merge:true, same reasoning as
+      // lastNight above - this used to be PURELY local (ax_golf_ids), with no
+      // cloud backup at all, so a cleared/reinstalled device lost every golf
+      // headshot until it happened to be online during a live tournament to
+      // recapture them itself. IDs never change once learned, so a plain
+      // accumulating merge is safe - no per-entry cutoff needed like lastNight.
+      if (window._golfEspnIds && Object.keys(window._golfEspnIds).length > 0) {
+        window._fbSetDoc(window._fbDoc(db, 'config', 'golfIds'),
+          { data: window._golfEspnIds, updatedAt: Date.now() },
+          { merge: true }
+        ).catch(e => {});
+      }
+
       // Write pregame to SEPARATE doc - only if not already set for today
       const pg = (() => { try { return JSON.parse(localStorage.getItem('ax_pregame')||'null'); } catch(e){ return null; } })();
       if (pg?.date === todayStr) {
@@ -12104,6 +12117,15 @@ async function loadPricesFromFirestore() {
         }
       });
       _saveLastNight();
+    }
+
+    // Restore golf headshot IDs - fills in headshots on a device that never
+    // itself saw a live tournament (including right after a localStorage
+    // clear/reinstall, since this used to be local-only - see syncPricesToFirestore).
+    const golfIdsSnap = await window._fbGetDoc(window._fbDoc(db, 'config', 'golfIds')).catch(() => null);
+    if (golfIdsSnap?.exists() && golfIdsSnap.data().data) {
+      window._golfEspnIds = { ...golfIdsSnap.data().data, ...(window._golfEspnIds || {}) };
+      try { localStorage.setItem('ax_golf_ids', JSON.stringify(window._golfEspnIds)); } catch(e) {}
     }
 
     _firestorePricesLoaded = true;
