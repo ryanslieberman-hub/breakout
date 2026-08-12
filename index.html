@@ -505,6 +505,16 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
    border is invisible, everything else about the footprint matches. */
 .friend-status-badge{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);white-space:nowrap;padding:5px 12px;border:1px solid transparent;border-radius:6px;display:inline-flex;align-items:center;gap:5px;flex-shrink:0;}
 .ulb-card .nbtn{flex-shrink:0;}
+/* Compact icon form of the friend-status badge, used on leaderboard rows specifically -
+   those already spend their width on rank/avatar/return%, so a full "Friends ✓" /
+   "+ Add" text badge (~65px) was fighting the username for the same ~60-90px of
+   remaining space and squeezing it down to nothing on a real (non-toy-width) card.
+   A 24px circle gives that width back to the name instead. */
+.ulb-friend-icon{width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;line-height:1;}
+.ulb-friend-icon.solid{background:var(--green);color:#000;}
+.ulb-friend-icon.outline{border:1px solid var(--hairline);color:var(--muted);}
+.ulb-friend-icon.clickable{cursor:pointer;border:1px solid var(--hairline);color:var(--muted);transition:all .12s;}
+.ulb-friend-icon.clickable:hover{border-color:var(--green);color:var(--green);}
 .ulb-card{background:var(--card);border:1px solid var(--hairline);border-radius:8px;padding:14px 18px;display:flex;align-items:center;gap:14px;margin-bottom:8px;transition:background .12s;}
 .ulb-card:hover{background:var(--card);}
 .ulb-rank{font-family:var(--font-display);font-size:28px;width:36px;color:var(--muted);text-align:center;}
@@ -16942,10 +16952,10 @@ function _renderGlobalLbRows(){
     const ret = u.returnPct || 0;
     const avatar = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
     const status = currentUser ? friendStatusWith(u.uid) : 'none';
-    const friendAction = isYou ? '' : status === 'friends' ? `<span class="friend-status-badge" style="color:var(--green);">Friends ✓</span>`
-      : status === 'outgoing' ? `<span class="friend-status-badge" style="color:var(--green);">Added ✓</span>`
-      : status === 'incoming' ? `<button class="nbtn" style="border-color:var(--green);color:var(--green);" onclick="acceptFriendRequest('${_friendshipId(currentUser.uid,u.uid)}')">Accept</button>`
-      : `<button class="nbtn" onclick="sendFriendRequestFromGlobalLb(${i})">+ Add</button>`;
+    const friendAction = isYou ? '' : status === 'friends' ? `<span class="ulb-friend-icon solid" title="Friends">✓</span>`
+      : status === 'outgoing' ? `<span class="ulb-friend-icon outline" title="Request sent">···</span>`
+      : status === 'incoming' ? `<span class="ulb-friend-icon clickable" title="Accept friend request" onclick="acceptFriendRequest('${_friendshipId(currentUser.uid,u.uid)}')">✓</span>`
+      : `<span class="ulb-friend-icon clickable" title="Add friend" onclick="sendFriendRequestFromGlobalLb(${i})">+</span>`;
     return `<div class="ulb-card ${isYou?'ulb-you':''}">
       <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
       <div class="ulb-info">
