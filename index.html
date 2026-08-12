@@ -11177,12 +11177,19 @@ function renderList(){
     const nbaId = NBA_IDS[p.rank];
     const _hsUrl = headshotUrl(p.rank);
     const bg = isInj?'#555':p.cols[0], fg = isInj?'#aaa':p.cols[1];
+    // Photo first, initials hidden-by-default and only revealed via onerror -
+    // the old pattern rendered initials immediately with the photo layered on
+    // top once it loaded, so a list of many players loading photos at once
+    // could show colored initials underneath/before a perfectly good photo
+    // finished loading. Matches updateHero()'s already-correct hav/hav-photo
+    // toggle (hide first, reveal only on real failure), just inline instead
+    // of two persistent DOM nodes.
     const avatarHtml = _hsUrl
       ? `<div style="position:relative;width:30px;height:30px;flex-shrink:0;">
-           <div class="pav" style="background:${bg};color:${fg}">${p.initials}</div>
-           <img src="${_hsUrl}"
+           <img src="${_hsUrl}" alt=""
              style="position:absolute;inset:0;width:30px;height:30px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border2);"
-             onerror="this.style.display='none'" alt="">
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+           <div class="pav" style="background:${bg};color:${fg};display:none;">${p.initials}</div>
          </div>`
       : `<div class="pav" style="background:${bg};color:${fg}">${p.initials}</div>`;
     // role/tabindex rather than a <button>: the row already contains the star
@@ -13353,10 +13360,13 @@ function renderTrending(){
     const isUp = pct >= 0;
     const cardClass = pct >= 3 ? 'tcard hot-up' : pct <= -3 ? 'tcard hot-dn' : vol > maxVol*0.3 ? 'tcard vol-spike' : 'tcard';
     const _tcHsUrl = headshotUrl(p.rank);
+    // Same fix as the list row's avatarHtml above - photo first, initials
+    // hidden-by-default and only revealed via onerror, not rendered
+    // immediately underneath a photo that just hasn't loaded yet.
     const imgHtml = _tcHsUrl
       ? `<div style="position:relative;width:${avSize}px;height:${avSize}px;flex-shrink:0;">
-           <div class="tcard-av" style="background:${p.cols[0]};color:${p.cols[1]};width:${avSize}px;height:${avSize}px;">${p.initials}</div>
-           <img style="position:absolute;inset:0;width:${avSize}px;height:${avSize}px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border2);" src="${_tcHsUrl}" onerror="this.style.display='none'" alt="">
+           <img style="position:absolute;inset:0;width:${avSize}px;height:${avSize}px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border2);" src="${_tcHsUrl}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+           <div class="tcard-av" style="background:${p.cols[0]};color:${p.cols[1]};width:${avSize}px;height:${avSize}px;display:none;">${p.initials}</div>
          </div>`
       : `<div class="tcard-av" style="background:${p.cols[0]};color:${p.cols[1]};width:${avSize}px;height:${avSize}px;">${p.initials}</div>`;
     const flameLabel = pct >= 5 ? '' : pct >= 3 ? '' : pct <= -5 ? '' : pct <= -3 ? '' : '';
