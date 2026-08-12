@@ -15779,7 +15779,7 @@ function renderChat() {
 function addFriendFromChatIdx(i){
   const m = _chatItems[i];
   if (!m) return;
-  addFriendFromChat(m.uid, m.displayName, m.photoURL, m.avatarColor);
+  addFriendFromChat(m.uid, m.displayName, m.photoURL, m.avatarColor, m.username);
 }
 
 // ── Reply (tags the original sender, shows a "replying to" bar, and carries a
@@ -16467,7 +16467,7 @@ function _rebuildFriendLists(){
     const otherUid = (f.users||[]).find(u => u !== me);
     if (!otherUid) return;
     const info = (f.userInfo && f.userInfo[otherUid]) || {};
-    const entry = { uid: otherUid, displayName: info.displayName || 'Trader', photoURL: info.photoURL || null, avatarColor: info.avatarColor || '#4caf50', friendshipId: f.id };
+    const entry = { uid: otherUid, displayName: info.displayName || 'Trader', username: info.username || null, photoURL: info.photoURL || null, avatarColor: info.avatarColor || '#4caf50', friendshipId: f.id };
     if (f.status === 'accepted') _myFriends.push(entry);
     else if (f.status === 'pending') {
       if (f.requestedBy === me) _outgoingRequests.push(entry);
@@ -16502,7 +16502,7 @@ function friendStatusWith(uid){
   return 'none';
 }
 
-async function sendFriendRequest(targetUid, targetDisplayName, targetPhotoURL, targetAvatarColor){
+async function sendFriendRequest(targetUid, targetDisplayName, targetPhotoURL, targetAvatarColor, targetUsername){
   if (!currentUser || !db) { showToast('Sign in to add friends'); return; }
   if (targetUid === currentUser.uid) { showToast("That's you!"); return; }
   const status = friendStatusWith(targetUid);
@@ -16518,11 +16518,13 @@ async function sendFriendRequest(targetUid, targetDisplayName, targetPhotoURL, t
     userInfo: {
       [currentUser.uid]: {
         displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
+        username: userProfile?.username || null,
         photoURL: userProfile?.photoURL || currentUser.photoURL || null,
         avatarColor: userProfile?.avatarColor || '#4caf50',
       },
       [targetUid]: {
         displayName: targetDisplayName || 'Trader',
+        username: targetUsername || null,
         photoURL: targetPhotoURL || null,
         avatarColor: targetAvatarColor || '#4caf50',
       },
@@ -16560,10 +16562,10 @@ async function removeFriendship(friendshipId){
 }
 
 // Click a username in Chat to add them as a friend directly.
-function addFriendFromChat(uid, displayName, photoURL, avatarColor){
+function addFriendFromChat(uid, displayName, photoURL, avatarColor, username){
   if (!currentUser) { showToast('Sign in to add friends'); return; }
   if (uid === currentUser.uid) return;
-  sendFriendRequest(uid, displayName, photoURL, avatarColor);
+  sendFriendRequest(uid, displayName, photoURL, avatarColor, username);
 }
 
 function renderFriendsRequestsPanel(){
@@ -16636,14 +16638,14 @@ function _renderFriendSearchRows(){
 function sendFriendRequestFromSearch(i){
   const u = _friendSearchResults[i];
   if (!u) return;
-  sendFriendRequest(u.uid, u.displayName, u.photoURL, u.avatarColor);
+  sendFriendRequest(u.uid, u.displayName, u.photoURL, u.avatarColor, u.username);
 }
 
 let _globalLbUsers = [];
 function sendFriendRequestFromGlobalLb(i){
   const u = _globalLbUsers[i];
   if (!u) return;
-  sendFriendRequest(u.uid, u.displayName, u.photoURL, u.avatarColor);
+  sendFriendRequest(u.uid, u.displayName, u.photoURL, u.avatarColor, u.username);
 }
 
 async function renderFriendsLeaderboard(){
@@ -16687,6 +16689,17 @@ async function renderFriendsLeaderboard(){
   await _renderFriendsLbList();
 }
 
+// Username large and primary, first/last underneath in smaller text - shared by the
+// Global and Friends leaderboard rows. Falls back to just the display name (at the
+// normal large size) for anyone who hasn't claimed a username yet.
+function _ulbNameBlock(u, isYou){
+  const youTag = isYou ? '<span style="color:var(--green);font-size:9px;">(you)</span>' : '';
+  if (u.username) {
+    return `<div class="ulb-name">@${escHtml(u.username)} ${youTag}</div><div class="ulb-sub ulb-realname">${escHtml(u.displayName||'Trader')}</div>`;
+  }
+  return `<div class="ulb-name">${escHtml(u.displayName||'Anonymous')} ${youTag}</div>`;
+}
+
 async function _renderFriendsLbList(){
   const el = document.getElementById('friends-lb-list');
   if (!el) return;
@@ -16708,7 +16721,7 @@ async function _renderFriendsLbList(){
       return `<div class="ulb-card ${isYou?'ulb-you':''}">
         <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
         <div class="ulb-info">
-          <div class="ulb-name">${escHtml(u.displayName||'Trader')} ${isYou?'<span style="color:var(--green);font-size:9px;">(you)</span>':''}</div>
+          ${_ulbNameBlock(u, isYou)}
           <div class="ulb-sub">Portfolio: $${(u.portfolioValue||100000).toLocaleString()}</div>
         </div>
         <div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>
@@ -16743,13 +16756,20 @@ function onChatInputChange(input){
   if (!active || !_myFriends.length) { dd.style.display = 'none'; _mentionTokenStart = -1; return; }
   _mentionTokenStart = active.start;
   const q = active.query.toLowerCase();
-  _mentionCandidates = _myFriends.filter(f => f.displayName.toLowerCase().includes(q)).slice(0, 6);
+  // Match on either field - typing "@alex" should still find someone by first name
+  // even if you don't know their exact username - but the inserted tag is always
+  // the username (see pickMention), falling back to display name only if they
+  // haven't claimed one.
+  _mentionCandidates = _myFriends.filter(f =>
+    (f.username && f.username.toLowerCase().includes(q)) || f.displayName.toLowerCase().includes(q)
+  ).slice(0, 6);
   _mentionDropdownIdx = _mentionCandidates.length ? 0 : -1;
   if (!_mentionCandidates.length) { dd.style.display = 'none'; return; }
   dd.innerHTML = _mentionCandidates.map((f, i) => `
     <div class="mention-pick ${i===0?'sel':''}" data-i="${i}" onmousedown="event.preventDefault();pickMention(${i})">
       ${f.photoURL ? `<img class="comment-ava" src="${f.photoURL}">` : `<div class="comment-ava-init" style="background:${f.avatarColor}">${(f.displayName||'?')[0].toUpperCase()}</div>`}
-      <span>${escHtml(f.displayName)}</span>
+      <span>${f.username ? escHtml('@' + f.username) : escHtml(f.displayName)}</span>
+      ${f.username ? `<span style="color:var(--muted);margin-left:4px;">${escHtml(f.displayName)}</span>` : ''}
     </div>`).join('');
   dd.style.display = 'block';
 }
@@ -16779,15 +16799,19 @@ function pickMention(i){
   const input = document.getElementById('gchat-input');
   const dd = document.getElementById('gchat-mention-dropdown');
   if (!f || !input || _mentionTokenStart < 0) return;
+  const tag = f.username || f.displayName;
   const before = input.value.slice(0, _mentionTokenStart);
   const cursorWas = input.selectionStart;
   const after = input.value.slice(cursorWas);
-  const insert = '@' + f.displayName + ' ';
+  const insert = '@' + tag + ' ';
   input.value = before + insert + after;
   const newPos = (before + insert).length;
   input.setSelectionRange(newPos, newPos);
   input.focus();
-  if (!_pendingMentions.some(m => m.uid === f.uid)) _pendingMentions.push({ uid: f.uid, displayName: f.displayName });
+  // Store the field under the same "displayName" key _highlightMentions matches
+  // against - it holds whichever string actually got inserted (username, or the
+  // display-name fallback), never the friend's real display name if that differs.
+  if (!_pendingMentions.some(m => m.uid === f.uid)) _pendingMentions.push({ uid: f.uid, displayName: tag });
   if (dd) dd.style.display = 'none';
   _mentionCandidates = []; _mentionTokenStart = -1;
 }
@@ -16921,7 +16945,7 @@ function _renderGlobalLbRows(){
     return `<div class="ulb-card ${isYou?'ulb-you':''}">
       <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
       <div class="ulb-info">
-        <div class="ulb-name">${escHtml(u.displayName||'Anonymous')} ${isYou?'<span style="color:var(--green);font-size:9px;">(you)</span>':''}</div>
+        ${_ulbNameBlock(u, isYou)}
         <div class="ulb-sub">Portfolio: $${(u.portfolioValue||100000).toLocaleString()}</div>
       </div>
       <div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>
