@@ -9814,42 +9814,6 @@ function applyRealStats(allStats, gameDate, playingTeamIds, isLatestDate=true, i
   }
 }
 
-// ── applyMLBStats: MLB final box scores ───────────────────────────────────
-function applyMLBStats(allStats, gameDate, isLatestDate=true, isFinal=false) {
-  if (!allStats?.length) return;
-  let moved = 0;
-  allStats.forEach(stat => {
-    const p = mlbPlayers.find(x => x.rank === stat.rank);
-    if (!p) return;
-    // If we've been pricing this player LIVE for this game-date, the live price is
-    // already the correct final value - just LOCK it as the close instead of applying
-    // another (compounding) move. Recompute one last time from final totals to be exact.
-    if (_liveOpen[p.rank] && _liveOpen[p.rank].date === gameDate) {
-      const perf = (p.role==='SP'||p.role==='RP') ? _mlbPitcherPerf(p, stat) : _mlbHitterPerf(p, stat);
-      _setLivePrice(p.rank, perf, gameDate);   // set to final totals (idempotent)
-      _finalizeLivePrice(p.rank, gameDate);      // lock close + mark applied
-      moved++;
-      lastNight[p.rank] = {played:true, date:gameDate, live:false, mlbRole:p.role,
-        pts:stat.pts||0, reb:stat.reb||0, ast:stat.ast||0, min:stat.min||0, tov:stat.tov||0};
-      return;
-    }
-    const pctChange = (p.role==='SP'||p.role==='RP')
-      ? _mlbPitcherPerf(p, stat) : _mlbHitterPerf(p, stat);
-    if (_applyMove(p.rank, pctChange, gameDate)) {
-      moved++;
-      lastNight[p.rank] = {played:true, date:gameDate, live:false, mlbRole:p.role,
-        pts:stat.pts||0, reb:stat.reb||0, ast:stat.ast||0,
-        min:stat.min||0, tov:stat.tov||0};
-    }
-  });
-  if (moved > 0) {
-    _saveCloses(); _saveLastNight();
-    try { localStorage.setItem('ax_liveP_cache', JSON.stringify(liveP)); } catch(e) {}
-    saveLocalPortfolio(); syncPricesToFirestore();
-    renderAll(); updateMovers();
-  }
-}
-
 // ── applyLiveStats: NBA live (display only, no price move) ────────────────
 function applyLiveStats(allStats, playingTeamIds) {
   if (!allStats?.length) return;
@@ -9865,20 +9829,6 @@ function applyLiveStats(allStats, playingTeamIds) {
   });
   _saveLastNight();
   renderAll(); updateMovers();
-}
-
-// ── applyMLBLiveStats: MLB live (display only) ────────────────────────────
-function applyMLBLiveStats(allStats) {
-  if (!allStats?.length) return;
-  const today = localDateStr(0);
-  allStats.forEach(stat => {
-    const p = mlbPlayers.find(x => x.rank === stat.rank);
-    if (!p) return;
-    lastNight[p.rank] = {played:true, date:today, live:true, mlbRole:p.role,
-      pts:stat.pts||0, reb:stat.reb||0, ast:stat.ast||0,
-      min:stat.min||0, tov:stat.tov||0};
-  });
-  _saveLastNight();
 }
 
 // ── applyPricingFromLastNight: retired ────────────────────────────────────
@@ -11917,7 +11867,11 @@ function syncPricesToFirestore() {
       const lastNightSnap = {};
       const lnCutoff = localDateStr(3);
       Object.entries(lastNight).forEach(([rank, ln]) => {
-        if (ln && ln.date && ln.date >= lnCutoff) lastNightSnap[rank] = ln;
+        if (!ln || !ln.date || ln.date < lnCutoff) return;
+        // Never share a malformed MLB record upstream - see the matching guard on
+        // the read side below for why (this is the other half of the same fix).
+        if (ln.mlbRole !== undefined && (ln.fg === undefined || ln.h === undefined)) return;
+        lastNightSnap[rank] = ln;
       });
       if (Object.keys(lastNightSnap).length > 0) {
         window._fbSetDoc(window._fbDoc(db, 'config', 'lastNight'),
@@ -12102,6 +12056,12 @@ async function loadPricesFromFirestore() {
       Object.entries(lnSnap.data().data).forEach(([rank, val]) => {
         const r = parseInt(rank);
         if (!val || !val.date || val.date < cutoff) return;
+        // An MLB record missing fg/h is a malformed write (a stale cached client
+        // running old code, a partial API response, etc.) - the "H/AB", "HR" and
+        // AB tiles read ln.fg/fg3/min directly with no fallback, so adopting a
+        // shape like this silently blanks that row on every device this doc gets
+        // pulled into. Skip it rather than propagate the corruption.
+        if (val.mlbRole !== undefined && (val.fg === undefined || val.h === undefined)) return;
         // Only fill in if local lastNight is missing or older for this player
         if (!lastNight[r] || !lastNight[r].date || val.date > lastNight[r].date) {
           lastNight[r] = val;
