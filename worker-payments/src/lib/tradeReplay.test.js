@@ -100,3 +100,31 @@ test('existing insufficient-shares rejection still works alongside band checks',
 test('portfolioValue still throws on a held rank with no trusted price (unchanged)', () => {
   assert.throws(() => portfolioValue({ cash: 100, holdings: { [RANK]: 5 } }, {}), /No trusted price/);
 });
+
+test('startingCash defaults to START_VALUE when omitted (existing callers unaffected)', async () => {
+  const { cash } = await replayTrades([]);
+  assert.equal(cash, START_VALUE);
+});
+
+test('startingCash overrides the $100k default - a sweeps coin balance, not a challenge pot', async () => {
+  const price = STAT_PRICE; // inside band
+  const trades = [
+    { rank: RANK, type: 'buy', shares: 10, price, ts: 1 },
+  ];
+  const { cash, holdings, rejected } = await replayTrades(trades, statPriceLookup(RANK), 5000);
+  assert.equal(rejected.length, 0);
+  assert.equal(holdings[RANK], 10);
+  assert.equal(cash, 5000 - 10 * price);
+});
+
+test('insufficient-cash rejection respects a variable startingCash, not the fixed $100k', async () => {
+  const price = STAT_PRICE; // inside band
+  const trades = [
+    { rank: RANK, type: 'buy', shares: 60, price, ts: 1 }, // costs 6000, more than a 5000 starting balance
+  ];
+  const { cash, holdings, rejected } = await replayTrades(trades, statPriceLookup(RANK), 5000);
+  assert.equal(rejected.length, 1);
+  assert.match(rejected[0].reason, /insufficient cash/);
+  assert.equal(cash, 5000);
+  assert.equal(Object.keys(holdings).length, 0);
+});

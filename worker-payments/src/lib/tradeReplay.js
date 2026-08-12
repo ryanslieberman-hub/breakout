@@ -21,10 +21,15 @@ const EPSILON = 1e-6;
 // trade priced outside the legitimate band for its rank. A rank with no
 // resolvable statPrice is treated the same as tampering - see
 // portfolioValue()'s "never silently substitute a guess" below.
+// startingCash: defaults to the fixed $100k every challenge starts at.
+// Sweeps coin redemption passes a variable balance instead (net of that
+// user's own coinDeposits/coinRedemptions ledger, see worker-payments'
+// /coins/redeem) - coins accumulate over time via repeated purchases rather
+// than starting once at a fixed pot, so this can't be a shared constant.
 // Returns { cash, holdings: {[rank]: shares}, rejected: [{trade, reason}] }
-export async function replayTrades(trades, getStatPrice) {
+export async function replayTrades(trades, getStatPrice, startingCash = START_VALUE) {
   const sorted = [...trades].sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
-  let cash = START_VALUE;
+  let cash = startingCash;
   const holdings = {};
   const rejected = [];
 

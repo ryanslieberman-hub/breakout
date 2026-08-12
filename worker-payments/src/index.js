@@ -118,6 +118,10 @@ async function handleStripeWebhook(request, env) {
   const event = JSON.parse(payload);
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
+    if (session.metadata?.kind === 'coins') {
+      await handleCoinDeposit(env, session);
+      return new Response('ok', { status: 200 });
+    }
     const { challengeId, uid } = session.metadata || {};
     if (!challengeId || !uid) {
       console.error('checkout.session.completed missing challengeId/uid metadata', session.id);
@@ -453,6 +457,20 @@ async function handleIdentityStatus(request, env) {
 // why both of those matter.
 const SPLITS = [0.5, 0.3, 0.2]; // top-3, 50/30/20
 
+// ── Gold/Sweeps coin packages ──
+// Placeholder economics - Ryan sets the real $/coin ratios once the business
+// model is finalized; this wires the mechanism, not the numbers. Dollar-
+// denominated (goldGranted/sweepsGranted are "cash" in the same units as
+// `cash` everywhere else in this codebase, not an arbitrary "coin count").
+const COIN_PACKAGES = {
+  starter:  { priceCents: 499,  goldGranted: 5000,  sweepsGranted: 5 },
+  standard: { priceCents: 999,  goldGranted: 11000, sweepsGranted: 11 },
+  value:    { priceCents: 2499, goldGranted: 30000, sweepsGranted: 30 },
+  premium:  { priceCents: 4999, goldGranted: 65000, sweepsGranted: 65 },
+};
+const MIN_REDEEM_CENTS_DEFAULT = 500; // $5 - overridable via env.MIN_REDEEM_CENTS
+const MAX_REDEMPTION_ATTEMPTS = 72; // ~3 days at the hourly sweep, same reasoning as MAX_PAYOUT_ATTEMPTS below
+
 // Rank ranges match RAW/MLB_RAW/GOLF_RAW/NFL_RAW in index.html.
 function leagueForRank(rank) {
   if (rank <= 1000) return 'nba';
@@ -766,6 +784,266 @@ async function handleChallengeStandings(request, env, challengeId) {
   return response;
 }
 
+// ── POST /coins/checkout ──
+// Buys a fixed Gold Coin package; the bundled Sweeps Coin bonus is credited
+// by handleCoinDeposit below once payment actually completes.
+async function handleCoinCheckout(request, env) {
+  const user = await requireUser(request, env);
+  const body = await request.json().catch(() => ({}));
+  const { packageId, clientNonce } = body || {};
+  const pkg = COIN_PACKAGES[packageId];
+  if (!pkg) throw new HttpError(400, 'Unknown coin package');
+  if (!clientNonce || typeof clientNonce !== 'string') throw new HttpError(400, 'Missing clientNonce');
+
+  const stripe = stripeClient(env.STRIPE_SECRET_KEY);
+  const session = await stripe.createCheckoutSession(
+    {
+      mode: 'payment',
+      client_reference_id: user.uid,
+      metadata: { kind: 'coins', packageId, uid: user.uid },
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: 'usd',
+            unit_amount: pkg.priceCents,
+            product_data: { name: `Breakout Gold Coins - ${packageId}` },
+          },
+        },
+      ],
+      success_url: env.CHECKOUT_SUCCESS_URL,
+      cancel_url: env.CHECKOUT_CANCEL_URL,
+    },
+    // Unlike challenge checkout's stable per-challenge key (one entry ever),
+    // coin purchases are repeatable by design - a fixed `uid:packageId` key
+    // would silently return the FIRST session for 24h on every later
+    // purchase of the same package. The client mints a fresh nonce per tap
+    // instead, so a double-click/double-submit of the SAME tap still dedupes
+    // without blocking a legitimate next purchase.
+    `coins-checkout:${user.uid}:${clientNonce}`
+  );
+  return json({ url: session.url }, 200, env);
+}
+
+// Credits a completed coin purchase. Doc ID = Stripe session ID, so a
+// replayed webhook event (Stripe's own retry, or a manual `stripe trigger`)
+// is a safe no-op rather than a double-credit - same idempotency pattern the
+// challenge webhook uses for challenges/{id}.participants.
+async function handleCoinDeposit(env, session) {
+  const { packageId, uid } = session.metadata || {};
+  if (!packageId || !uid) {
+    console.error('checkout.session.completed (coins) missing packageId/uid metadata', session.id);
+    return;
+  }
+  const existing = await firestoreGetDoc(env, `coinDeposits/${session.id}`);
+  if (existing) return; // already credited (webhook retry)
+
+  // Re-derive grant amounts fresh from the CURRENT catalog rather than
+  // trusting anything carried on the session - if COIN_PACKAGES changes
+  // between checkout creation and webhook delivery, today's catalog is what
+  // should apply.
+  const pkg = COIN_PACKAGES[packageId];
+  if (!pkg) {
+    console.error(`checkout.session.completed (coins): unknown packageId ${packageId} for session ${session.id}`);
+    return;
+  }
+
+  await firestorePatchDoc(env, `coinDeposits/${session.id}`, {
+    uid, ts: Date.now(), packageId,
+    amountPaidCents: session.amount_total,
+    goldGranted: pkg.goldGranted,
+    sweepsGranted: pkg.sweepsGranted,
+  });
+
+  // Best-effort display-cache bump - never trusted for redemption (that
+  // independently replays /trades + coinDeposits/coinRedemptions below, same
+  // "client-writable cache is not the source of truth" reasoning as the
+  // challenge portfolio seed above).
+  for (const [walletId, grant] of [['gold', pkg.goldGranted], ['sweeps', pkg.sweepsGranted]]) {
+    try {
+      const path = `portfolios/${uid}/wallets/${walletId}`;
+      const wallet = (await firestoreGetDoc(env, path)) || { cash: 0, holdings: {}, logs: [], portHx: [] };
+      await firestorePatchDoc(env, path, { cash: (wallet.cash || 0) + grant, savedAt: Date.now() });
+    } catch (e) {
+      console.error(`Failed to bump ${walletId} wallet cache for ${uid}:`, e.message);
+    }
+  }
+}
+
+// Shared by GET /coins/balance (read-only) and POST /coins/redeem (side
+// effects) - same "how much can this user actually redeem" computation,
+// mirroring computeChallengeStandings/settleChallenge's reasoning (one
+// computation, not two that can quietly disagree). Cash only, not held
+// positions - see the plan's Flaw 2: valuing/force-liquidating a live
+// position at an arbitrary redemption instant is a materially different
+// risk than challenge settlement's fixed-end-date valuation. A held
+// position must be sold back to cash before it's redeemable.
+async function computeSweepsBalance(env, uid) {
+  const [deposits, redemptions] = await Promise.all([
+    firestoreQuery(env, 'coinDeposits', [{ field: 'uid', op: 'EQUAL', value: uid }]),
+    firestoreQuery(env, 'coinRedemptions', [{ field: 'uid', op: 'EQUAL', value: uid }]),
+  ]);
+  const totalGranted = deposits.reduce((sum, d) => sum + (d.sweepsGranted || 0), 0);
+  // pending + paid both count against the balance (money already spoken
+  // for); only a genuinely failed redemption never took anything.
+  const totalReserved = redemptions
+    .filter(r => r.status !== 'failed')
+    .reduce((sum, r) => sum + (r.amountCents || 0) / 100, 0);
+  const startingCash = totalGranted - totalReserved;
+
+  const priceEngineDocCache = {};
+  async function getStatPrice(rank) {
+    if (rank in priceEngineDocCache) return priceEngineDocCache[rank]?.statPrice ?? null;
+    const doc = await firestoreGetDoc(env, `priceEngine/${leagueForRank(rank)}_${rank}`);
+    priceEngineDocCache[rank] = doc;
+    return doc ? doc.statPrice ?? null : null;
+  }
+
+  const trades = await firestoreQuery(env, 'trades', [
+    { field: 'uid', op: 'EQUAL', value: uid },
+    { field: 'portfolioId', op: 'EQUAL', value: 'sweeps' },
+  ]);
+  const { cash, rejected } = await replayTrades(trades, getStatPrice, startingCash);
+  if (rejected.length) {
+    console.warn(`${rejected.length} rejected (invalid) sweeps trade(s) for ${uid}`);
+  }
+  return { cash, startingCash, totalGranted, totalReserved };
+}
+
+// True if this user has a redemption that hasn't resolved to 'paid' yet -
+// either still in flight (pending) or exhausted its own retries (failed).
+// Both must block a NEW redemption request: a pending one is already
+// reserved against the balance above, and a failed one needs a human to
+// look at it (see runRedemptionRetrySweep's redemptionBlocked escalation)
+// before this user redeems again, same "needs a human" philosophy as a
+// challenge's settlementBlocked flag.
+async function hasUnresolvedRedemption(env, uid) {
+  const [pending, failed] = await Promise.all([
+    firestoreQuery(env, 'coinRedemptions', [
+      { field: 'uid', op: 'EQUAL', value: uid }, { field: 'status', op: 'EQUAL', value: 'pending' },
+    ]),
+    firestoreQuery(env, 'coinRedemptions', [
+      { field: 'uid', op: 'EQUAL', value: uid }, { field: 'status', op: 'EQUAL', value: 'failed' },
+    ]),
+  ]);
+  return pending.length > 0 || failed.length > 0;
+}
+
+// Shared by handleCoinRedeem (first attempt) and runRedemptionRetrySweep
+// (retries) - same double-payment-guard pattern settleChallenge uses: ask
+// Stripe what's ACTUALLY already been sent (via transfer_group) rather than
+// trusting a fixed idempotency key alone, which would replay a stored
+// failure for 24h just like it does for challenge payouts.
+async function attemptRedemptionTransfer(env, redemptionId, { uid, amountCents, stripeConnectId }, attemptNo) {
+  const stripe = stripeClient(env.STRIPE_SECRET_KEY);
+  let already;
+  try {
+    const existing = await stripe.listTransfers({ transfer_group: redemptionId, limit: 10 });
+    already = (existing.data || [])[0];
+  } catch (e) {
+    console.error(`Redemption ${redemptionId}: could not list existing transfers (${e.message}) - not sending yet.`);
+    return { status: 'pending' };
+  }
+  if (already) {
+    await firestorePatchDoc(env, `coinRedemptions/${redemptionId}`, { status: 'paid', transferId: already.id });
+    return { status: 'paid', transferId: already.id };
+  }
+  try {
+    const transfer = await stripe.createTransfer(
+      {
+        amount: amountCents,
+        currency: 'usd',
+        destination: stripeConnectId,
+        transfer_group: redemptionId,
+        metadata: { redemptionId, uid },
+      },
+      `redeem:${uid}:${redemptionId}:${attemptNo}`
+    );
+    await firestorePatchDoc(env, `coinRedemptions/${redemptionId}`, {
+      status: 'paid', transferId: transfer.id, attempts: attemptNo,
+    });
+    return { status: 'paid', transferId: transfer.id };
+  } catch (e) {
+    console.error(`Redemption ${redemptionId} transfer failed (attempt ${attemptNo}):`, e.message);
+    await firestorePatchDoc(env, `coinRedemptions/${redemptionId}`, {
+      status: 'failed', attempts: attemptNo, lastError: e.message,
+    });
+    return { status: 'failed', error: e.message };
+  }
+}
+
+// ── GET /coins/balance ──
+async function handleCoinBalance(request, env) {
+  const user = await requireUser(request, env);
+  const { cash } = await computeSweepsBalance(env, user.uid);
+  const blocked = await hasUnresolvedRedemption(env, user.uid);
+  return json({ availableCents: Math.max(0, Math.round(cash * 100)), redemptionInProgress: blocked }, 200, env);
+}
+
+// ── POST /coins/redeem ──
+// Cash-out for Sweeps Coins only (Gold Coins are never redeemed).
+async function handleCoinRedeem(request, env) {
+  const user = await requireUser(request, env);
+
+  if (await hasUnresolvedRedemption(env, user.uid)) {
+    throw new HttpError(409, 'A redemption is already in progress or needs manual review');
+  }
+
+  const { cash } = await computeSweepsBalance(env, user.uid);
+  const minRedeem = (Number(env.MIN_REDEEM_CENTS) || MIN_REDEEM_CENTS_DEFAULT) / 100;
+  if (cash < minRedeem) {
+    throw new HttpError(400, `Minimum redemption is $${minRedeem.toFixed(2)} (available: $${cash.toFixed(2)})`);
+  }
+
+  const userDoc = (await firestoreGetDoc(env, `users/${user.uid}`)) || {};
+  if (!userDoc.stripeConnectId) throw new HttpError(400, 'Connect a payout account first');
+
+  // Written BEFORE attempting the transfer - this is what keeps the NEXT
+  // computeSweepsBalance() correct even if the transfer below fails
+  // partway, same reasoning as challenge settlement never marking a
+  // challenge settled until its payouts actually land.
+  const redemptionId = crypto.randomUUID();
+  const amountCents = Math.round(cash * 100);
+  await firestorePatchDoc(env, `coinRedemptions/${redemptionId}`, {
+    uid: user.uid, ts: Date.now(), amountCents, status: 'pending', attempts: 0,
+  });
+
+  const result = await attemptRedemptionTransfer(
+    env, redemptionId, { uid: user.uid, amountCents, stripeConnectId: userDoc.stripeConnectId }, 1
+  );
+  return json({ redemptionId, amountCents, ...result }, 200, env);
+}
+
+// ── Redemption retry sweep (Cron Trigger, hourly, alongside runSettlementSweep) ──
+export async function runRedemptionRetrySweep(env) {
+  const allFailed = await firestoreQuery(env, 'coinRedemptions', [{ field: 'status', op: 'EQUAL', value: 'failed' }]);
+  const retryable = allFailed.filter(r => r.redemptionBlocked !== true);
+
+  let retried = 0;
+  for (const r of retryable) {
+    const attemptNo = (Number(r.attempts) || 0) + 1;
+    if (attemptNo > MAX_REDEMPTION_ATTEMPTS) {
+      // Same "stop looping, flag for a human" escalation as a challenge's
+      // settlementBlocked - hasUnresolvedRedemption() then keeps this user
+      // from starting a new redemption until someone resolves this one.
+      await firestorePatchDoc(env, `coinRedemptions/${r.id}`, { redemptionBlocked: true, redemptionBlockedAt: Date.now() });
+      console.error(`Redemption ${r.id} exhausted ${MAX_REDEMPTION_ATTEMPTS} attempts - flagged redemptionBlocked, needs manual review.`);
+      continue;
+    }
+    const userDoc = (await firestoreGetDoc(env, `users/${r.uid}`)) || {};
+    if (!userDoc.stripeConnectId) continue; // can't retry without a payout destination
+    try {
+      const result = await attemptRedemptionTransfer(
+        env, r.id, { uid: r.uid, amountCents: r.amountCents, stripeConnectId: userDoc.stripeConnectId }, attemptNo
+      );
+      if (result.status === 'paid') retried++;
+    } catch (e) {
+      console.error(`Redemption retry sweep: ${r.id} failed:`, e.message);
+    }
+  }
+  return { checked: allFailed.length, retried };
+}
+
 // ── Router ──
 export default {
   async fetch(request, env) {
@@ -795,6 +1073,15 @@ export default {
       if (request.method === 'GET' && url.pathname === '/internal/stripe-info') {
         return await handleStripeInfo(request, env);
       }
+      if (request.method === 'POST' && url.pathname === '/coins/checkout') {
+        return await handleCoinCheckout(request, env);
+      }
+      if (request.method === 'GET' && url.pathname === '/coins/balance') {
+        return await handleCoinBalance(request, env);
+      }
+      if (request.method === 'POST' && url.pathname === '/coins/redeem') {
+        return await handleCoinRedeem(request, env);
+      }
       if (request.method === 'GET' && /^\/challenges\/[^/]+\/standings$/.test(url.pathname)) {
         await requireUser(request, env); // any signed-in user, not admin-only - this moves no money
         const challengeId = url.pathname.split('/')[2];
@@ -818,5 +1105,6 @@ export default {
 
   async scheduled(event, env, ctx) {
     ctx.waitUntil(runSettlementSweep(env));
+    ctx.waitUntil(runRedemptionRetrySweep(env));
   },
 };

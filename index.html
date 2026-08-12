@@ -7337,6 +7337,16 @@ async function goTradeInChallenge(challengeId){
 
 // Show/hide the persistent "you're not trading your regular money" banner on
 // the Market view.
+// Single source of truth for how a portfolio context's name is shown -
+// used by the banner, the drawer, and buildPortfolio()'s context button so
+// they can never disagree.
+function contextDisplayName(id){
+  if (id === 'regular') return 'Practice';
+  if (id === 'gold') return 'Gold Coins';
+  if (id === 'sweeps') return 'Sweeps Coins';
+  return _challengeNames[id] || 'Challenge';
+}
+
 function updatePortfolioContextUI(){
   const banner = document.getElementById('portfolio-context-banner');
   const text = document.getElementById('portfolio-context-banner-text');
@@ -7345,8 +7355,7 @@ function updatePortfolioContextUI(){
     banner.style.display = 'none';
     return;
   }
-  const name = _challengeNames[activePortfolioId] || 'this challenge';
-  text.textContent = `Trading in: ${name} — tap to switch`;
+  text.textContent = `Trading in: ${contextDisplayName(activePortfolioId)} — tap to switch`;
   banner.style.display = 'flex';
 }
 
@@ -7385,6 +7394,10 @@ async function openPortfolioDrawer(){
   const rows = [
     { id: 'regular', name: 'Practice Portfolio', icon: '$',
       sub: (activePortfolioId==='regular' ? fmt(portVal()) : fmt(_portfolios['regular']?.cash ?? 100000)) + ' cash' },
+    { id: 'gold', name: 'Gold Coins', icon: '🪙',
+      sub: fmt((activePortfolioId==='gold' ? portVal() : _portfolios['gold']?.cash) ?? 0) + ' coins' },
+    { id: 'sweeps', name: 'Sweeps Coins', icon: '✨',
+      sub: fmt((activePortfolioId==='sweeps' ? portVal() : _portfolios['sweeps']?.cash) ?? 0) + ' coins' },
     ...challenges.map(c => ({
       id: c.id, name: c.name, icon: '🏆',
       sub: fmt((activePortfolioId===c.id ? cash : _portfolios[c.id]?.cash) ?? 100000) + ` cash · ends ${fmtStamp(c.endDate)}`,
@@ -7408,29 +7421,40 @@ function closePortfolioDrawer(){
 // have a cloud doc yet on the very first switch, in which case we start it
 // fresh at $100,000 - joinChallenge()/the Stripe webhook normally create this
 // doc at join time, so this is a defensive fallback, not the common path.
+// 'gold'/'sweeps' are the same shape but a DIFFERENT fresh-start amount and a
+// different cloud path (portfolios/{uid}/wallets/{id}, not .../challenges/{id})
+// - a brand-new coin wallet starts at $0, not the challenge $100,000, since
+// it's only funded by an actual purchase (see worker-payments' /coins/checkout
+// webhook), not a fixed starting pot.
+function isWalletContext(portfolioId){
+  return portfolioId === 'gold' || portfolioId === 'sweeps';
+}
 async function loadPortfolioBlob(portfolioId){
   if (portfolioId === 'regular') {
     return { cash, holdings: {...holdings}, logs: [...logs], portHx: [...portHx] };
   }
+  const freshCash = isWalletContext(portfolioId) ? 0 : 100000;
+  const cloudSubcollection = isWalletContext(portfolioId) ? 'wallets' : 'challenges';
+  const localKeyPrefix = isWalletContext(portfolioId) ? 'ax_wallet_' : 'ax_portfolio_ch_';
   // Cloud is authoritative when signed in (synced across devices) - fall back
   // to the local cache (offline, or cloud read failed), then to a fresh start.
   if (currentUser && db) {
     try {
-      const snap = await window._fbGetDoc(window._fbDoc(db, 'portfolios', currentUser.uid, 'challenges', portfolioId));
+      const snap = await window._fbGetDoc(window._fbDoc(db, 'portfolios', currentUser.uid, cloudSubcollection, portfolioId));
       if (snap.exists()) {
         const d = snap.data();
-        return { cash: d.cash ?? 100000, holdings: d.holdings || {}, logs: d.logs || [], portHx: d.portHx || [], pools: d.pools || {} };
+        return { cash: d.cash ?? freshCash, holdings: d.holdings || {}, logs: d.logs || [], portHx: d.portHx || [], pools: d.pools || {} };
       }
-    } catch(e) { console.warn('[portfolio] load challenge portfolio failed:', e.message); }
+    } catch(e) { console.warn('[portfolio] load ' + cloudSubcollection + ' portfolio failed:', e.message); }
   }
   try {
-    const raw = localStorage.getItem('ax_portfolio_ch_' + portfolioId);
+    const raw = localStorage.getItem(localKeyPrefix + portfolioId);
     if (raw) {
       const d = JSON.parse(raw);
-      return { cash: d.cash ?? 100000, holdings: d.holdings || {}, logs: d.logs || [], portHx: d.portHx || [], pools: d.pools || {} };
+      return { cash: d.cash ?? freshCash, holdings: d.holdings || {}, logs: d.logs || [], portHx: d.portHx || [], pools: d.pools || {} };
     }
   } catch(e) {}
-  return { cash: 100000, holdings: {}, logs: [], portHx: [{day:0,value:100000,t:Date.now()}], pools: {} };
+  return { cash: freshCash, holdings: {}, logs: [], portHx: [{day:0,value:freshCash,t:Date.now()}], pools: {} };
 }
 
 // Record a portfolio-value snapshot stamped with the real wall-clock time, so the
@@ -11889,9 +11913,14 @@ function syncPricesToFirestore() {
           }
         }).catch(() => {});
       }
-      // Update user's leaderboard entry with current portfolio value
-      // This keeps the leaderboard accurate without requiring a manual save
-      if (currentUser && window._fbSetDoc && window._fbDoc) {
+      // Update user's leaderboard entry with current portfolio value.
+      // Regular-only: this fires after basically every trade regardless of
+      // which portfolio context is active, and the practice leaderboard must
+      // only ever reflect the regular portfolio - trading inside a challenge
+      // or a coin wallet must never overwrite it with THAT context's value
+      // (same reasoning as saveCloudPortfolio's portfolioId==='regular' gate
+      // on this same field).
+      if (currentUser && window._fbSetDoc && window._fbDoc && activePortfolioId === 'regular') {
         const val = portVal();
         const ret = Math.round(((val - START_VALUE) / START_VALUE) * 1000) / 10;
         window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), {
@@ -12606,7 +12635,13 @@ function drawPortChartRanged(range){
 
   if (series.length < 2){
     holder.innerHTML = `<div class="pchart-empty">Not enough history yet - your portfolio value will chart here as you trade and games settle.</div>`;
-    _setPchartHead(series.length?series[series.length-1].value:portVal(), series.length?series[0].value:START_VALUE, null);
+    // A coin wallet has no $100k fixed starting point (see buildPortfolio's
+    // isWallet guard) - falling back to it here would show a fresh $50
+    // wallet as roughly -99.95%. _setPchartHead treats a falsy baseValue as
+    // "no % to show" (see its own `pct = baseValue ? ... : 0`), so 0 is the
+    // correct empty-history fallback for a wallet, not START_VALUE.
+    const emptyBase = isWalletContext(activePortfolioId) ? 0 : START_VALUE;
+    _setPchartHead(series.length?series[series.length-1].value:portVal(), series.length?series[0].value:emptyBase, null);
     return;
   }
 
@@ -13351,6 +13386,12 @@ function buildLeaderboard(){
 function buildPortfolio(){
   pushPortHx(); // capture current value so the chart always has an up-to-date point
   const total=portVal();
+  // A coin wallet has no fixed $100k starting point to diff against - it's
+  // funded by whatever's been purchased over time (see the plan's "P&L
+  // display fix": a real per-context cost basis driven by cumulative
+  // deposits is Phase 2 polish). Suppress the %-of-100k framing rather than
+  // show a misleading "-99.9%" for a real $50 balance.
+  const isWallet = isWalletContext(activePortfolioId);
   const pnl=total-START_VALUE;
   const pp=pnl/START_VALUE*100;
   // Portfolio-wide today P/L: sum each holding's (current − today's open) × shares.
@@ -13365,9 +13406,9 @@ function buildPortfolio(){
   const holdingsVal = total - cash;
   const todayPp = holdingsVal > 0 ? (todayPnl / holdingsVal) * 100 : 0;
 
-  const portLabel = activePortfolioId === 'regular' ? 'Practice' : (_challengeNames[activePortfolioId] || 'Challenge');
+  const portLabel = contextDisplayName(activePortfolioId);
   let html=`
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;"><div class="ptitle">Your <span style="color:var(--green)">Portfolio</span></div><button onclick="sharePortfolio()" style="margin-top:8px;padding:7px 14px;background:#12d47e18;border:1px solid #12d47e44;border-radius:6px;color:var(--green);font-family:var(--font-mono);font-size:11px;cursor:pointer">Share</button></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;"><div class="ptitle">Your <span style="color:var(--green)">Portfolio</span></div>${isWallet ? '' : `<button onclick="sharePortfolio()" style="margin-top:8px;padding:7px 14px;background:#12d47e18;border:1px solid #12d47e44;border-radius:6px;color:var(--green);font-family:var(--font-mono);font-size:11px;cursor:pointer">Share</button>`}</div>
     <button class="league-btn-compact" onclick="openPortfolioDrawer()" style="margin-bottom:10px;"><span>${escHtml(portLabel)}</span><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
     <div class="psub-txt">Holdings, performance, and trade history</div>
     <div class="pgrid">
@@ -13378,10 +13419,12 @@ function buildPortfolio(){
         <div class="pcval" style="color:${todayPnl>=0?'var(--green)':'var(--red)'}">${fmtS(todayPnl)}</div>
         <div class="pcsub" style="color:${todayPnl>=0?'var(--green)':'var(--red)'}">${fmtP(todayPp)}</div>
       </div>
-      <div class="pcard"><div class="pclbl">Total Return</div>
+      ${isWallet
+        ? `<div class="pcard"><div class="pclbl">Balance</div><div class="pcval">${fmt(total)}</div></div>`
+        : `<div class="pcard"><div class="pclbl">Total Return</div>
         <div class="pcval" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${fmtS(pnl)}</div>
         <div class="pcsub" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${fmtP(pp)}</div>
-      </div>
+      </div>`}
     </div>`;
 
   // Portfolio value chart - interactive, ranged (Robinhood-style)
@@ -13600,13 +13643,15 @@ function toggleWatchlist(btn) {
 // ═══════════════════════════════════════════
 function saveLocalPortfolio(portfolioId = 'regular') {
   if (portfolioId !== 'regular') {
-    // Challenge portfolios: just the cash/holdings/logs/portHx slice - market
-    // data (prices/closes/etc.) is shared and already saved by the regular
-    // path below, no need to duplicate it per challenge.
+    // Challenge/wallet portfolios: just the cash/holdings/logs/portHx slice -
+    // market data (prices/closes/etc.) is shared and already saved by the
+    // regular path below, no need to duplicate it per context. Wallets get
+    // their own key prefix so they never collide with a same-named challenge.
+    const key = (isWalletContext(portfolioId) ? 'ax_wallet_' : 'ax_portfolio_ch_') + portfolioId;
     try {
-      localStorage.setItem('ax_portfolio_ch_' + portfolioId, JSON.stringify({
+      localStorage.setItem(key, JSON.stringify({
         cash, holdings, logs: logs.slice(0, 50), portHx: portHx.slice(-400), savedAt: Date.now(),
-        pools: challengePools[portfolioId] || {}, // this challenge's own AMM drift, not the shared market
+        pools: challengePools[portfolioId] || {}, // this context's own AMM drift, not the shared market
       }));
     } catch(e) {}
     return;
@@ -14929,8 +14974,10 @@ async function loadCloudPortfolio() {
 async function saveCloudPortfolio(silent = false, portfolioId = activePortfolioId) {
   if (!currentUser || !db) return;
   // Don't save if we're in default state - likely localStorage was cleared on mobile
-  // and cloud data would be overwritten with blank $100k portfolio
-  const hasActivity = logs.length > 0 || Object.values(holdings).some(h => h.shares > 0) || cash !== START_VALUE;
+  // and cloud data would be overwritten with blank state. The "default" baseline is
+  // context-specific: practice/challenges start at $100k, a coin wallet starts at $0.
+  const freshCash = isWalletContext(portfolioId) ? 0 : START_VALUE;
+  const hasActivity = logs.length > 0 || Object.values(holdings).some(h => h.shares > 0) || cash !== freshCash;
   if (!hasActivity) {
     console.log('[cloud save] Skipped - no activity detected, may be fresh load after iOS clear');
     return;
@@ -14939,7 +14986,9 @@ async function saveCloudPortfolio(silent = false, portfolioId = activePortfolioI
     const val = portVal();
     const docRef = portfolioId === 'regular'
       ? window._fbDoc(db, 'portfolios', currentUser.uid)
-      : window._fbDoc(db, 'portfolios', currentUser.uid, 'challenges', portfolioId);
+      : isWalletContext(portfolioId)
+        ? window._fbDoc(db, 'portfolios', currentUser.uid, 'wallets', portfolioId)
+        : window._fbDoc(db, 'portfolios', currentUser.uid, 'challenges', portfolioId);
     await window._fbSetDoc(docRef, {
       cash, holdings,
       logs: logs.slice(-50),
@@ -14995,6 +15044,10 @@ function updateAuthUI() {
     const pnlPct = (pnl / START_VALUE * 100).toFixed(1);
     const pnlColor = pnl >= 0 ? 'var(--green)' : 'var(--red)';
     const pnlSign  = pnl >= 0 ? '+' : '';
+    // A coin wallet has no $100k baseline to show a % against (see
+    // buildPortfolio's isWallet guard) - show the plain balance instead.
+    const pillText = isWalletContext(activePortfolioId) ? fmt(total) : `${pnlSign}${pnlPct}%`;
+    const pillColor = isWalletContext(activePortfolioId) ? 'var(--muted)' : pnlColor;
     const avatar = photoURL
       ? `<img src="${photoURL}" alt="" style="width:26px;height:26px;border-radius:50%;object-fit:cover;">`
       : `<div style="width:26px;height:26px;border-radius:50%;background:${profile.avatarColor||'#4caf50'};display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:13px;color:#fff;">${displayName[0].toUpperCase()}</div>`;
@@ -15003,7 +15056,7 @@ function updateAuthUI() {
       <div class="avatar-pill" onclick="openProfile()">
         ${avatar}
         <span>${firstName}</span>
-        <span class="av-pnl" style="color:${pnlColor}">${pnlSign}${pnlPct}%</span>
+        <span class="av-pnl" style="color:${pillColor}">${pillText}</span>
       </div>`;
   } else {
     bar.innerHTML = `
@@ -15078,7 +15131,9 @@ function renderProfileView() {
       <div class="profile-stat-row">
         <div class="profile-stat"><div class="profile-stat-lbl">Cash</div><div class="profile-stat-val">${fmt(cash)}</div></div>
         <div class="profile-stat"><div class="profile-stat-lbl">Total Value</div><div class="profile-stat-val">${fmt(total)}</div></div>
-        <div class="profile-stat"><div class="profile-stat-lbl">P&amp;L</div><div class="profile-stat-val" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${fmtP(pnlPct)}</div></div>
+        ${isWalletContext(activePortfolioId)
+          ? `<div class="profile-stat"><div class="profile-stat-lbl">Wallet</div><div class="profile-stat-val">${escHtml(contextDisplayName(activePortfolioId))}</div></div>`
+          : `<div class="profile-stat"><div class="profile-stat-lbl">P&amp;L</div><div class="profile-stat-val" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${fmtP(pnlPct)}</div></div>`}
       </div>
 
       <label style="font-family:var(--font-mono);font-size:9px;color:var(--muted);display:block;margin-bottom:4px;">Username</label>
@@ -16824,9 +16879,12 @@ async function buildLeaderboardFirebase() {
   const inner = document.getElementById('lb-view-inner');
   if (!inner) return;
 
-  // Determine active tab (persist across refreshes). Challenges is hidden for now
-  // (see switchLbTab) - if a stale value from before that got persisted, fall back
-  // to global rather than rendering a tab with no button to select it.
+  // Determine active tab (persist across refreshes). 'challenge' - the old
+  // paid-challenge entry point - has no button below anymore (replaced by
+  // 'coins'); a value persisted from before that change falls back to global
+  // rather than rendering a tab with no button to select it. The challenge
+  // code itself (renderChallengeList/renderChallengeDetail/joinChallenge/the
+  // compliance modal) is untouched, just no longer reachable from here.
   let activeTab = window._lbTab || 'global';
   if (activeTab === 'challenge') { activeTab = 'global'; window._lbTab = 'global'; }
 
@@ -16840,11 +16898,14 @@ async function buildLeaderboardFirebase() {
     <div class="ulb-tabs" style="margin-bottom:16px;">
       <div class="ulb-tab ${activeTab==='global'?'active':''}" onclick="switchLbTab('global')">Global</div>
       <div class="ulb-tab ${activeTab==='friends'?'active':''}" onclick="switchLbTab('friends')">Friends<span class="friends-req-dot" id="friends-req-dot" style="display:${_incomingRequests.length?'inline-block':'none'};"></span></div>
+      <div class="ulb-tab ${activeTab==='coins'?'active':''}" onclick="switchLbTab('coins')">Coins</div>
     </div>
     <div id="lb-tab-content"></div>`;
 
   if (activeTab === 'friends') {
     await renderFriendsLeaderboard();
+  } else if (activeTab === 'coins') {
+    await renderCoinsTab();
   } else {
     await renderGlobalLeaderboard();
   }
@@ -16853,6 +16914,97 @@ async function buildLeaderboardFirebase() {
 function switchLbTab(tab) {
   window._lbTab = tab;
   buildLeaderboardFirebase();
+}
+
+// ═══════════════════════════════════════════
+//  GOLD / SWEEPS COINS
+// ═══════════════════════════════════════════
+// Must match COIN_PACKAGES in worker-payments/src/index.js exactly (id,
+// priceCents, goldGranted, sweepsGranted) - duplicated here rather than
+// fetched for Phase 1 simplicity, kept in sync manually the same way
+// RESTRICTED_STATES is mirrored between that Worker and this file elsewhere.
+const COIN_PACKAGES_DISPLAY = [
+  { id: 'starter',  priceCents: 499,  goldGranted: 5000,  sweepsGranted: 5 },
+  { id: 'standard', priceCents: 999,  goldGranted: 11000, sweepsGranted: 11 },
+  { id: 'value',    priceCents: 2499, goldGranted: 30000, sweepsGranted: 30 },
+  { id: 'premium',  priceCents: 4999, goldGranted: 65000, sweepsGranted: 65 },
+];
+
+async function buyCoinPackage(packageId) {
+  if (!currentUser) { showToast('Sign in to buy coins'); return; }
+  try {
+    showToast('Opening secure checkout…');
+    const { url } = await paymentsWorkerFetch('/coins/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // A fresh nonce per tap - the server keys checkout idempotency on it so
+      // a legitimate second purchase of the same package isn't silently
+      // collapsed into the first one (see worker-payments' /coins/checkout).
+      body: JSON.stringify({ packageId, clientNonce: crypto.randomUUID() }),
+    });
+    window.location.href = url;
+  } catch(e) { showToast('Could not start checkout: ' + e.message); }
+}
+
+async function redeemSweepsCoins() {
+  if (!currentUser) { showToast('Sign in first'); return; }
+  const status = await refreshConnectStatus();
+  if (!status?.payoutsEnabled) {
+    // Reuses the exact same Connect onboarding flow challenges already use
+    // for prize payouts - a redemption destination is a redemption
+    // destination regardless of what it's paying out.
+    showToast('Set up a payout account first');
+    startConnectOnboarding();
+    return;
+  }
+  try {
+    showToast('Requesting redemption…');
+    const result = await paymentsWorkerFetch('/coins/redeem', { method: 'POST' });
+    showToast(result.status === 'paid' ? 'Redeemed! Funds are on the way.' : 'Redemption is processing - check back soon.');
+  } catch(e) {
+    showToast('Redemption failed: ' + e.message);
+  }
+  renderCoinsTab();
+}
+
+async function renderCoinsTab() {
+  const el = document.getElementById('lb-tab-content');
+  if (!el) return;
+  if (!currentUser) {
+    el.innerHTML = `<div class="g10-loading">Sign in to buy coins.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="g10-loading">Loading…</div>`;
+
+  let balance = null;
+  try { balance = await paymentsWorkerFetch('/coins/balance'); } catch(e) {
+    console.warn('[coins] balance fetch failed:', e.message);
+  }
+
+  const availableUsd = balance ? (balance.availableCents / 100).toFixed(2) : '—';
+  const redeemBlocked = !balance || balance.availableCents < 500 || balance.redemptionInProgress;
+
+  const packagesHtml = COIN_PACKAGES_DISPLAY.map(pkg => `
+    <div style="background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:14px;">
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);text-transform:capitalize;">${escHtml(pkg.id)}</div>
+      <div style="font-family:var(--font-display);font-size:22px;margin:4px 0;">$${(pkg.priceCents/100).toFixed(2)}</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--gold);">🪙 ${pkg.goldGranted.toLocaleString()} Gold</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--green);">✨ ${pkg.sweepsGranted} Sweeps (bonus)</div>
+      <button class="profile-btn primary" style="width:100%;margin-top:10px;" onclick="buyCoinPackage('${pkg.id}')">Buy</button>
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div style="margin-bottom:16px;padding:14px;background:var(--card);border:1px solid var(--hairline);border-radius:10px;">
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);">Sweeps Coins available to redeem</div>
+      <div style="font-family:var(--font-display);font-size:32px;color:var(--green);margin:2px 0 10px;">$${availableUsd}</div>
+      <button class="profile-btn secondary" ${redeemBlocked ? 'disabled style="opacity:0.5;cursor:default;"' : ''} onclick="redeemSweepsCoins()">
+        ${balance?.redemptionInProgress ? 'Redemption in progress' : 'Redeem for cash'}
+      </button>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:8px;">Buy Gold Coins</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;">
+      ${packagesHtml}
+    </div>`;
 }
 
 // Auto-refresh leaderboard every 60s when it's open

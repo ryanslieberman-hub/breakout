@@ -91,6 +91,16 @@ service cloud.firestore {
       match /challenges/{challengeId} {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
+
+      // Gold/Sweeps coin trading portfolios (walletId is 'gold' or 'sweeps').
+      // Same trust level and same reasoning as /challenges above - a fast
+      // client-writable display cache, never settlement's source of truth.
+      // Sweeps redemption independently replays /trades (portfolioId ==
+      // 'sweeps') against coinDeposits/coinRedemptions below; a client could
+      // set cash here to anything and it still can't forge a payout.
+      match /wallets/{walletId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
     }
 
     // Comments (player comments + challenge chat, same collection) -
@@ -214,6 +224,24 @@ service cloud.firestore {
     // client-writable config/prices cache used for casual display.
     match /priceEngine/{doc} {
       allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Gold/Sweeps coin purchase ledger. Doc ID is the Stripe checkout session
+    // ID (free idempotency - a replayed webhook event can't double-write).
+    // Server-write-only (worker-payments' service account bypasses these
+    // rules entirely); owner-read only, not public, since this is financial
+    // history rather than a display value like /trades.
+    match /coinDeposits/{depositId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow write: if false;
+    }
+
+    // Sweeps coin cash-out ledger. Netted against coinDeposits (server-side)
+    // to compute a redemption's true available balance - see worker-payments'
+    // /coins/redeem. Server-write-only, same reasoning as coinDeposits above.
+    match /coinRedemptions/{redemptionId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.uid;
       allow write: if false;
     }
 
