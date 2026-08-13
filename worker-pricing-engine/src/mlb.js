@@ -127,20 +127,41 @@ export async function fetchSeasonStats(season) {
 // Fetches several games and merges into { rank: statRow }, summing counting
 // stats for players who played a doubleheader (two games same day) instead of
 // letting the second game silently overwrite the first.
-export async function fetchBoxscores(gamePks, rosterByName) {
+//
+// Also stamps each player's row with `final` - true only once EVERY game that
+// player appears in (all of, for a doubleheader) is final. This must be
+// computed per-player, not once for the whole day's slate: MLB slates are
+// staggered (afternoon games finish hours before West Coast night games), so
+// gating on "is the entire day final" meant closes almost never got written
+// for anyone, even players whose own game ended hours earlier - silently
+// freezing their price/close history (stale 1W/1M %, frozen portfolio-summary
+// value, spurious mover alerts off a stale anchor).
+export async function fetchBoxscores(gamePks, rosterByName, finalGamePks) {
   const map = {};
-  const settled = await Promise.allSettled(gamePks.map(pk => fetchBoxscore(pk, rosterByName)));
+  const gamesByRank = {};
+  const settled = await Promise.allSettled(
+    gamePks.map(pk => fetchBoxscore(pk, rosterByName).then(rows => ({ pk, rows })))
+  );
   for (const s of settled) {
     if (s.status !== 'fulfilled') continue;
-    for (const st of s.value) {
+    const { pk, rows } = s.value;
+    for (const st of rows) {
       const prior = map[st.rank];
-      if (!prior) { map[st.rank] = st; continue; }
-      const add = k => (prior[k] || 0) + (st[k] || 0);
-      map[st.rank] = {
-        ...prior,
-        h: add('h'), hr: add('hr'), rbi: add('rbi'), ab: add('ab'), k: add('k'), bb: add('bb'),
-        ip: add('ip'), kp: add('kp'), er: add('er'),
-      };
+      if (!prior) { map[st.rank] = st; }
+      else {
+        const add = k => (prior[k] || 0) + (st[k] || 0);
+        map[st.rank] = {
+          ...prior,
+          h: add('h'), hr: add('hr'), rbi: add('rbi'), ab: add('ab'), k: add('k'), bb: add('bb'),
+          ip: add('ip'), kp: add('kp'), er: add('er'),
+        };
+      }
+      (gamesByRank[st.rank] || (gamesByRank[st.rank] = new Set())).add(pk);
+    }
+  }
+  if (finalGamePks) {
+    for (const rank of Object.keys(map)) {
+      map[rank].final = [...gamesByRank[rank]].every(pk => finalGamePks.has(pk));
     }
   }
   return map;

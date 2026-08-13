@@ -221,9 +221,8 @@ async function tickMlb(env, today) {
 
   const rosterByName = {};
   for (const p of mlbRaw) rosterByName[mlb.normalizeName(p.name)] = { rank: p.rank, role: p.role };
-  const statsByRank = await mlb.fetchBoxscores(gamePks, rosterByName);
   const finalSet = new Set(schedule.final);
-  const isFinal = gamePks.every(pk => finalSet.has(pk));
+  const statsByRank = await mlb.fetchBoxscores(gamePks, rosterByName, finalSet);
 
   const toProcess = mlbRaw
     .map(player => ({ player, stat: statsByRank[player.rank] }))
@@ -247,7 +246,7 @@ async function tickMlb(env, today) {
       avg: st.avg, hr: st.hr, rbi: st.rbi, ops: st.ops, era: st.era, kper9: st.kper9, ipp: st.ipp,
     };
     if (isPitcher && stat.ip >= 1) fields.pitcherLastStart = today;
-    if (isFinal) { fields.closes = { ...st.closes, [today]: finalize(value, today, st.closes) }; finalized++; }
+    if (stat.final) { fields.closes = { ...st.closes, [today]: finalize(value, today, st.closes) }; finalized++; }
     const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: today, now });
     Object.assign(fields, moveFields);
     movers.push(...events);
