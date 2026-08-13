@@ -32,14 +32,24 @@ messaging.onBackgroundMessage((payload) => {
   });
 });
 
-// Tapping a notification focuses an already-open tab instead of opening a duplicate.
+// Tapping a notification focuses an already-open tab instead of opening a
+// duplicate. A mover alert's data.rank (see worker-pricing-engine's
+// announceMovers) becomes an ?openPlayer=<rank> deep link - index.html's
+// boot sequence reads that param and opens straight to that player's detail
+// view (see handleOpenPlayerDeepLink).
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
+  const rank = event.notification.data?.rank;
+  const url = rank ? `/?openPlayer=${encodeURIComponent(rank)}` : (event.notification.data?.url || '/');
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) return client.focus();
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          // Navigate the already-open tab too, not just focus it - otherwise
+          // tapping a mover alert while the app is already open does nothing.
+          if ('navigate' in client) client.navigate(url).catch(() => {});
+          return client.focus();
+        }
       }
       if (clients.openWindow) return clients.openWindow(url);
     })

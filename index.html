@@ -12836,6 +12836,58 @@ function selectPlayerFromList(rank){
   openPlayerDetail();
 }
 
+// Deep-link from a push notification tap: ?openPlayer=<rank>. Built by
+// firebase-messaging-sw.js's notificationclick from a mover alert's
+// data.rank (see worker-pricing-engine's announceMovers) - a portfolio
+// summary push has no rank and is left alone, opening the app normally.
+// Rank ranges match RAW/MLB_RAW/GOLF_RAW/NFL_RAW in worker-pricing-engine.
+function handleOpenPlayerDeepLink(){
+  const rank = parseInt(new URLSearchParams(location.search).get('openPlayer'), 10);
+  if (!rank) return;
+  // Strip the param immediately so a later refresh/share of this URL doesn't
+  // keep re-triggering the deep link.
+  history.replaceState(null, '', location.pathname);
+  const league = rank <= 1000 ? 'NBA' : rank <= 2000 ? 'MLB' : rank <= 3000 ? 'GOLF' : 'NFL';
+  const apply = () => {
+    if (currentLeague !== league) switchLeague(league);
+    showView('market', document.querySelector('.nav-tab'));
+    selectPlayerFromList(rank);
+  };
+  apply();
+  // Cold boot kicks off its own fire-and-forget live-stats fetch (real
+  // network calls, unpredictable latency) that can finish well after this
+  // point and re-render over top of it - updateHero() can't find selRank in
+  // the mid-switch players array for an instant and "self-heals" back to
+  // players[0], silently undoing the deep link. A fixed-delay retry loses
+  // this race unpredictably depending on how slow that fetch is on any given
+  // load, confirmed by tracing. Re-assert on a bounded interval instead of
+  // guessing a delay - cheap (just re-selects the same player) and outlasts
+  // any reasonable fetch time without auditing every async path a legacy
+  // boot sequence can take.
+  let _deepLinkTries = 0;
+  const _deepLinkInterval = setInterval(() => {
+    apply();
+    if (++_deepLinkTries >= 16) clearInterval(_deepLinkInterval); // ~8s at 500ms
+  }, 500);
+
+  // On mobile, something in this same boot window can independently drop
+  // show-detail right after openPlayerDetail() adds it - reproducible even
+  // through the reassertion loop above, so it isn't only the selRank race.
+  // Rather than chase every layout/resize path that can touch this class
+  // during boot, guarantee it directly for the same window: watch for it
+  // being removed and put it right back.
+  if (isMobileLayout()) {
+    const layoutEl = document.querySelector('.market-layout');
+    if (layoutEl) {
+      const guard = new MutationObserver(() => {
+        if (!layoutEl.classList.contains('show-detail')) layoutEl.classList.add('show-detail');
+      });
+      guard.observe(layoutEl, { attributes: true, attributeFilter: ['class'] });
+      setTimeout(() => guard.disconnect(), 8500);
+    }
+  }
+}
+
 function openPlayerDetail(){
   if (!isMobileLayout()) return;
   document.querySelector('.market-layout')?.classList.add('show-detail');
@@ -14747,7 +14799,7 @@ const _g10TabBoot = document.getElementById('ctab-g10');
 if (_g10TabBoot) _g10TabBoot.textContent = currentLeague === 'MLB' ? 'Game Log' : 'Last 10';
 const _obTagline = document.getElementById('ob-tagline');
 if (_obTagline) _obTagline.textContent = currentLeague === 'MLB' ? 'MLB PLAYER STOCK MARKET' : 'NBA PLAYER STOCK MARKET';
-refreshAll();
+refreshAll().then(() => { try { handleOpenPlayerDeepLink(); } catch(e){} });
 // Note: trackerInterval is managed entirely by smartTracker itself
 
 // ── Live badge countdown ──────────────────────────────────────────────────
