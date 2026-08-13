@@ -17,6 +17,14 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Without this, a new version of this file sits "waiting" in the background
+// until every open tab is fully closed - so a fix shipped here (like the
+// notificationclick deep-link below) silently doesn't apply to a tab/PWA
+// instance that was already open when it deployed, even after a refresh.
+// skipWaiting + clients.claim make a new SW take over immediately.
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => event.waitUntil(clients.claim()));
+
 // Data-only messages, deliberately - if the FCM payload also carried a
 // `notification` field, the browser auto-displays it in the background AND
 // this handler fires, showing every push twice. One source of truth: the

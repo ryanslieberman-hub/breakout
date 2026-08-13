@@ -63,16 +63,21 @@ export function detectMovers({ rank, name, perf, value, st, dateKey, now }) {
   return { events, fields };
 }
 
+const SPORT_EMOJI = { nba: '🏀', mlb: '⚾', golf: '⛳', nfl: '🏈' };
+
 // Formats and fires one push per mover event, broadcast to every opted-in
 // device. Returns how many devices got at least one push (for tick stats).
 async function announceMovers(env, movers) {
   let notified = 0;
   for (const m of movers) {
-    const direction = m.pct >= 0 ? 'up' : 'down';
+    const up = m.pct >= 0;
+    const direction = up ? 'up' : 'down';
     const pct = (Math.abs(m.pct) * 100).toFixed(1);
     const windowText = m.kind === 'fast' ? 'in the last 30 min' : 'today';
+    const sportEmoji = SPORT_EMOJI[rankToLeague[m.rank]] || '';
+    const moveEmoji = up ? '🔥' : '🧊';
     const sent = await notifyAllTokens(env, {
-      title: `${m.name} is ${direction} ${pct}% ${windowText}`,
+      title: `${moveEmoji}${sportEmoji} ${m.name} is ${direction} ${pct}% ${windowText}`,
       body: `Now $${m.value.toFixed(2)}`,
     }, { rank: String(m.rank), kind: `${m.kind}_move` });
     notified += sent;
