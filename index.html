@@ -12986,21 +12986,17 @@ function updateRangePcts(rank){
   const curPrice = liveP[rank];
   if (!curPrice) return;
 
-  const c = closes[rank] || {};
-  const sortedDates = Object.keys(c).filter(d => c[d] > 0).sort();
-
+  // _rangePct (ENGINE.pct) already anchors each range to the best close it
+  // actually has - the most recent one on/before that range's cutoff, or the
+  // oldest available if history doesn't reach back that far - so it's a real,
+  // meaningful number even with sparse history. No need to second-guess it and
+  // fall back to 1D here; that fallback was papering over pct()'s old bug
+  // (which used to collapse to 0% in exactly this sparse-history case) and now
+  // just hides the real value behind a flat 0.0% instead.
   [1,7,14,30,0].forEach(days => {
     const el = document.getElementById('rb-pct-'+(days===0?'0':days));
     if (!el) return;
-
-    // A real anchor for THIS range means we have a close that actually predates
-    // the window (so the % reflects real movement over that span). Without one,
-    // don't show "—" - a player who played last night has a real number, just
-    // not a week-old one yet, so fall back to 1D rather than a blank. Range
-    // buttons converge to their real values on their own as closes accumulate
-    // day by day; no special-casing needed once there's enough history.
-    const hasRealAnchor = days === 1 || days === 0 || sortedDates.some(d => d < localDateStr(days));
-    const pct = hasRealAnchor ? _rangePct(rank, days) : _rangePct(rank, 1);
+    const pct = _rangePct(rank, days);
     el.textContent = (pct>=0?'+':'')+pct.toFixed(1)+'%';
     el.className = 'rb-pct '+(pct>=0?'up':'down');
   });
