@@ -887,6 +887,30 @@ async function handleCoinDeposit(env, session) {
       console.error(`Failed to bump ${walletId} wallet cache for ${uid}:`, e.message);
     }
   }
+
+  // Also credit the real coinAccounts ledger (see getOrCreateCoinAccount) -
+  // Coins is now the app's primary portfolio, and its % gain leaderboard
+  // metric needs totalGranted to include purchases, not just daily-grant
+  // claims. Safe as a plain read+patch, not a transaction: this function
+  // itself only ever runs once per Stripe session id (guarded by the
+  // coinDeposits/{session.id} existence check above), so there's no
+  // concurrent-claim race to protect against here the way there is in
+  // handleCoinsClaim.
+  if (pkg.goldGranted) {
+    try {
+      const account = (await firestoreGetDoc(env, `coinAccounts/${uid}`))
+        || { cash: 0, cashReserved: 0, holdings: {}, totalGranted: 0 };
+      await firestorePatchDoc(env, `coinAccounts/${uid}`, {
+        cash: (account.cash || 0) + pkg.goldGranted,
+        cashReserved: account.cashReserved || 0,
+        holdings: account.holdings || {},
+        totalGranted: (account.totalGranted || 0) + pkg.goldGranted,
+        updatedAt: Date.now(),
+      });
+    } catch (e) {
+      console.error(`Failed to credit coinAccounts for ${uid}:`, e.message);
+    }
+  }
 }
 
 // Shared by GET /coins/balance (read-only) and POST /coins/redeem (side
@@ -951,8 +975,11 @@ async function getOrCreateCoinAccount(env, uid) {
   if (existing) return existing;
 
   const deposits = await firestoreQuery(env, 'coinDeposits', [{ field: 'uid', op: 'EQUAL', value: uid }]);
-  const cash = deposits.reduce((sum, d) => sum + (d.goldGranted || 0), 0);
-  const account = { cash, cashReserved: 0, holdings: {}, updatedAt: Date.now() };
+  const totalGranted = deposits.reduce((sum, d) => sum + (d.goldGranted || 0), 0);
+  // totalGranted is used for the % gain leaderboard metric (current value vs.
+  // total ever received) - it should never shrink, unlike `cash` which spends
+  // down with trades, so it's tracked separately rather than derived from it.
+  const account = { cash: totalGranted, cashReserved: 0, holdings: {}, totalGranted, updatedAt: Date.now() };
   await firestorePatchDoc(env, `coinAccounts/${uid}`, account);
   return account;
 }
@@ -1019,12 +1046,21 @@ async function attemptRedemptionTransfer(env, redemptionId, { uid, amountCents, 
   }
 }
 
-// ── GET /coins/balance ──
+// ── GET /coins/balance ── (Breakout Bucks / Sweeps)
 async function handleCoinBalance(request, env) {
   const user = await requireUser(request, env);
   const { cash } = await computeSweepsBalance(env, user.uid);
   const blocked = await hasUnresolvedRedemption(env, user.uid);
   return json({ availableCents: Math.max(0, Math.round(cash * 100)), redemptionInProgress: blocked }, 200, env);
+}
+
+// ── GET /coins/account ── (Coins / Gold) - read-only view of the
+// coinAccounts ledger, used by the client for the % gain leaderboard metric
+// (current portfolio value vs. totalGranted).
+async function handleCoinAccount(request, env) {
+  const user = await requireUser(request, env);
+  const account = await getOrCreateCoinAccount(env, user.uid);
+  return json({ cash: account.cash || 0, totalGranted: account.totalGranted || 0 }, 200, env);
 }
 
 // ── POST /coins/redeem ──
@@ -1105,13 +1141,14 @@ async function handleCoinsClaim(request, env) {
   }
 
   const account = (await firestoreGetDoc(env, `coinAccounts/${uid}`, txnId))
-    || { cash: 0, cashReserved: 0, holdings: {} };
+    || { cash: 0, cashReserved: 0, holdings: {}, totalGranted: 0 };
   const writes = [
     updateWrite(env, `dailyGrants/${uid}`, timestamps),
     updateWrite(env, `coinAccounts/${uid}`, {
       cash: (account.cash || 0) + coinsGranted,
       cashReserved: account.cashReserved || 0,
       holdings: account.holdings || {},
+      totalGranted: (account.totalGranted || 0) + coinsGranted,
       updatedAt: now,
     }),
   ];
@@ -1221,6 +1258,9 @@ export default {
       }
       if (request.method === 'GET' && url.pathname === '/coins/balance') {
         return await handleCoinBalance(request, env);
+      }
+      if (request.method === 'GET' && url.pathname === '/coins/account') {
+        return await handleCoinAccount(request, env);
       }
       if (request.method === 'POST' && url.pathname === '/coins/redeem') {
         return await handleCoinRedeem(request, env);

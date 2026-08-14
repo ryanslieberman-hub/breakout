@@ -806,6 +806,8 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .trend-range{display:flex;gap:6px;margin-top:8px;}
 .trend-range-btn{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border:1px solid var(--hairline);background:transparent;color:var(--muted);cursor:pointer;border-radius:6px;transition:all .12s;}
 .trend-range-btn.active{border-color:var(--red);color:var(--red);background:rgba(245,68,95,.07);}
+.ulb-sort-btn{font-family:var(--font-mono);font-size:10px;letter-spacing:.5px;padding:6px 14px;border:1px solid var(--hairline);background:transparent;color:var(--muted);cursor:pointer;border-radius:6px;transition:all .12s;}
+.ulb-sort-btn.active{border-color:var(--green);color:var(--green);background:rgba(18,212,126,.08);}
 .trending-grid{flex:1;overflow-y:auto;padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-content:start;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
 .trending-grid::-webkit-scrollbar{width:4px;}
 .trending-grid::-webkit-scrollbar-thumb{background:var(--border2);}
@@ -1483,9 +1485,9 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   <button type="button" class="nav-tab" onclick="showView('profile',this)" id="nav-profile-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span class="tab-label-full">Profile</span><span class="tab-label-mobile">Profile</span></button>
   </div>
   <div class="nav-right">
-    <div class="nav-stat">Cash: <span id="nav-cash">$100,000.00</span></div>
+    <div class="nav-stat">Cash: <span id="nav-cash">$0.00</span></div>
     <div class="nav-stat" id="last-updated" style="display: inline;">Updated: <span id="update-time">—</span></div>
-    <div class="nav-stat">Total: <span id="nav-total">$100,000.00</span></div>
+    <div class="nav-stat">Total: <span id="nav-total">$0.00</span></div>
     <span id="live-badge-nav" class="live-badge" style="display:inline;cursor:default" title="Tip-off: 4/10 - 7:00 PM EDT">
       <span id="live-dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--muted);margin-right:4px;vertical-align:middle;transition:background .3s"></span><span id="live-badge-txt">refresh 8s</span>
     </span>
@@ -5509,7 +5511,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="share-card-rank-lbl">GLOBAL RANK</div>
       </div>
       <div class="share-card-name" id="share-card-name">My Portfolio</div>
-      <div class="share-card-val" id="share-card-val">$100,000</div>
+      <div class="share-card-val" id="share-card-val">$0</div>
       <div class="share-card-ret" id="share-card-ret">+0.0%</div>
       <div class="share-card-holdings" id="share-card-holdings"></div>
       <div class="share-card-url">playbreakout.netlify.app</div>
@@ -5699,7 +5701,27 @@ async function refreshAdminClaim() {
   return isAdminUser;
 }
 let userProfile = null;
-const START_VALUE = 100000;
+const START_VALUE = 100000; // legacy: the old $100k Practice/challenge baseline - challenges still use it
+
+// Coins ('gold') has no fixed baseline like Practice's $100k - it's funded
+// by variable daily grants + purchases (see coinAccounts.totalGranted,
+// worker-payments' /coins/account). This is the direct analog of the old
+// (val-START_VALUE)/START_VALUE formula, just with each user's own
+// totalGranted. Returns null (not 0) when nothing's been granted yet, so
+// callers can distinguish "no data yet" from "0% gain" - the leaderboard
+// sort already treats a null returnPct as "sorts last" (see ~17914).
+let _coinsTotalGranted = 0; // cached from /coins/account - refreshed on sign-in, claim, and purchase
+function computeCoinsReturnPct(val, totalGranted = _coinsTotalGranted) {
+  if (!totalGranted || totalGranted <= 0) return null;
+  return Math.round(((val - totalGranted) / totalGranted) * 1000) / 10;
+}
+async function refreshCoinsTotalGranted() {
+  if (!currentUser) return;
+  try {
+    const r = await paymentsWorkerFetch('/coins/account');
+    _coinsTotalGranted = r.totalGranted || 0;
+  } catch (e) { console.warn('[coins] account fetch failed:', e.message); }
+}
 
 // ═══════════════════════════════════════════
 //  CONSTANTS
@@ -7202,21 +7224,28 @@ const liveP={},trueV={},dem={},priceHx={},pools={},volume={},dayOpen={};
     }
   } catch(e) {}
 })();
-let simDay=0,cash=100000;
+let simDay=0,cash=0;
 let _refreshSecs=60, _nextRefresh=Date.now()+60000;
 const pendingTrades=[]; // {id,mode,rank,shares,lockedPrice,ammResult,name,queuedAt,executeAt}
 let _commentUnsub=null;
 let scheduleOffset=0;
-const holdings={},portHx=[{day:0,value:100000,t:Date.now()}],logs=[];
+const holdings={},portHx=[],logs=[];
 
-// ── Multi-portfolio: regular practice portfolio, plus one independent
-// $100,000 portfolio per challenge joined ──────────────────────────────────
+// ── Multi-portfolio: Coins is the default/only portfolio, plus one
+// independent $100,000 portfolio per challenge joined ──────────────────────
 // cash/holdings/logs/portHx above stay bare globals (dozens of existing call
 // sites read them directly - trade bar, hero header, market list ownership
 // dots, buildPortfolio, etc.) - rather than threading a portfolioId through
 // all of them, we SWAP their contents in place when the user switches which
 // portfolio they're trading in.
-let activePortfolioId = 'regular'; // 'regular' | challengeId
+//
+// 'regular' (the old $100k Practice portfolio) is no longer reachable - see
+// contextDisplayName()/the portfolio drawer for the "hidden, not deleted"
+// precedent this follows. 'gold' (Coins) starts at $0/empty (no fixed
+// baseline - it's funded by the daily free grant and purchases, see
+// worker-payments' /coins/claim and /coins/checkout) rather than the old
+// hardcoded $100k, which is why the bootstrap defaults above changed too.
+let activePortfolioId = 'gold'; // 'gold' | 'sweeps' | 'regular' (dormant) | challengeId
 const _portfolios = {}; // cached {cash,holdings,logs,portHx} blobs for inactive contexts
 const _challengeNames = {}; // challengeId -> name, filled in wherever a challenge doc is read
 
@@ -7244,10 +7273,13 @@ const _challengeNames = {}; // challengeId -> name, filled in wherever a challen
 const challengePools = {}; // challengeId -> { [rank]: {x,y,k} }, lazily populated
 
 // Returns the pool object AMM math should read/write for a given portfolio
-// context + rank. 'regular' is a pure pass-through to the bare global pool -
-// byte-identical behavior to today, same object reference.
+// context + rank. 'gold' (Coins) is a pure pass-through to the bare global
+// pool - this is what makes Coins one shared market instead of an isolated
+// simulation per user (previously this was 'regular', the now-dormant
+// Practice portfolio's spot - Coins inherits it since Coins is now the
+// primary/only portfolio).
 function poolFor(portfolioId, rank){
-  if (portfolioId === 'regular') return pools[rank];
+  if (portfolioId === 'gold') return pools[rank];
   let cp = challengePools[portfolioId];
   if (!cp) cp = challengePools[portfolioId] = {};
   if (!cp[rank]) {
@@ -7391,21 +7423,23 @@ async function openPortfolioDrawer(){
   if (!currentUser) {
     list.innerHTML = `
       <div class="portfolio-option active">
-        <div class="po-icon">$</div>
-        <div class="po-info"><div class="po-name">Practice Portfolio</div><div class="po-sub">${fmt(portVal())} · sign in to join challenges</div></div>
+        <div class="po-icon">🪙</div>
+        <div class="po-info"><div class="po-name">Coins</div><div class="po-sub">Sign in to claim free Coins</div></div>
       </div>`;
     return;
   }
   list.innerHTML = `<div class="g10-loading">Loading…</div>`;
   const challenges = await getMyActiveChallenges();
-  // Coins/Breakout Bucks rows removed from this list - same "not legally
-  // reviewed yet, hide the display, keep the code" treatment as the 'coins'
-  // leaderboard tab above. switchPortfolioContext('gold'/'sweeps') and every
-  // wallet code path still work fine; a user just can't reach them from here
-  // anymore. Re-add these two objects to bring the entry point back.
+  // Practice Portfolio ('regular') is dormant - Coins ('gold') is the
+  // default/only portfolio now. Breakout Bucks ('sweeps') stays out of this
+  // list, same "not legally reviewed yet, hide the display, keep the code"
+  // treatment as the 'coins' leaderboard tab above -
+  // switchPortfolioContext('sweeps') and every wallet code path still work
+  // fine; a user just can't reach it from here. Re-add its row to bring that
+  // entry point back once it clears legal review.
   const rows = [
-    { id: 'regular', name: 'Practice Portfolio', icon: '$',
-      sub: (activePortfolioId==='regular' ? fmt(portVal()) : fmt(_portfolios['regular']?.cash ?? 100000)) + ' cash' },
+    { id: 'gold', name: 'Coins', icon: '🪙',
+      sub: fmt((activePortfolioId==='gold' ? portVal() : _portfolios['gold']?.cash) ?? 0) + ' coins' },
     ...challenges.map(c => ({
       id: c.id, name: c.name, icon: '🏆',
       sub: fmt((activePortfolioId===c.id ? cash : _portfolios[c.id]?.cash) ?? 100000) + ` cash · ends ${fmtStamp(c.endDate)}`,
@@ -11020,11 +11054,11 @@ function applyBuy(rank, shares, r){
   if(!holdings[rank])holdings[rank]={shares:0,totalCost:0};
   holdings[rank].shares+=shares;
   holdings[rank].totalCost+=r.cost;
-  // liveP / the shared config/prices sync only ever reflect the practice/
-  // fundamental market - a challenge's own AMM drift lives entirely in its
-  // own pool (challengePools), never leaking into the price every other
-  // context sees.
-  if (activePortfolioId === 'regular') { liveP[rank]=r.newPrice; pushTradePrice(rank, r.newPrice); }
+  // liveP / the shared config/prices sync only ever reflect the Coins/
+  // fundamental market (formerly 'regular'/Practice, now 'gold'/Coins - see
+  // poolFor()) - a challenge's own AMM drift lives entirely in its own pool
+  // (challengePools), never leaking into the price every other context sees.
+  if (activePortfolioId === 'gold') { liveP[rank]=r.newPrice; pushTradePrice(rank, r.newPrice); }
   const ap=activePool(rank); ap.x=r.newX; ap.y=r.newY; syncPool(ap);
   volume[rank]=(volume[rank]||0)+shares;
   priceHx[rank].push({day:todayDayNum(),price:r.newPrice});
@@ -11039,7 +11073,7 @@ function applySell(rank, sell, r){
   const avg=holdings[rank].totalCost/holdings[rank].shares;
   holdings[rank].shares-=sell;
   holdings[rank].totalCost=Math.max(0,holdings[rank].shares*avg);
-  if (activePortfolioId === 'regular') { liveP[rank]=r.newPrice; pushTradePrice(rank, r.newPrice); }
+  if (activePortfolioId === 'gold') { liveP[rank]=r.newPrice; pushTradePrice(rank, r.newPrice); }
   const ap=activePool(rank); ap.x=r.newX; ap.y=r.newY; syncPool(ap);
   volume[rank]=(volume[rank]||0)+sell;
   priceHx[rank].push({day:todayDayNum(),price:r.newPrice});
@@ -11971,18 +12005,17 @@ function syncPricesToFirestore() {
         }).catch(() => {});
       }
       // Update user's leaderboard entry with current portfolio value.
-      // Regular-only: this fires after basically every trade regardless of
-      // which portfolio context is active, and the practice leaderboard must
-      // only ever reflect the regular portfolio - trading inside a challenge
-      // or a coin wallet must never overwrite it with THAT context's value
-      // (same reasoning as saveCloudPortfolio's portfolioId==='regular' gate
-      // on this same field).
-      if (currentUser && window._fbSetDoc && window._fbDoc && activePortfolioId === 'regular') {
+      // Coins-only ('gold' - formerly 'regular'/Practice): this fires after
+      // basically every trade regardless of which portfolio context is
+      // active, and the leaderboard must only ever reflect the Coins
+      // portfolio - trading inside a challenge must never overwrite it with
+      // THAT context's value (same reasoning as saveCloudPortfolio's
+      // portfolioId==='gold' gate on this same field).
+      if (currentUser && window._fbSetDoc && window._fbDoc && activePortfolioId === 'gold') {
         const val = portVal();
-        const ret = Math.round(((val - START_VALUE) / START_VALUE) * 1000) / 10;
         window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), {
           portfolioValue: Math.round(val),
-          returnPct: ret,
+          returnPct: computeCoinsReturnPct(val),
         }, { merge: true }).catch(() => {});
       }
 
@@ -15011,10 +15044,11 @@ async function handleAuthChange(user) {
 
       // Load their saved portfolio so portVal() is accurate
       await loadCloudPortfolio();
+      await refreshCoinsTotalGranted();
 
       // Compute accurate returnPct and update Firestore
       const val = portVal();
-      const ret = Math.round(((val - START_VALUE) / START_VALUE) * 1000) / 10;
+      const ret = computeCoinsReturnPct(val);
       userProfile.displayName = user.displayName || userProfile.displayName;
       // Same rule as above - never let this clobber a self-uploaded photo, since this
       // object gets written straight back to Firestore two lines down.
@@ -15046,40 +15080,26 @@ async function handleAuthChange(user) {
   }
 }
 
+// Loads whichever portfolio is currently ACTIVE (activePortfolioId) into the
+// bare globals on sign-in. Used to be hardcoded to the top-level
+// portfolios/{uid} doc - the old $100k Practice portfolio's shape - and would
+// silently reload that regardless of which portfolio was actually active, a
+// real bug now that Coins ('gold') is the default. Delegates to
+// loadPortfolioBlob() (the same loader switchPortfolioContext() already uses,
+// which correctly branches by isWalletContext() to the right Firestore path),
+// so there's one "load a portfolio" code path instead of two that could
+// silently drift apart.
 async function loadCloudPortfolio() {
   if (!currentUser || !db) return;
   try {
-    const snap = await window._fbGetDoc(window._fbDoc(db, 'portfolios', currentUser.uid));
-    if (snap.exists()) {
-      const data = snap.data();
-      if (data.cash !== undefined) {
-        let restoredCash = data.cash;
-        // One-time correction: strip accumulated daily login bonuses ($500/day)
-        // Bonuses inflated cash beyond what trades alone could produce.
-        // Max legitimate cash = START_VALUE (if user never bought anything).
-        // We cap cash at START_VALUE only if it exceeds it with no open positions,
-        // otherwise trust the value (selling stocks returns cash legitimately above start).
-        const bonusesAccrued = parseInt(localStorage.getItem('ax_bonus_count_corrected') || '0');
-        if (!bonusesAccrued) {
-          const oldStreak = parseInt(localStorage.getItem('ax_bonus_streak') || '0');
-          if (oldStreak > 0) {
-            const bonusCashToRemove = oldStreak * 500;
-            restoredCash = Math.max(restoredCash - bonusCashToRemove, 0);
-            console.log(`Corrected bonus inflation: removed $${bonusCashToRemove} (${oldStreak} bonuses)`);
-            localStorage.setItem('ax_bonus_count_corrected', '1');
-          }
-        }
-        cash = restoredCash;
-      }
-      // Fully replace holdings and logs from cloud - don't merge with potentially stale local data
-      if (data.holdings) {
-        Object.keys(holdings).forEach(k => delete holdings[k]);
-        Object.assign(holdings, data.holdings);
-      }
-      if (data.logs) {
-        logs.length = 0;
-        logs.push(...data.logs);
-      }
+    const blob = await loadPortfolioBlob(activePortfolioId);
+    // Only announce/re-render as a "load" when there's actually something
+    // meaningful in it - loadPortfolioBlob always returns a shape (even a
+    // fresh-empty one for a brand new wallet), and a "Portfolio loaded from
+    // cloud" toast for someone who's never had a portfolio would be noise.
+    const hasData = blob.cash > 0 || (blob.logs && blob.logs.length > 0) || Object.keys(blob.holdings || {}).length > 0;
+    if (hasData) {
+      loadPortfolioIntoGlobals(blob);
       autoRepairPrices('cloud-load');
       renderAll();
       updateMovers();
@@ -15117,18 +15137,18 @@ async function saveCloudPortfolio(silent = false, portfolioId = activePortfolioI
                            // and wiped the portHx history that snapshotPortfolios writes
                            // server-side each hour, so the portfolio chart never had data.
     // users/{uid}.portfolioValue/returnPct feeds the free/casual GLOBAL leaderboard -
-    // that must always reflect the REGULAR portfolio. Skipping this write while
-    // trading inside a challenge is deliberate: nothing about the regular
-    // portfolio changed, so there's nothing correct to write here, and writing
-    // the challenge's value would silently corrupt the practice leaderboard.
-    if (portfolioId === 'regular') {
-      const ret = ((val - START_VALUE) / START_VALUE) * 100;
+    // that must always reflect the COINS portfolio ('gold', formerly 'regular').
+    // Skipping this write while trading inside a challenge is deliberate: nothing
+    // about the Coins portfolio changed, so there's nothing correct to write
+    // here, and writing the challenge's value would silently corrupt the
+    // leaderboard.
+    if (portfolioId === 'gold') {
       await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), {
         displayName: userProfile.displayName,
         photoURL: userProfile.photoURL || null,
         avatarColor: userProfile.avatarColor,
         portfolioValue: Math.round(val),
-        returnPct: Math.round(ret * 10) / 10,
+        returnPct: computeCoinsReturnPct(val),
       }, { merge: true });
       updateAuthUI(); // refresh pill P&L
     }
@@ -15411,7 +15431,7 @@ async function openPublicProfile(uid){
         ${friendActionHtml}
       </div>
       <div class="profile-stat-row" style="margin-bottom:18px;">
-        <div class="profile-stat"><div class="profile-stat-lbl">Portfolio</div><div class="profile-stat-val">$${(u.portfolioValue||100000).toLocaleString()}</div></div>
+        <div class="profile-stat"><div class="profile-stat-lbl">Portfolio</div><div class="profile-stat-val">$${(u.portfolioValue||0).toLocaleString()}</div></div>
         <div class="profile-stat"><div class="profile-stat-lbl">Return</div><div class="profile-stat-val" style="color:${ret>=0?'var(--green)':'var(--red)'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div></div>
       </div>
       <div class="profile-section-lbl">Holdings</div>
@@ -16888,7 +16908,7 @@ async function _renderFriendsLbList(){
   try {
     const uids = _myFriends.map(f => f.uid);
     const docs = await Promise.all(uids.map(uid => window._fbGetDoc(window._fbDoc(db, 'users', uid)).catch(() => null)));
-    let users = docs.map((snap, i) => (snap && snap.exists()) ? { uid: uids[i], ...snap.data() } : { uid: uids[i], ..._myFriends[i], returnPct: 0, portfolioValue: 100000 });
+    let users = docs.map((snap, i) => (snap && snap.exists()) ? { uid: uids[i], ...snap.data() } : { uid: uids[i], ..._myFriends[i], returnPct: 0, portfolioValue: 0 });
     if (userProfile) users.push({ uid: currentUser.uid, ...userProfile });
     users.sort((a, b) => (b.returnPct || 0) - (a.returnPct || 0));
     el.innerHTML = users.map((u, i) => {
@@ -16901,7 +16921,7 @@ async function _renderFriendsLbList(){
         <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
         <div class="ulb-info">
           ${_ulbNameBlock(u, isYou)}
-          <div class="ulb-sub">Portfolio: $${(u.portfolioValue||100000).toLocaleString()}</div>
+          <div class="ulb-sub">Portfolio: $${(u.portfolioValue||0).toLocaleString()}</div>
         </div>
         <div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>
         ${!isYou ? `<span class="comment-delete" style="margin-left:4px;" onclick="removeFriendship('${_friendshipId(currentUser.uid,u.uid)}')">remove</span>` : ''}
@@ -17108,8 +17128,9 @@ async function claimDailyFree() {
       const { coins, bucksCents } = result.granted;
       const parts = [];
       if (coins) parts.push(`🪙 ${coins.toLocaleString()} Coins`);
-      if (bucksCents) parts.push(`✨ $${(bucksCents/100).toFixed(2)} Bucks`);
+      if (bucksCents) parts.push(`💵 $${(bucksCents/100).toFixed(2)} Bucks`);
       showToast(`Claimed ${parts.join(' + ')}!`);
+      if (coins) refreshCoinsTotalGranted(); // keep the % gain leaderboard baseline in sync
     } else {
       showToast(`Nothing to claim yet - next free grant in ${fmtCountdown(result.nextEligibleAt - Date.now())}`);
     }
@@ -17162,7 +17183,7 @@ async function renderCoinsTab() {
       <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);text-transform:capitalize;">${escHtml(pkg.id)}</div>
       <div style="font-family:var(--font-display);font-size:22px;margin:4px 0;">$${(pkg.priceCents/100).toFixed(2)}</div>
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--gold);">🪙 ${pkg.goldGranted.toLocaleString()} Coins</div>
-      <div style="font-family:var(--font-mono);font-size:10px;color:var(--green);">✨ ${pkg.sweepsGranted} Breakout Bucks (bonus)</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--green);">💵 ${pkg.sweepsGranted} Breakout Bucks (bonus)</div>
       <button class="profile-btn primary" style="width:100%;margin-top:10px;" onclick="buyCoinPackage('${pkg.id}')">Buy</button>
     </div>`).join('');
 
@@ -17191,11 +17212,34 @@ setInterval(() => {
   if (lbView && lbView.style.display === 'flex') buildLeaderboardFirebase();
 }, 60000);
 
+// 'balance' (total Coins) or 'gain' (% return on Coins ever received) - Coins
+// has no fixed $100k baseline like the old Practice portfolio did, so unlike
+// the single %-return ranking that used to be the only option, this needs to
+// be two genuinely different, both-meaningful rankings (see
+// computeCoinsReturnPct's header comment for why %-gain needs a per-user
+// baseline now).
+let _lbSortMode = 'balance';
+function _lbCompare(a, b) {
+  return _lbSortMode === 'gain' ? (b.returnPct || 0) - (a.returnPct || 0) : (b.portfolioValue || 0) - (a.portfolioValue || 0);
+}
+function setLbSortMode(mode, el) {
+  _lbSortMode = mode;
+  document.querySelectorAll('.ulb-sort-btn').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  if (_globalLbUsers) {
+    _globalLbUsers.sort(_lbCompare);
+    _renderGlobalLbRows();
+  }
+}
+
 async function renderGlobalLeaderboard() {
   const el = document.getElementById('lb-tab-content');
   if (!el) return;
   el.innerHTML = `
-    <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:20px;">Ranked by % return from $100,000 starting portfolio</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
+      <button class="ulb-sort-btn ${_lbSortMode==='balance'?'active':''}" onclick="setLbSortMode('balance',this)">Total Coins</button>
+      <button class="ulb-sort-btn ${_lbSortMode==='gain'?'active':''}" onclick="setLbSortMode('gain',this)">% Gain</button>
+    </div>
     <div id="ulb-list"><div class="g10-loading">Loading traders…</div></div>
     <div style="height:32px"></div>
     <div class="trending-header" style="padding:0;border-bottom:none;background:transparent;margin-bottom:14px;">
@@ -17233,11 +17277,11 @@ async function renderGlobalLeaderboard() {
     const q = window._fbQuery(colRef, window._fbLimit(100));
     const snap = await window._fbGetDocsFromServer(q);
     console.log('Leaderboard: fetched', snap.docs.length, 'users from Firestore');
-    let users = snap.docs.map(d => ({ uid: d.id, ...d.data() })).sort((a, b) => (b.returnPct || 0) - (a.returnPct || 0));
+    let users = snap.docs.map(d => ({ uid: d.id, ...d.data() })).sort(_lbCompare);
     const seen = new Map();
     users = users.filter(u => { if (seen.has(u.uid)) return false; seen.set(u.uid, true); return true; });
     const currentInList = users.find(u => u.uid === currentUser.uid);
-    if (!currentInList && userProfile) users = [...users, userProfile].sort((a, b) => (b.returnPct || 0) - (a.returnPct || 0));
+    if (!currentInList && userProfile) users = [...users, userProfile].sort(_lbCompare);
     if (!users.length) { document.getElementById('ulb-list').innerHTML = `<div class="g10-loading">No traders yet - be the first!</div>`; return; }
     _globalLbUsers = users;
     _renderGlobalLbRows();
@@ -17269,7 +17313,7 @@ function _renderGlobalLbRows(){
       <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
       <div class="ulb-info">
         ${_ulbNameBlock(u, isYou)}
-        <div class="ulb-sub">Portfolio: $${(u.portfolioValue||100000).toLocaleString()}</div>
+        <div class="ulb-sub">Portfolio: $${(u.portfolioValue||0).toLocaleString()}</div>
       </div>
       <div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>
       ${friendAction}
@@ -18548,7 +18592,7 @@ window.addEventListener('appinstalled', () => {
         <div class="ob-body">
           Buy and sell athletes like stocks across <span class="ob-highlight">MLB, NBA, Golf, and NFL</span>.<br>
           Prices move on real games - every hit, bucket, and birdie counts.<br><br>
-          <span class="ob-highlight">$100,000</span> to start. Best portfolio wins.
+          Claim free <span class="ob-highlight">Coins</span> every day. Trade against real players. Best portfolio wins.
         </div>
         <div class="ob-stat-row">
           <div class="ob-stat"><div class="ob-stat-val">4</div><div class="ob-stat-lbl">Leagues</div></div>
