@@ -1097,6 +1097,22 @@ async function handleCoinRedeem(request, env) {
   return json({ redemptionId, amountCents, ...result }, 200, env);
 }
 
+// ── GET /coins/claim-status ── read-only eligibility check, no grant/write.
+// Lets the client show an always-visible "claim available" indicator (nav
+// bar, etc.) without risking an accidental grant just from checking state.
+async function handleCoinsClaimStatus(request, env) {
+  const user = await requireUser(request, env);
+  const now = Date.now();
+  const grants = (await firestoreGetDoc(env, `dailyGrants/${user.uid}`)) || { last24h: 0, last2h: 0 };
+  const eligible24h = now - (grants.last24h || 0) >= GRANT_24H_MS;
+  const eligible2h = now - (grants.last2h || 0) >= GRANT_2H_MS;
+  const nextEligibleAt = Math.min(
+    (eligible24h ? now : grants.last24h) + GRANT_24H_MS,
+    (eligible2h ? now : grants.last2h) + GRANT_2H_MS
+  );
+  return json({ eligible: eligible24h || eligible2h, nextEligibleAt }, 200, env);
+}
+
 // ── POST /coins/claim ── the no-purchase-necessary free grant.
 // Eligibility is decided ENTIRELY from server-stored timestamps - the client
 // never supplies "when" or "how much", it just asks "can I claim right now".
@@ -1264,6 +1280,9 @@ export default {
       }
       if (request.method === 'POST' && url.pathname === '/coins/redeem') {
         return await handleCoinRedeem(request, env);
+      }
+      if (request.method === 'GET' && url.pathname === '/coins/claim-status') {
+        return await handleCoinsClaimStatus(request, env);
       }
       if (request.method === 'POST' && url.pathname === '/coins/claim') {
         return await handleCoinsClaim(request, env);

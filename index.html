@@ -119,6 +119,12 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .nav-stat{font-family:var(--font-mono);font-size:11px;color:var(--muted);}
 .nav-stat span{color:var(--green);}
 .nav-stat .down{color:var(--red);}
+/* Always-visible free-claim CTA (see claimDailyFree/refreshClaimBadge) - the
+   whole point is that this is hard to miss, not tucked in a menu somewhere. */
+.nav-claim-btn{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:6px 12px;border-radius:7px;cursor:pointer;border:1px solid rgba(242,184,67,.4);background:rgba(242,184,67,.1);color:var(--gold);transition:all .15s;}
+.nav-claim-btn.claim-available{border-color:var(--green);background:rgba(18,212,126,.14);color:var(--green);animation:navClaimPulse 1.6s ease-in-out infinite;}
+.nav-claim-btn.claim-cooldown{opacity:.55;cursor:default;animation:none;}
+@keyframes navClaimPulse{0%,100%{box-shadow:0 0 0 0 rgba(18,212,126,.4);}50%{box-shadow:0 0 0 5px rgba(18,212,126,0);}}
 .nbtn{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:5px 12px;border:1px solid var(--hairline);background:transparent;color:var(--muted);cursor:pointer;border-radius:6px;transition:all .15s;display:inline-flex;align-items:center;gap:5px;}
 .nbtn:hover{border-color:var(--green);color:var(--green);}
 .nbtn.viral{border-color:var(--red);color:var(--red);}
@@ -1485,9 +1491,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   <button type="button" class="nav-tab" onclick="showView('profile',this)" id="nav-profile-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span class="tab-label-full">Profile</span><span class="tab-label-mobile">Profile</span></button>
   </div>
   <div class="nav-right">
-    <div class="nav-stat">Cash: <span id="nav-cash">$0.00</span></div>
+    <button id="nav-claim-btn" class="nav-claim-btn" onclick="claimDailyFree()" style="display:none;" title="Free Coins &amp; Bucks - no purchase necessary">🪙 Claim</button>
+    <div class="nav-stat">Coins: <span id="nav-cash">🪙0.00</span></div>
     <div class="nav-stat" id="last-updated" style="display: inline;">Updated: <span id="update-time">—</span></div>
-    <div class="nav-stat">Total: <span id="nav-total">$0.00</span></div>
+    <div class="nav-stat">Total: <span id="nav-total">🪙0.00</span></div>
     <span id="live-badge-nav" class="live-badge" style="display:inline;cursor:default" title="Tip-off: 4/10 - 7:00 PM EDT">
       <span id="live-dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--muted);margin-right:4px;vertical-align:middle;transition:background .3s"></span><span id="live-badge-txt">refresh 8s</span>
     </span>
@@ -5511,7 +5518,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="share-card-rank-lbl">GLOBAL RANK</div>
       </div>
       <div class="share-card-name" id="share-card-name">My Portfolio</div>
-      <div class="share-card-val" id="share-card-val">$0</div>
+      <div class="share-card-val" id="share-card-val">🪙0</div>
       <div class="share-card-ret" id="share-card-ret">+0.0%</div>
       <div class="share-card-holdings" id="share-card-holdings"></div>
       <div class="share-card-url">playbreakout.netlify.app</div>
@@ -8861,7 +8868,9 @@ function syncPool(pool){pool.k=pool.x*pool.y;}
 function sr(s){let x=Math.sin(s*9301+49297)*233280;return x-Math.floor(x);}
 function dmod(s){return(s-50)/200;}
 function dcls(s){return s>=75?'hot':s>=55?'high':s>=35?'mid':'low';}
-function fmt(n){return'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+// Coins is the app's only currency now (not real money) - shown as a coin
+// count, not a dollar amount, so it never reads as real currency.
+function fmt(n){return'🪙'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtS(n){return(n>=0?'+':'-')+fmt(n);}
 function fmtP(n){return(n>=0?'+':'')+n.toFixed(1)+'%';}
 // The brand mark, generated rather than hand-copied so the nav logo, the
@@ -12547,7 +12556,10 @@ function drawMain(hoverX){
   ctx.strokeStyle='rgba(255,255,255,0.045)';ctx.lineWidth=1;
   for(let i=0;i<=4;i++){const y=pad.t+(i/4)*(H-pad.t-pad.b);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();}
   ctx.fillStyle='#4a6280';ctx.font=`9px 'IBM Plex Mono'`;ctx.textAlign='left';
-  for(let i=0;i<=4;i++){const v=minP+(1-i/4)*rng;ctx.fillText('$'+v.toFixed(2),W-pad.r+4,pad.t+(i/4)*(H-pad.t-pad.b)+3);}
+  // No emoji/currency symbol here - canvas text width math elsewhere in this
+  // function (the tooltip below) depends on predictable monospace glyph
+  // widths, which an emoji prefix would throw off. Plain number instead.
+  for(let i=0;i<=4;i++){const v=minP+(1-i/4)*rng;ctx.fillText(v.toFixed(2),W-pad.r+4,pad.t+(i/4)*(H-pad.t-pad.b)+3);}
 
   // x-axis date labels - evenly spaced by time, not by index
   const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -12646,7 +12658,7 @@ function drawMain(hoverX){
     const pct = basePrice > 0 ? (price - basePrice) / basePrice * 100 : 0;
     const pctStr=(pct>=0?'+':'')+pct.toFixed(2)+'%';
     const dateStr = daySpan < 2 ? dayToTime(hx[hovIdx].day) : dayToDate(hx[hovIdx].day);
-    const label='$'+price.toFixed(2)+'  '+pctStr+'  '+dateStr;
+    const label=price.toFixed(2)+'  '+pctStr+'  '+dateStr;
     ctx.font=`bold 11px 'IBM Plex Mono'`;
     const tw=ctx.measureText(label).width;
     const tp=8, th=20, tx=Math.min(Math.max(hpx-tw/2-tp,pad.l), W-pad.r-tw-tp*2);
@@ -13563,7 +13575,7 @@ function buildPortfolio(){
     <div class="psub-txt">Holdings, performance, and trade history</div>
     <div class="pgrid">
       <div class="pcard"><div class="pclbl">Total Value</div><div class="pcval" style="color:var(--green)">${fmt(total)}</div></div>
-      <div class="pcard"><div class="pclbl">Cash</div><div class="pcval">${fmt(cash)}</div></div>
+      <div class="pcard"><div class="pclbl">Coins</div><div class="pcval">${fmt(cash)}</div></div>
       <div class="pcard"><div class="pclbl">Holdings</div><div class="pcval">${fmt(total-cash)}</div></div>
       <div class="pcard"><div class="pclbl">Today</div>
         <div class="pcval" style="color:${todayPnl>=0?'var(--green)':'var(--red)'}">${fmtS(todayPnl)}</div>
@@ -13954,7 +13966,7 @@ function showTradeConfirm(mode, shares, cost, player) {
           <div class="conf-detail">
             <strong style="color:var(--text)">${shares} shares of ${player}</strong><br>
             ${isBuy ? 'Cost' : 'Return'}: <strong style="color:${isBuy?'var(--red)':'var(--green)'}">${fmt(cost)}</strong><br>
-            ${isBuy ? `Cash after: <strong>${fmt(cash - cost)}</strong>` : `Cash after: <strong>${fmt(cash + cost)}</strong>`}
+            ${isBuy ? `Coins after: <strong>${fmt(cash - cost)}</strong>` : `Coins after: <strong>${fmt(cash + cost)}</strong>`}
           </div>
           <div class="conf-btns">
             <button class="conf-cancel" onclick="dismissConfirm(false)">Cancel</button>
@@ -15061,6 +15073,7 @@ async function handleAuthChange(user) {
       // Update UI now that everything is loaded
       updateAuthUI();
       updateSettingsAccount();
+      startClaimBadgePolling();
     } catch(e) {
       console.error('Firestore error:', e.code, e.message);
       showToast('️ Could not save to leaderboard: ' + (e.code || e.message));
@@ -15077,6 +15090,9 @@ async function handleAuthChange(user) {
     userProfile = null;
     updateAuthUI();
     stopFriendsListener();
+    clearInterval(_claimBadgeTimer);
+    const btn = document.getElementById('nav-claim-btn');
+    if (btn) btn.style.display = 'none';
   }
 }
 
@@ -15266,7 +15282,7 @@ function renderProfileView() {
         <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);">${currentUser.email}</div>
       </div>
       <div class="profile-stat-row">
-        <div class="profile-stat"><div class="profile-stat-lbl">Cash</div><div class="profile-stat-val">${fmt(cash)}</div></div>
+        <div class="profile-stat"><div class="profile-stat-lbl">Coins</div><div class="profile-stat-val">${fmt(cash)}</div></div>
         <div class="profile-stat"><div class="profile-stat-lbl">Total Value</div><div class="profile-stat-val">${fmt(total)}</div></div>
         ${isWalletContext(activePortfolioId)
           ? `<div class="profile-stat"><div class="profile-stat-lbl">Wallet</div><div class="profile-stat-val">${escHtml(contextDisplayName(activePortfolioId))}</div></div>`
@@ -17138,6 +17154,40 @@ async function claimDailyFree() {
     showToast('Claim failed: ' + e.message);
   }
   renderCoinsTab();
+  refreshClaimBadge();
+}
+
+// Keeps the always-visible nav claim button (see the top of nav-right in the
+// markup) in sync with server-side eligibility - GET /coins/claim-status is
+// read-only, so polling it can never accidentally trigger a grant the way
+// calling /coins/claim itself would. Runs on sign-in, right after a claim,
+// and on a slow interval so the badge lights up on its own once the 2h/24h
+// window opens back up, without the user needing to reload or go looking
+// for it - that's the actual "more prevalent" fix, not just moving the
+// button to a louder spot.
+let _claimBadgeTimer = null;
+async function refreshClaimBadge() {
+  const btn = document.getElementById('nav-claim-btn');
+  if (!btn) return;
+  if (!currentUser) { btn.style.display = 'none'; return; }
+  try {
+    const status = await paymentsWorkerFetch('/coins/claim-status');
+    btn.style.display = '';
+    if (status.eligible) {
+      btn.textContent = '🪙 Claim';
+      btn.className = 'nav-claim-btn claim-available';
+      btn.title = 'Free Coins & Bucks ready - tap to claim';
+    } else {
+      btn.textContent = `🪙 ${fmtCountdown(status.nextEligibleAt - Date.now())}`;
+      btn.className = 'nav-claim-btn claim-cooldown';
+      btn.title = 'Next free claim in ' + fmtCountdown(status.nextEligibleAt - Date.now());
+    }
+  } catch (e) { /* leave the button in whatever state it was already in */ }
+}
+function startClaimBadgePolling() {
+  refreshClaimBadge();
+  clearInterval(_claimBadgeTimer);
+  _claimBadgeTimer = setInterval(refreshClaimBadge, 60000);
 }
 
 async function redeemSweepsCoins() {
@@ -18802,7 +18852,7 @@ window._fillGateTicker = function() {
     const chip = p => {
       let pct = 0; try { pct = getTodayPct(p.rank) || 0; } catch(e){}
       const cls = pct > 0.05 ? 'up' : pct < -0.05 ? 'dn' : '';
-      return `<span class="ob-tk"><span class="ob-tk-n">${p.name}</span><span class="ob-tk-p">$${priceOf(p).toFixed(2)}</span><span class="ob-tk-c ${cls}">${pct > 0 ? '+' : ''}${pct.toFixed(1)}%</span></span>`;
+      return `<span class="ob-tk"><span class="ob-tk-n">${p.name}</span><span class="ob-tk-p">🪙${priceOf(p).toFixed(2)}</span><span class="ob-tk-c ${cls}">${pct > 0 ? '+' : ''}${pct.toFixed(1)}%</span></span>`;
     };
     const html = picks.map(chip).join('');
     track.innerHTML = html + html;
