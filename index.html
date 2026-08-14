@@ -1492,9 +1492,9 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   </div>
   <div class="nav-right">
     <button id="nav-claim-btn" class="nav-claim-btn" onclick="claimDailyFree()" style="display:none;" title="Free Coins &amp; Bucks - no purchase necessary">🪙 Claim</button>
-    <div class="nav-stat">Coins: <span id="nav-cash">🪙0.00</span></div>
+    <div class="nav-stat">Coins: <span id="nav-cash">0.00</span></div>
     <div class="nav-stat" id="last-updated" style="display: inline;">Updated: <span id="update-time">—</span></div>
-    <div class="nav-stat">Total: <span id="nav-total">🪙0.00</span></div>
+    <div class="nav-stat">Total: <span id="nav-total">0.00</span></div>
     <span id="live-badge-nav" class="live-badge" style="display:inline;cursor:default" title="Tip-off: 4/10 - 7:00 PM EDT">
       <span id="live-dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--muted);margin-right:4px;vertical-align:middle;transition:background .3s"></span><span id="live-badge-txt">refresh 8s</span>
     </span>
@@ -5518,7 +5518,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="share-card-rank-lbl">GLOBAL RANK</div>
       </div>
       <div class="share-card-name" id="share-card-name">My Portfolio</div>
-      <div class="share-card-val" id="share-card-val">🪙0</div>
+      <div class="share-card-val" id="share-card-val">0</div>
       <div class="share-card-ret" id="share-card-ret">+0.0%</div>
       <div class="share-card-holdings" id="share-card-holdings"></div>
       <div class="share-card-url">playbreakout.netlify.app</div>
@@ -8868,9 +8868,13 @@ function syncPool(pool){pool.k=pool.x*pool.y;}
 function sr(s){let x=Math.sin(s*9301+49297)*233280;return x-Math.floor(x);}
 function dmod(s){return(s-50)/200;}
 function dcls(s){return s>=75?'hot':s>=55?'high':s>=35?'mid':'low';}
-// Coins is the app's only currency now (not real money) - shown as a coin
-// count, not a dollar amount, so it never reads as real currency.
-function fmt(n){return'🪙'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+// Coins is the app's only currency now (not real money) - plain number, no
+// $ and no symbol at all. This runs on nearly every price/value in the app
+// (holdings, prices, trade confirmations, leaderboard rows...), so a coin
+// emoji here read as noise repeated dozens of times per screen - the 🪙
+// stays as an intentional one-off accent in a few dedicated spots (the claim
+// button, the buy-coins package cards), not stamped on every number.
+function fmt(n){return Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtS(n){return(n>=0?'+':'-')+fmt(n);}
 function fmtP(n){return(n>=0?'+':'')+n.toFixed(1)+'%';}
 // The brand mark, generated rather than hand-copied so the nav logo, the
@@ -18852,7 +18856,7 @@ window._fillGateTicker = function() {
     const chip = p => {
       let pct = 0; try { pct = getTodayPct(p.rank) || 0; } catch(e){}
       const cls = pct > 0.05 ? 'up' : pct < -0.05 ? 'dn' : '';
-      return `<span class="ob-tk"><span class="ob-tk-n">${p.name}</span><span class="ob-tk-p">🪙${priceOf(p).toFixed(2)}</span><span class="ob-tk-c ${cls}">${pct > 0 ? '+' : ''}${pct.toFixed(1)}%</span></span>`;
+      return `<span class="ob-tk"><span class="ob-tk-n">${p.name}</span><span class="ob-tk-p">${priceOf(p).toFixed(2)}</span><span class="ob-tk-c ${cls}">${pct > 0 ? '+' : ''}${pct.toFixed(1)}%</span></span>`;
     };
     const html = picks.map(chip).join('');
     track.innerHTML = html + html;
