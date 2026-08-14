@@ -4,6 +4,9 @@ import {
   firestorePatchDoc,
   firestoreSetNestedField,
   firestoreQuery,
+  firestoreBeginTransaction,
+  firestoreCommit,
+  updateWrite,
 } from './lib/firestore.js';
 import { stripeClient, verifyStripeWebhookSignature } from './lib/stripe.js';
 import { replayTrades, portfolioValue, START_VALUE } from './lib/tradeReplay.js';
@@ -468,8 +471,24 @@ const COIN_PACKAGES = {
   value:    { priceCents: 2499, goldGranted: 30000, sweepsGranted: 30 },
   premium:  { priceCents: 4999, goldGranted: 65000, sweepsGranted: 65 },
 };
-const MIN_REDEEM_CENTS_DEFAULT = 500; // $5 - overridable via env.MIN_REDEEM_CENTS
+const MIN_REDEEM_CENTS_DEFAULT = 5000; // $50 (matches Fliff's comparable) - overridable via env.MIN_REDEEM_CENTS
 const MAX_REDEMPTION_ATTEMPTS = 72; // ~3 days at the hourly sweep, same reasoning as MAX_PAYOUT_ATTEMPTS below
+
+// ── Daily free grant (no-purchase-necessary path) ──
+// Modeled directly on Fliff's real mechanic: a big grant once a day, a
+// smaller one every 2 hours for people actively checking back. Coins (Gold)
+// stack freely every window - it's the free-play currency, there's no cost
+// ceiling that matters. Breakout Bucks (Sweeps) only top up TO the floor
+// below on the 2h window, never stack past it - this is what makes the
+// no-purchase-necessary path legally real without being a way to farm
+// unlimited redeemable balance for free.
+const GRANT_24H_MS = 24 * 60 * 60 * 1000;
+const GRANT_2H_MS = 2 * 60 * 60 * 1000;
+const GRANT_24H_COINS = 5000;
+const GRANT_24H_BUCKS_CENTS = 100; // $1
+const GRANT_2H_COINS = 1000;
+const GRANT_2H_BUCKS_CENTS = 10; // $0.10
+const BUCKS_TOPUP_FLOOR_CENTS = 500; // $5 - the 2h Bucks grant only fires below this
 
 // Rank ranges match RAW/MLB_RAW/GOLF_RAW/NFL_RAW in index.html.
 function leagueForRank(rank) {
@@ -910,6 +929,34 @@ async function computeSweepsBalance(env, uid) {
   return { cash, startingCash, totalGranted, totalReserved };
 }
 
+// Coins (Gold) never had a real ledger - only the client-writable
+// `wallets/gold.cash` display cache (same untrusted-cache status Sweeps had
+// before computeSweepsBalance existed). This is the server-authoritative
+// replacement: `coinAccounts/{uid}` holds cash/holdings plus `cashReserved`/
+// holdings[rank].sharesReserved for order-book escrow (unused until the P2P
+// matching engine lands, but the shape is settled now so nothing has to
+// migrate later). On first read, backfill by replaying every `coinDeposits`
+// doc's `goldGranted` the same way computeSweepsBalance replays
+// `sweepsGranted` - identical pattern, different field.
+//
+// The backfill write is a plain patch, not a transaction: coinDeposits
+// history is immutable once written, so two concurrent first-reads racing
+// each other both compute the same total and write the same value - a
+// redundant identical write, not a correctness bug. Once a real balance
+// exists, callers that need read-modify-write safety (the future order
+// book, and Phase D's grant claiming) use firestoreBeginTransaction/
+// firestoreCommit instead of this function's own read+patch.
+async function getOrCreateCoinAccount(env, uid) {
+  const existing = await firestoreGetDoc(env, `coinAccounts/${uid}`);
+  if (existing) return existing;
+
+  const deposits = await firestoreQuery(env, 'coinDeposits', [{ field: 'uid', op: 'EQUAL', value: uid }]);
+  const cash = deposits.reduce((sum, d) => sum + (d.goldGranted || 0), 0);
+  const account = { cash, cashReserved: 0, holdings: {}, updatedAt: Date.now() };
+  await firestorePatchDoc(env, `coinAccounts/${uid}`, account);
+  return account;
+}
+
 // True if this user has a redemption that hasn't resolved to 'paid' yet -
 // either still in flight (pending) or exhausted its own retries (failed).
 // Both must block a NEW redemption request: a pending one is already
@@ -1014,6 +1061,102 @@ async function handleCoinRedeem(request, env) {
   return json({ redemptionId, amountCents, ...result }, 200, env);
 }
 
+// ── POST /coins/claim ── the no-purchase-necessary free grant.
+// Eligibility is decided ENTIRELY from server-stored timestamps - the client
+// never supplies "when" or "how much", it just asks "can I claim right now".
+async function handleCoinsClaim(request, env) {
+  const user = await requireUser(request, env);
+  const uid = user.uid;
+  const now = Date.now();
+
+  // Read pinned to the transaction: two requests racing (double-tap, two open
+  // tabs) must not both see "eligible" and both grant - the transaction's
+  // optimistic-concurrency commit below is what actually enforces that; this
+  // read is what the eligibility decision is based on.
+  const txnId = await firestoreBeginTransaction(env);
+  const grants = (await firestoreGetDoc(env, `dailyGrants/${uid}`, txnId)) || { last24h: 0, last2h: 0 };
+  const eligible24h = now - (grants.last24h || 0) >= GRANT_24H_MS;
+  const eligible2h = now - (grants.last2h || 0) >= GRANT_2H_MS;
+  const nextEligibleAt = () => Math.min(
+    (eligible24h ? now : grants.last24h) + GRANT_24H_MS,
+    (eligible2h ? now : grants.last2h) + GRANT_2H_MS
+  );
+
+  if (!eligible24h && !eligible2h) {
+    return json({ granted: null, nextEligibleAt: nextEligibleAt() }, 200, env);
+  }
+
+  // Best-effort read (not transaction-pinned) - worst case on a hard race is
+  // one extra/skipped $0.10 top-up, which isn't worth blocking the whole
+  // claim on. Only fires when the 2h window is actually eligible.
+  let bucksTopupEligible = false;
+  if (eligible2h) {
+    const { cash } = await computeSweepsBalance(env, uid);
+    bucksTopupEligible = Math.round(cash * 100) < BUCKS_TOPUP_FLOOR_CENTS;
+  }
+
+  let coinsGranted = 0, bucksCentsGranted = 0;
+  const timestamps = { last24h: grants.last24h || 0, last2h: grants.last2h || 0 };
+  if (eligible24h) { coinsGranted += GRANT_24H_COINS; bucksCentsGranted += GRANT_24H_BUCKS_CENTS; timestamps.last24h = now; }
+  if (eligible2h) {
+    coinsGranted += GRANT_2H_COINS;
+    if (bucksTopupEligible) bucksCentsGranted += GRANT_2H_BUCKS_CENTS;
+    timestamps.last2h = now;
+  }
+
+  const account = (await firestoreGetDoc(env, `coinAccounts/${uid}`, txnId))
+    || { cash: 0, cashReserved: 0, holdings: {} };
+  const writes = [
+    updateWrite(env, `dailyGrants/${uid}`, timestamps),
+    updateWrite(env, `coinAccounts/${uid}`, {
+      cash: (account.cash || 0) + coinsGranted,
+      cashReserved: account.cashReserved || 0,
+      holdings: account.holdings || {},
+      updatedAt: now,
+    }),
+  ];
+  if (bucksCentsGranted > 0) {
+    // Lands in the SAME coinDeposits collection computeSweepsBalance already
+    // replays (index.js:~886) - `source` distinguishes this from a paid
+    // Stripe package, but the balance math needs no changes to pick it up.
+    writes.push(updateWrite(env, `coinDeposits/grant_${uid}_${now}`, {
+      uid, ts: now, source: 'daily_grant', sweepsGranted: bucksCentsGranted / 100, goldGranted: 0,
+    }));
+  }
+
+  try {
+    await firestoreCommit(env, txnId, writes);
+  } catch (e) {
+    if (e.aborted) {
+      // Lost a genuine race to a concurrent claim - not an error, just
+      // nothing new to grant right now.
+      return json({ granted: null, nextEligibleAt: now }, 200, env);
+    }
+    throw e;
+  }
+
+  // Best-effort bump of the legacy display caches so the grant is
+  // immediately spendable in the existing Coins/Bucks trading UI today
+  // (which still reads portfolios/{uid}/wallets/{gold|sweeps}.cash) - same
+  // "never trusted, just a fast cache" pattern handleCoinDeposit already
+  // uses for purchased coins.
+  for (const [walletId, grant] of [['gold', coinsGranted], ['sweeps', bucksCentsGranted / 100]]) {
+    if (!grant) continue;
+    try {
+      const path = `portfolios/${uid}/wallets/${walletId}`;
+      const wallet = (await firestoreGetDoc(env, path)) || { cash: 0, holdings: {}, logs: [], portHx: [] };
+      await firestorePatchDoc(env, path, { cash: (wallet.cash || 0) + grant, savedAt: now });
+    } catch (e) {
+      console.error(`Failed to bump ${walletId} wallet cache for ${uid} after claim:`, e.message);
+    }
+  }
+
+  return json({
+    granted: { coins: coinsGranted, bucksCents: bucksCentsGranted },
+    nextEligibleAt: nextEligibleAt(),
+  }, 200, env);
+}
+
 // ── Redemption retry sweep (Cron Trigger, hourly, alongside runSettlementSweep) ──
 export async function runRedemptionRetrySweep(env) {
   const allFailed = await firestoreQuery(env, 'coinRedemptions', [{ field: 'status', op: 'EQUAL', value: 'failed' }]);
@@ -1081,6 +1224,9 @@ export default {
       }
       if (request.method === 'POST' && url.pathname === '/coins/redeem') {
         return await handleCoinRedeem(request, env);
+      }
+      if (request.method === 'POST' && url.pathname === '/coins/claim') {
+        return await handleCoinsClaim(request, env);
       }
       if (request.method === 'GET' && /^\/challenges\/[^/]+\/standings$/.test(url.pathname)) {
         await requireUser(request, env); // any signed-in user, not admin-only - this moves no money

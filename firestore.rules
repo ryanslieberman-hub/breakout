@@ -248,6 +248,24 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Coins (Gold) server-authoritative ledger - see worker-payments'
+    // getOrCreateCoinAccount. Doc id IS the uid, so owner-read is a direct
+    // match rather than a resource.data.uid comparison. Server-write-only,
+    // same reasoning as coinDeposits/coinRedemptions above; this is what the
+    // future peer-to-peer order book settles trades against.
+    match /coinAccounts/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // No-purchase-necessary daily free grant cooldown tracker - see
+    // worker-payments' POST /coins/claim. Server-write-only so a client can't
+    // roll its own timestamps back to re-claim early.
+    match /dailyGrants/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
     // Default deny - anything not explicitly allowed above is rejected.
     match /{document=**} {
       allow read, write: if false;

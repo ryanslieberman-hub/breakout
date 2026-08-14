@@ -78,15 +78,80 @@ export function fromFirestoreFields(fields) {
   return out;
 }
 
-export async function firestoreGetDoc(env, path) {
+// `transactionId` is optional - when passed, the read is pinned to that
+// transaction's consistent snapshot (required for read-modify-write safety;
+// see firestoreBeginTransaction/firestoreCommit below).
+export async function firestoreGetDoc(env, path, transactionId) {
   const token = await getAccessToken(env);
-  const res = await fetch(`${baseUrl(env.FIREBASE_PROJECT_ID)}/${path}`, {
+  const qs = transactionId ? `?transaction=${encodeURIComponent(transactionId)}` : '';
+  const res = await fetch(`${baseUrl(env.FIREBASE_PROJECT_ID)}/${path}${qs}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Firestore get failed (${path}): ${await res.text()}`);
   const json = await res.json();
   return fromFirestoreFields(json.fields);
+}
+
+// ── Real Firestore transactions (optimistic concurrency) ──
+// Every other function in this file is a bare get/patch/query - fine for the
+// single-writer flows they serve (Stripe webhooks, settlement), but a
+// multi-party ledger (see coinAccounts) needs genuine read-modify-write
+// safety: two concurrent requests touching the same document must not both
+// win. Firestore's REST transactions give us that: begin, read documents
+// pinned to that transaction (via firestoreGetDoc's transactionId param),
+// then commit a batch of writes conditioned on nothing having changed since
+// the reads. A commit that lost the race comes back as an ABORTED error
+// (status 409/ABORTED status field) - callers must re-run their whole
+// read-decide-write cycle from firestoreBeginTransaction, not just retry the
+// commit, since the decision itself may no longer be valid.
+export async function firestoreBeginTransaction(env) {
+  const token = await getAccessToken(env);
+  const res = await fetch(`${baseUrl(env.FIREBASE_PROJECT_ID)}:beginTransaction`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ options: { readWrite: {} } }),
+  });
+  if (!res.ok) throw new Error(`Firestore beginTransaction failed: ${await res.text()}`);
+  return (await res.json()).transaction;
+}
+
+// `writes` is an array of Firestore Write objects (the same shape as the REST
+// API's :commit expects - e.g. { update: {name, fields}, updateMask: {...} }).
+// Callers build these with toFirestoreValue + docNamePrefix directly, same
+// pattern firestoreBatchWriteDocs-style helpers use elsewhere. Throws an
+// Error with `.aborted = true` on a lost-race commit so callers can tell
+// "retry from scratch" apart from a genuine failure.
+export async function firestoreCommit(env, transactionId, writes) {
+  const token = await getAccessToken(env);
+  const res = await fetch(`${baseUrl(env.FIREBASE_PROJECT_ID)}:commit`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transaction: transactionId, writes }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    const err = new Error(`Firestore commit failed: ${errText}`);
+    err.aborted = res.status === 409 || errText.includes('ABORTED');
+    throw err;
+  }
+  return res.json();
+}
+
+// Builds a Firestore REST Write object that merge-patches `fields` onto the
+// document at `path` - the transactional equivalent of firestorePatchDoc,
+// for use inside a firestoreCommit `writes` array.
+export function updateWrite(env, path, fields) {
+  const body = { fields: {} };
+  for (const [k, v] of Object.entries(fields)) body.fields[k] = toFirestoreValue(v);
+  return {
+    update: { name: `${docNamePrefix(env.FIREBASE_PROJECT_ID)}${path}`, ...body },
+    updateMask: { fieldPaths: Object.keys(fields) },
+  };
+}
+
+function docNamePrefix(projectId) {
+  return `projects/${projectId}/databases/(default)/documents/`;
 }
 
 // Merge-patches the given top-level fields onto the document (creates it if

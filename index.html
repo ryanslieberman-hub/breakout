@@ -7349,8 +7349,8 @@ async function goTradeInChallenge(challengeId){
 // they can never disagree.
 function contextDisplayName(id){
   if (id === 'regular') return 'Practice';
-  if (id === 'gold') return 'Gold Coins';
-  if (id === 'sweeps') return 'Sweeps Coins';
+  if (id === 'gold') return 'Coins';
+  if (id === 'sweeps') return 'Breakout Bucks';
   return _challengeNames[id] || 'Challenge';
 }
 
@@ -7401,10 +7401,10 @@ async function openPortfolioDrawer(){
   const rows = [
     { id: 'regular', name: 'Practice Portfolio', icon: '$',
       sub: (activePortfolioId==='regular' ? fmt(portVal()) : fmt(_portfolios['regular']?.cash ?? 100000)) + ' cash' },
-    { id: 'gold', name: 'Gold Coins', icon: '🪙',
+    { id: 'gold', name: 'Coins', icon: '🪙',
       sub: fmt((activePortfolioId==='gold' ? portVal() : _portfolios['gold']?.cash) ?? 0) + ' coins' },
-    { id: 'sweeps', name: 'Sweeps Coins', icon: '✨',
-      sub: fmt((activePortfolioId==='sweeps' ? portVal() : _portfolios['sweeps']?.cash) ?? 0) + ' coins' },
+    { id: 'sweeps', name: 'Breakout Bucks', icon: '✨',
+      sub: fmt((activePortfolioId==='sweeps' ? portVal() : _portfolios['sweeps']?.cash) ?? 0) + ' bucks' },
     ...challenges.map(c => ({
       id: c.id, name: c.name, icon: '🏆',
       sub: fmt((activePortfolioId===c.id ? cash : _portfolios[c.id]?.cash) ?? 100000) + ` cash · ends ${fmtStamp(c.endDate)}`,
@@ -17048,7 +17048,11 @@ function switchLbTab(tab) {
 }
 
 // ═══════════════════════════════════════════
-//  GOLD / SWEEPS COINS
+//  COINS / BREAKOUT BUCKS
+//  (internal ids stay 'gold'/'sweeps' - see contextDisplayName() - only the
+//  user-facing labels are "Coins"/"Breakout Bucks". Renaming the ids would
+//  touch live production balances/trade history; renaming just the label is
+//  zero-risk.)
 // ═══════════════════════════════════════════
 // Must match COIN_PACKAGES in worker-payments/src/index.js exactly (id,
 // priceCents, goldGranted, sweepsGranted) - duplicated here rather than
@@ -17075,6 +17079,37 @@ async function buyCoinPackage(packageId) {
     });
     window.location.href = url;
   } catch(e) { showToast('Could not start checkout: ' + e.message); }
+}
+
+// No-purchase-necessary free grant (see worker-payments' POST /coins/claim).
+// The endpoint itself decides eligibility from server-stored timestamps -
+// this just calls it and reports back whatever it says. No client-side
+// countdown state to keep in sync; a re-tap when nothing's eligible yet just
+// gets told the next eligible time.
+function fmtCountdown(ms) {
+  if (ms <= 0) return 'now';
+  const mins = Math.round(ms / 60000);
+  if (mins < 60) return `${mins}m`;
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
+
+async function claimDailyFree() {
+  if (!currentUser) { showToast('Sign in to claim free Coins & Bucks'); return; }
+  try {
+    const result = await paymentsWorkerFetch('/coins/claim', { method: 'POST' });
+    if (result.granted) {
+      const { coins, bucksCents } = result.granted;
+      const parts = [];
+      if (coins) parts.push(`🪙 ${coins.toLocaleString()} Coins`);
+      if (bucksCents) parts.push(`✨ $${(bucksCents/100).toFixed(2)} Bucks`);
+      showToast(`Claimed ${parts.join(' + ')}!`);
+    } else {
+      showToast(`Nothing to claim yet - next free grant in ${fmtCountdown(result.nextEligibleAt - Date.now())}`);
+    }
+  } catch(e) {
+    showToast('Claim failed: ' + e.message);
+  }
+  renderCoinsTab();
 }
 
 async function redeemSweepsCoins() {
@@ -17113,26 +17148,31 @@ async function renderCoinsTab() {
   }
 
   const availableUsd = balance ? (balance.availableCents / 100).toFixed(2) : '—';
-  const redeemBlocked = !balance || balance.availableCents < 500 || balance.redemptionInProgress;
+  const redeemBlocked = !balance || balance.availableCents < 5000 || balance.redemptionInProgress; // mirrors MIN_REDEEM_CENTS_DEFAULT in worker-payments/src/index.js
 
   const packagesHtml = COIN_PACKAGES_DISPLAY.map(pkg => `
     <div style="background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:14px;">
       <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);text-transform:capitalize;">${escHtml(pkg.id)}</div>
       <div style="font-family:var(--font-display);font-size:22px;margin:4px 0;">$${(pkg.priceCents/100).toFixed(2)}</div>
-      <div style="font-family:var(--font-mono);font-size:10px;color:var(--gold);">🪙 ${pkg.goldGranted.toLocaleString()} Gold</div>
-      <div style="font-family:var(--font-mono);font-size:10px;color:var(--green);">✨ ${pkg.sweepsGranted} Sweeps (bonus)</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--gold);">🪙 ${pkg.goldGranted.toLocaleString()} Coins</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--green);">✨ ${pkg.sweepsGranted} Breakout Bucks (bonus)</div>
       <button class="profile-btn primary" style="width:100%;margin-top:10px;" onclick="buyCoinPackage('${pkg.id}')">Buy</button>
     </div>`).join('');
 
   el.innerHTML = `
     <div style="margin-bottom:16px;padding:14px;background:var(--card);border:1px solid var(--hairline);border-radius:10px;">
-      <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);">Sweeps Coins available to redeem</div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);">Breakout Bucks available to redeem</div>
       <div style="font-family:var(--font-display);font-size:32px;color:var(--green);margin:2px 0 10px;">$${availableUsd}</div>
       <button class="profile-btn secondary" ${redeemBlocked ? 'disabled style="opacity:0.5;cursor:default;"' : ''} onclick="redeemSweepsCoins()">
         ${balance?.redemptionInProgress ? 'Redemption in progress' : 'Redeem for cash'}
       </button>
+      ${(!balance?.redemptionInProgress && balance && balance.availableCents < 5000) ? `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:6px;">$50 minimum to redeem</div>` : ''}
     </div>
-    <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:8px;">Buy Gold Coins</div>
+    <div style="margin-bottom:16px;padding:14px;background:var(--card);border:1px solid var(--hairline);border-radius:10px;">
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:8px;">Play free - no purchase necessary</div>
+      <button class="profile-btn primary" style="width:100%;" onclick="claimDailyFree()">Claim free Coins &amp; Bucks</button>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:8px;">Buy Coins</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;">
       ${packagesHtml}
     </div>`;
