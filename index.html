@@ -8179,8 +8179,17 @@ const ENGINE = (() => {
     if (range === 0) b = c[dates[0]];
     else {
       const cutoff = localDateStr(range);
-      const inWin = dates.filter(d => d >= cutoff);
-      b = inWin.length ? c[inWin[0]] : c[dates[dates.length-1]];
+      // Anchor to the most recent close ON/BEFORE the cutoff - the actual "price N
+      // days ago". Close history is sparse (players don't play every day), so the
+      // old logic picked the EARLIEST close still >= cutoff instead - which, the
+      // moment a fresh close writes for TODAY and the last real close before it is
+      // further back than `range` days, became "today's own close" (today is always
+      // >= cutoff). That's comparing the current price to itself: an honest,
+      // real move (matching what the chart shows, which anchors differently) read
+      // as a flat 0.0% on this badge. Falling back further in time (never forward to
+      // today) keeps the two in agreement.
+      const priorOrAt = dates.filter(d => d <= cutoff);
+      b = priorOrAt.length ? c[priorOrAt[priorOrAt.length - 1]] : c[dates[0]];
     }
     return b > 0 ? round1((cur - b) / b * 100) : 0;
   }
@@ -15691,6 +15700,21 @@ async function enablePushNotifications() {
         updated: window._fbServerTimestamp() },
       { merge: true }
     );
+
+    // Retire this SAME device's previous token, if Firebase just handed us a
+    // different one (subscription refresh, SW reinstall, etc). Without this, the
+    // old token doc sticks around indefinitely - and if it's still routable, the
+    // backend (which pushes to every token for a uid) sends this person the same
+    // notification twice, once per token. Best-effort: a failure here shouldn't
+    // block the new token from working.
+    try {
+      const prevToken = localStorage.getItem('ax_push_token');
+      if (prevToken && prevToken !== token) {
+        await window._fbDeleteDoc(window._fbDoc(db, 'pushTokens', prevToken));
+      }
+    } catch (e) { console.warn('[push] old token cleanup failed:', e.message); }
+    localStorage.setItem('ax_push_token', token);
+
     console.log('[push] token stored:', token.slice(0, 12) + '…');
     showToast('Notifications enabled ✓');
 

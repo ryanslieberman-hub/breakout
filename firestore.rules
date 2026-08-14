@@ -209,11 +209,14 @@ service cloud.firestore {
 
     // Push notification device tokens - keyed by the token itself, not uid.
     // Only read by trusted backend contexts (which bypass these rules), never
-    // by clients.
+    // by clients. Delete is scoped to your own token docs only, so a device
+    // can retire its OLD token when Firebase issues it a new one (otherwise
+    // stale-but-still-routable tokens pile up per uid and the same person
+    // gets duplicate pushes - see enablePushNotifications' cleanup).
     match /pushTokens/{token} {
       allow read: if false;
       allow create, update: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      allow delete: if false;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
     // Authoritative, server-computed player prices (currently NBA only - see

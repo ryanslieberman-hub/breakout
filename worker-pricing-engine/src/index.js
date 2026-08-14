@@ -48,7 +48,13 @@ export function detectMovers({ rank, name, perf, value, st, dateKey, now }) {
     events.push({ kind: 'day', rank, name, pct: perf, value });
   }
 
-  const history = Array.isArray(st.recentValues) ? st.recentValues : [];
+  // Same-day only. Without this, a sample from just before midnight (still within
+  // the 65-min history window) gets compared against today's freshly-reset opening
+  // base right after the day rolls over - yesterday's live price vs today's base is
+  // not a "move", but the raw delta between them can easily clear FAST_MOVE_THRESHOLD,
+  // firing a spurious mover push right at/after midnight for no real reason.
+  const history = (Array.isArray(st.recentValues) ? st.recentValues : [])
+    .filter(e => easternDateStrOf(e.t) === dateKey);
   const ref = [...history].reverse().find(e => now - e.t >= FAST_MOVE_LOOKBACK_MS);
   if (ref && ref.value > 0) {
     const fastPct = (value - ref.value) / ref.value;
@@ -89,10 +95,13 @@ async function announceMovers(env, movers) {
 // localDateStr() - a Worker has no "local" timezone, so this must be
 // hardcoded to match the US-centric leagues this prices.
 function easternDateStr(offsetDays = 0) {
-  const d = new Date(Date.now() - offsetDays * 86400000);
+  return easternDateStrOf(Date.now() - offsetDays * 86400000);
+}
+
+function easternDateStrOf(ms) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(d);
+  }).formatToParts(new Date(ms));
   const get = t => parts.find(p => p.type === t).value;
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
