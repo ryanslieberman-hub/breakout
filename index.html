@@ -15102,6 +15102,9 @@ async function handleAuthChange(user) {
     updateAuthUI();
     stopFriendsListener();
     clearInterval(_claimBadgeTimer);
+    clearInterval(_claimTickTimer);
+    _claimEligible = false;
+    _claimNextEligibleAt = null;
     const btn = document.getElementById('nav-claim-btn');
     if (btn) btn.style.display = 'none';
   }
@@ -17173,57 +17176,92 @@ async function claimDailyFree() {
   refreshClaimBadge();
 }
 
-// Keeps the always-visible nav claim button (see the top of nav-right in the
-// markup) in sync with server-side eligibility - GET /coins/claim-status is
-// read-only, so polling it can never accidentally trigger a grant the way
-// calling /coins/claim itself would. Runs on sign-in, right after a claim,
-// and on a slow interval so the badge lights up on its own once the 2h/24h
-// window opens back up, without the user needing to reload or go looking
-// for it - that's the actual "more prevalent" fix, not just moving the
-// button to a louder spot.
-let _claimBadgeTimer = null;
-async function refreshClaimBadge() {
+// Live HH:MM:SS (or MM:SS once under an hour) countdown clock - distinct
+// from fmtCountdown's rounded "23m"/"1h 4m", which only reads right when
+// it's being refreshed every 60s. A number that just sits there saying
+// "23m" for a full minute at a time doesn't read as "counting down" at all.
+function fmtCountdownClock(ms) {
+  if (ms <= 0) return '0:00';
+  const total = Math.floor(ms / 1000);
+  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
+  const mm = String(m).padStart(2, '0'), ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+}
+
+// Always-visible nav claim button + the Profile tab claim card, kept in sync
+// with server-side eligibility. Two update paths:
+//   refreshClaimBadge() - the network truth. Calls GET /coins/claim-status
+//     (read-only, so this can never accidentally trigger a grant the way
+//     calling /coins/claim itself would), stores what it learns, repaints.
+//   tickClaimCountdown() - every second, purely local arithmetic against the
+//     stored nextEligibleAt. No network call - this is what makes the clock
+//     actually count down instead of jumping once a minute.
+// Once the local clock hits zero it calls refreshClaimBadge() to confirm
+// with the server rather than just assuming eligibility (server is still the
+// only source of truth for whether a claim will actually succeed).
+let _claimBadgeTimer = null, _claimTickTimer = null;
+let _claimEligible = false, _claimNextEligibleAt = null;
+
+function renderClaimUI() {
   const btn = document.getElementById('nav-claim-btn');
   const card = document.getElementById('profile-claim-card');
-  if (!btn && !card) return;
+  if (btn) {
+    btn.style.display = '';
+    if (_claimEligible) {
+      btn.textContent = 'Claim';
+      btn.className = 'nav-claim-btn claim-available';
+      btn.title = 'Free Coins & Bucks ready - tap to claim';
+    } else {
+      const clock = fmtCountdownClock(_claimNextEligibleAt - Date.now());
+      btn.textContent = clock;
+      btn.className = 'nav-claim-btn claim-cooldown';
+      btn.title = 'Next free claim in ' + clock;
+    }
+  }
+  // Profile tab card - the actual "put it somewhere I can find it" fix. Same
+  // eligibility data as the nav badge, just a much bigger, harder-to-miss
+  // target with its own Claim button and a live clock instead of a tight nav pill.
+  if (card) {
+    if (_claimEligible) {
+      card.innerHTML = `
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:8px;">Free Coins &amp; Bucks ready - no purchase necessary</div>
+        <button class="profile-btn primary" style="width:100%;" onclick="claimDailyFree()">Claim now</button>`;
+    } else {
+      card.innerHTML = `
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:6px;">Free Coins &amp; Bucks - no purchase necessary</div>
+        <div style="font-family:var(--font-display);font-size:22px;font-variant-numeric:tabular-nums;">${fmtCountdownClock(_claimNextEligibleAt - Date.now())}</div>
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-top:2px;">until next free claim</div>`;
+    }
+  }
+}
+
+async function refreshClaimBadge() {
+  if (!document.getElementById('nav-claim-btn') && !document.getElementById('profile-claim-card')) return;
   if (!currentUser) {
+    const btn = document.getElementById('nav-claim-btn');
     if (btn) btn.style.display = 'none';
     return;
   }
   try {
     const status = await paymentsWorkerFetch('/coins/claim-status');
-    if (btn) {
-      btn.style.display = '';
-      if (status.eligible) {
-        btn.textContent = 'Claim';
-        btn.className = 'nav-claim-btn claim-available';
-        btn.title = 'Free Coins & Bucks ready - tap to claim';
-      } else {
-        btn.textContent = fmtCountdown(status.nextEligibleAt - Date.now());
-        btn.className = 'nav-claim-btn claim-cooldown';
-        btn.title = 'Next free claim in ' + fmtCountdown(status.nextEligibleAt - Date.now());
-      }
-    }
-    // Profile tab card - the actual "put it somewhere I can find it" fix.
-    // Same eligibility data as the nav badge, just a much bigger, harder-to-
-    // miss target with its own Claim button instead of a tight nav pill.
-    if (card) {
-      if (status.eligible) {
-        card.innerHTML = `
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:8px;">Free Coins &amp; Bucks ready - no purchase necessary</div>
-          <button class="profile-btn primary" style="width:100%;" onclick="claimDailyFree()">Claim now</button>`;
-      } else {
-        card.innerHTML = `
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:6px;">Free Coins &amp; Bucks - no purchase necessary</div>
-          <div style="font-family:var(--font-mono);font-size:13px;color:var(--text);">Next claim in ${fmtCountdown(status.nextEligibleAt - Date.now())}</div>`;
-      }
-    }
+    _claimEligible = status.eligible;
+    _claimNextEligibleAt = status.nextEligibleAt;
+    renderClaimUI();
   } catch (e) { /* leave whatever was already showing */ }
 }
+
+function tickClaimCountdown() {
+  if (_claimEligible || _claimNextEligibleAt == null) return;
+  if (Date.now() >= _claimNextEligibleAt) { refreshClaimBadge(); return; }
+  renderClaimUI();
+}
+
 function startClaimBadgePolling() {
   refreshClaimBadge();
   clearInterval(_claimBadgeTimer);
-  _claimBadgeTimer = setInterval(refreshClaimBadge, 60000);
+  clearInterval(_claimTickTimer);
+  _claimBadgeTimer = setInterval(refreshClaimBadge, 60000); // server re-sync safety net
+  _claimTickTimer = setInterval(tickClaimCountdown, 1000);  // the actual visible countdown
 }
 
 async function redeemSweepsCoins() {
