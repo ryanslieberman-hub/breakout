@@ -7430,7 +7430,7 @@ async function openPortfolioDrawer(){
   if (!currentUser) {
     list.innerHTML = `
       <div class="portfolio-option active">
-        <div class="po-icon">●</div>
+        <div class="po-icon">${coinIcon(22)}</div>
         <div class="po-info"><div class="po-name">Coins</div><div class="po-sub">Sign in to claim free Coins</div></div>
       </div>`;
     return;
@@ -7445,7 +7445,7 @@ async function openPortfolioDrawer(){
   // fine; a user just can't reach it from here. Re-add its row to bring that
   // entry point back once it clears legal review.
   const rows = [
-    { id: 'gold', name: 'Coins', icon: '●',
+    { id: 'gold', name: 'Coins', icon: coinIcon(22),
       sub: fmt((activePortfolioId==='gold' ? portVal() : _portfolios['gold']?.cash) ?? 0) + ' coins' },
     ...challenges.map(c => ({
       id: c.id, name: c.name, icon: '🏆',
