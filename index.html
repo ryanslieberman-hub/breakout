@@ -1491,7 +1491,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   <button type="button" class="nav-tab" onclick="showView('profile',this)" id="nav-profile-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span class="tab-label-full">Profile</span><span class="tab-label-mobile">Profile</span></button>
   </div>
   <div class="nav-right">
-    <button id="nav-claim-btn" class="nav-claim-btn" onclick="claimDailyFree()" style="display:none;" title="Free Coins &amp; Bucks - no purchase necessary">🪙 Claim</button>
+    <button id="nav-claim-btn" class="nav-claim-btn" onclick="claimDailyFree()" style="display:none;" title="Free Coins &amp; Bucks - no purchase necessary">Claim</button>
     <div class="nav-stat">Coins: <span id="nav-cash">0.00</span></div>
     <div class="nav-stat" id="last-updated" style="display: inline;">Updated: <span id="update-time">—</span></div>
     <div class="nav-stat">Total: <span id="nav-total">0.00</span></div>
@@ -7430,7 +7430,7 @@ async function openPortfolioDrawer(){
   if (!currentUser) {
     list.innerHTML = `
       <div class="portfolio-option active">
-        <div class="po-icon">🪙</div>
+        <div class="po-icon">●</div>
         <div class="po-info"><div class="po-name">Coins</div><div class="po-sub">Sign in to claim free Coins</div></div>
       </div>`;
     return;
@@ -7445,7 +7445,7 @@ async function openPortfolioDrawer(){
   // fine; a user just can't reach it from here. Re-add its row to bring that
   // entry point back once it clears legal review.
   const rows = [
-    { id: 'gold', name: 'Coins', icon: '🪙',
+    { id: 'gold', name: 'Coins', icon: '●',
       sub: fmt((activePortfolioId==='gold' ? portVal() : _portfolios['gold']?.cash) ?? 0) + ' coins' },
     ...challenges.map(c => ({
       id: c.id, name: c.name, icon: '🏆',
@@ -8891,6 +8891,13 @@ function breakoutMark(dir){
   return `<svg class="brand-mark" viewBox="0 0 26 22" fill="none" aria-hidden="true"><line x1="2" y1="${y}" x2="24" y2="${y}" stroke="var(--border2)" stroke-width="1.4" stroke-dasharray="2 2.6"/><path d="${path}" stroke="${c}" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12.5" cy="${y}" r="1.9" fill="${c}"/></svg>`;
 }
 function fmtMcap(n){if(n>=1e9)return'$'+(n/1e9).toFixed(1)+'B';if(n>=1e6)return'$'+(n/1e6).toFixed(1)+'M';return'$'+(n/1e3).toFixed(0)+'K';}
+// Gold coin icon, drawn (not emoji) - the actual U+1FA99 coin emoji renders
+// silver/grey on most platforms (Apple, Twemoji, etc.), not gold, and can't
+// be recolored. Used ONLY in the two spots that call for it: buying Coins
+// and the leaderboard - not stamped on every number the way fmt() used to.
+function coinIcon(size=12){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true" style="vertical-align:-2px;flex-shrink:0;"><circle cx="12" cy="12" r="10" fill="var(--gold)"/><circle cx="12" cy="12" r="7" fill="none" stroke="#00000030" stroke-width="1.2"/></svg>`;
+}
 function portVal(){let v=cash;Object.entries(holdings).forEach(([r,h])=>{if(h.shares>0)v+=h.shares*activePrice(r);});return v;}
 function get7DPrices(rank){const hx=priceHx[rank];return hx.length>=7?hx.slice(-7).map(h=>h.price):hx.map(h=>h.price);}
 
@@ -15451,7 +15458,7 @@ async function openPublicProfile(uid){
         ${friendActionHtml}
       </div>
       <div class="profile-stat-row" style="margin-bottom:18px;">
-        <div class="profile-stat"><div class="profile-stat-lbl">Portfolio</div><div class="profile-stat-val">$${(u.portfolioValue||0).toLocaleString()}</div></div>
+        <div class="profile-stat"><div class="profile-stat-lbl">Portfolio</div><div class="profile-stat-val">${coinIcon()} ${(u.portfolioValue||0).toLocaleString()}</div></div>
         <div class="profile-stat"><div class="profile-stat-lbl">Return</div><div class="profile-stat-val" style="color:${ret>=0?'var(--green)':'var(--red)'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div></div>
       </div>
       <div class="profile-section-lbl">Holdings</div>
@@ -16941,7 +16948,7 @@ async function _renderFriendsLbList(){
         <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
         <div class="ulb-info">
           ${_ulbNameBlock(u, isYou)}
-          <div class="ulb-sub">Portfolio: $${(u.portfolioValue||0).toLocaleString()}</div>
+          <div class="ulb-sub">${coinIcon(9)} ${(u.portfolioValue||0).toLocaleString()}</div>
         </div>
         <div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>
         ${!isYou ? `<span class="comment-delete" style="margin-left:4px;" onclick="removeFriendship('${_friendshipId(currentUser.uid,u.uid)}')">remove</span>` : ''}
@@ -17147,7 +17154,7 @@ async function claimDailyFree() {
     if (result.granted) {
       const { coins, bucksCents } = result.granted;
       const parts = [];
-      if (coins) parts.push(`🪙 ${coins.toLocaleString()} Coins`);
+      if (coins) parts.push(`${coins.toLocaleString()} Coins`);
       if (bucksCents) parts.push(`💵 $${(bucksCents/100).toFixed(2)} Bucks`);
       showToast(`Claimed ${parts.join(' + ')}!`);
       if (coins) refreshCoinsTotalGranted(); // keep the % gain leaderboard baseline in sync
@@ -17178,11 +17185,11 @@ async function refreshClaimBadge() {
     const status = await paymentsWorkerFetch('/coins/claim-status');
     btn.style.display = '';
     if (status.eligible) {
-      btn.textContent = '🪙 Claim';
+      btn.textContent = 'Claim';
       btn.className = 'nav-claim-btn claim-available';
       btn.title = 'Free Coins & Bucks ready - tap to claim';
     } else {
-      btn.textContent = `🪙 ${fmtCountdown(status.nextEligibleAt - Date.now())}`;
+      btn.textContent = fmtCountdown(status.nextEligibleAt - Date.now());
       btn.className = 'nav-claim-btn claim-cooldown';
       btn.title = 'Next free claim in ' + fmtCountdown(status.nextEligibleAt - Date.now());
     }
@@ -17236,7 +17243,7 @@ async function renderCoinsTab() {
     <div style="background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:14px;">
       <div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);text-transform:capitalize;">${escHtml(pkg.id)}</div>
       <div style="font-family:var(--font-display);font-size:22px;margin:4px 0;">$${(pkg.priceCents/100).toFixed(2)}</div>
-      <div style="font-family:var(--font-mono);font-size:10px;color:var(--gold);">🪙 ${pkg.goldGranted.toLocaleString()} Coins</div>
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--gold);">${coinIcon()} ${pkg.goldGranted.toLocaleString()} Coins</div>
       <div style="font-family:var(--font-mono);font-size:10px;color:var(--green);">💵 ${pkg.sweepsGranted} Breakout Bucks (bonus)</div>
       <button class="profile-btn primary" style="width:100%;margin-top:10px;" onclick="buyCoinPackage('${pkg.id}')">Buy</button>
     </div>`).join('');
@@ -17291,7 +17298,7 @@ async function renderGlobalLeaderboard() {
   if (!el) return;
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
-      <button class="ulb-sort-btn ${_lbSortMode==='balance'?'active':''}" onclick="setLbSortMode('balance',this)">Total Coins</button>
+      <button class="ulb-sort-btn ${_lbSortMode==='balance'?'active':''}" onclick="setLbSortMode('balance',this)">${coinIcon()} Total Coins</button>
       <button class="ulb-sort-btn ${_lbSortMode==='gain'?'active':''}" onclick="setLbSortMode('gain',this)">% Gain</button>
     </div>
     <div id="ulb-list"><div class="g10-loading">Loading traders…</div></div>
@@ -17367,7 +17374,7 @@ function _renderGlobalLbRows(){
       <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
       <div class="ulb-info">
         ${_ulbNameBlock(u, isYou)}
-        <div class="ulb-sub">Portfolio: $${(u.portfolioValue||0).toLocaleString()}</div>
+        <div class="ulb-sub">${coinIcon(9)} ${(u.portfolioValue||0).toLocaleString()}</div>
       </div>
       <div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>
       ${friendAction}
