@@ -7398,13 +7398,14 @@ async function openPortfolioDrawer(){
   }
   list.innerHTML = `<div class="g10-loading">Loading…</div>`;
   const challenges = await getMyActiveChallenges();
+  // Coins/Breakout Bucks rows removed from this list - same "not legally
+  // reviewed yet, hide the display, keep the code" treatment as the 'coins'
+  // leaderboard tab above. switchPortfolioContext('gold'/'sweeps') and every
+  // wallet code path still work fine; a user just can't reach them from here
+  // anymore. Re-add these two objects to bring the entry point back.
   const rows = [
     { id: 'regular', name: 'Practice Portfolio', icon: '$',
       sub: (activePortfolioId==='regular' ? fmt(portVal()) : fmt(_portfolios['regular']?.cash ?? 100000)) + ' cash' },
-    { id: 'gold', name: 'Coins', icon: '🪙',
-      sub: fmt((activePortfolioId==='gold' ? portVal() : _portfolios['gold']?.cash) ?? 0) + ' coins' },
-    { id: 'sweeps', name: 'Breakout Bucks', icon: '✨',
-      sub: fmt((activePortfolioId==='sweeps' ? portVal() : _portfolios['sweeps']?.cash) ?? 0) + ' bucks' },
     ...challenges.map(c => ({
       id: c.id, name: c.name, icon: '🏆',
       sub: fmt((activePortfolioId===c.id ? cash : _portfolios[c.id]?.cash) ?? 100000) + ` cash · ends ${fmtStamp(c.endDate)}`,
@@ -17016,8 +17017,15 @@ async function buildLeaderboardFirebase() {
   // rather than rendering a tab with no button to select it. The challenge
   // code itself (renderChallengeList/renderChallengeDetail/joinChallenge/the
   // compliance modal) is untouched, just no longer reachable from here.
+  //
+  // 'coins' (Coins/Breakout Bucks - buy/claim/redeem) got the same treatment
+  // the moment it was built: none of it has legal review yet, so the tab
+  // button is gone and a persisted 'coins' selection falls back to global,
+  // same reasoning as 'challenge' above. renderCoinsTab() and everything
+  // behind it (worker-payments' /coins/* endpoints, the coinAccounts ledger)
+  // stay fully intact - this is a display change, not a rollback.
   let activeTab = window._lbTab || 'global';
-  if (activeTab === 'challenge') { activeTab = 'global'; window._lbTab = 'global'; }
+  if (activeTab === 'challenge' || activeTab === 'coins') { activeTab = 'global'; window._lbTab = 'global'; }
 
   inner.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
@@ -17029,7 +17037,6 @@ async function buildLeaderboardFirebase() {
     <div class="ulb-tabs" style="margin-bottom:16px;">
       <div class="ulb-tab ${activeTab==='global'?'active':''}" onclick="switchLbTab('global')">Global</div>
       <div class="ulb-tab ${activeTab==='friends'?'active':''}" onclick="switchLbTab('friends')">Friends<span class="friends-req-dot" id="friends-req-dot" style="display:${_incomingRequests.length?'inline-block':'none'};"></span></div>
-      <div class="ulb-tab ${activeTab==='coins'?'active':''}" onclick="switchLbTab('coins')">Coins</div>
     </div>
     <div id="lb-tab-content"></div>`;
 
