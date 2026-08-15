@@ -6,9 +6,12 @@ service cloud.firestore {
     // permissive assumption about prior behavior (this repo never had a
     // committed rules file, and price-sync writes may happen from signed-out
     // sessions too) - not part of the money-safety scope this ruleset exists
-    // for. NOTE: config/app currently stores a third-party API key here,
-    // readable/writable by anyone. That's a separate pre-existing issue,
-    // flagged but not fixed by this ruleset - see project notes.
+    // for. config/app used to also hold a real Anthropic API key here
+    // (antKey) - readable/writable by anyone, and separately visible in the
+    // client's own network requests regardless of this rule. That's been
+    // removed entirely; the news feature now proxies through worker-payments'
+    // POST /news, which holds the key as a Worker secret the client never
+    // sees. Nothing secret belongs under config/ - anything here is public.
     match /config/{doc} {
       allow read, write: if true;
     }

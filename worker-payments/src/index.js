@@ -471,6 +471,18 @@ const COIN_PACKAGES = {
   value:    { priceCents: 2499, goldGranted: 30000, sweepsGranted: 30 },
   premium:  { priceCents: 4999, goldGranted: 65000, sweepsGranted: 65 },
 };
+// A plain `COIN_PACKAGES[packageId]` lookup with an attacker-controlled string
+// returns Object.prototype (truthy, not undefined) for packageId values like
+// '__proto__' or 'constructor', slipping past a `!pkg` check with an object
+// that has none of the real fields. Not currently exploitable for free coins
+// (Stripe rejects the resulting NaN/undefined unit_amount), but it's the
+// wrong shape of lookup for user-controlled keys - hasOwnProperty closes it.
+function getCoinPackage(packageId) {
+  if (typeof packageId !== 'string' || !Object.prototype.hasOwnProperty.call(COIN_PACKAGES, packageId)) {
+    return null;
+  }
+  return COIN_PACKAGES[packageId];
+}
 const MIN_REDEEM_CENTS_DEFAULT = 5000; // $50 (matches Fliff's comparable) - overridable via env.MIN_REDEEM_CENTS
 const MAX_REDEMPTION_ATTEMPTS = 72; // ~3 days at the hourly sweep, same reasoning as MAX_PAYOUT_ATTEMPTS below
 
@@ -810,7 +822,7 @@ async function handleCoinCheckout(request, env) {
   const user = await requireUser(request, env);
   const body = await request.json().catch(() => ({}));
   const { packageId, clientNonce } = body || {};
-  const pkg = COIN_PACKAGES[packageId];
+  const pkg = getCoinPackage(packageId);
   if (!pkg) throw new HttpError(400, 'Unknown coin package');
   if (!clientNonce || typeof clientNonce !== 'string') throw new HttpError(400, 'Missing clientNonce');
 
@@ -861,7 +873,7 @@ async function handleCoinDeposit(env, session) {
   // trusting anything carried on the session - if COIN_PACKAGES changes
   // between checkout creation and webhook delivery, today's catalog is what
   // should apply.
-  const pkg = COIN_PACKAGES[packageId];
+  const pkg = getCoinPackage(packageId);
   if (!pkg) {
     console.error(`checkout.session.completed (coins): unknown packageId ${packageId} for session ${session.id}`);
     return;
@@ -1210,6 +1222,81 @@ async function handleCoinsClaim(request, env) {
   }, 200, env);
 }
 
+// ── POST /news ──
+// Server-side proxy for the player-news feature. This key used to live in a
+// public Firestore doc (config/app.antKey) AND get sent straight from the
+// browser to api.anthropic.com - readable by anyone via Firestore, and
+// visible in plain sight in any user's Network tab regardless. Routing it
+// through here means the real key only ever lives in this Worker's secrets;
+// requireUser() below keeps it from being a fully-anonymous cost sink.
+const NEWS_MAX_LEN = 60;
+async function handleNewsSearch(request, env) {
+  await requireUser(request, env); // any signed-in user - just keeps this from being anonymous-abusable
+  const body = await request.json().catch(() => ({}));
+  const { playerName, league } = body || {};
+  if (!playerName || typeof playerName !== 'string' || playerName.length > NEWS_MAX_LEN) {
+    throw new HttpError(400, 'Invalid playerName');
+  }
+  if (!league || typeof league !== 'string' || league.length > NEWS_MAX_LEN) {
+    throw new HttpError(400, 'Invalid league');
+  }
+  if (!env.ANTHROPIC_API_KEY) throw new HttpError(503, 'News is not configured');
+
+  const prompt = `Search for the latest ${league} news about ${playerName} from the past week. Then return ONLY a JSON array of up to 5 real articles found, no markdown, no backticks. Each object: {"headline":"...","source":"...","date":"...","summary":"2-3 sentences.","sentiment":"positive|negative|neutral","url":"https://..."}`;
+
+  async function askClaude(messages) {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new HttpError(502, data.error?.message || `Anthropic API error ${res.status}`);
+    return data;
+  }
+
+  const data1 = await askClaude([{ role: 'user', content: prompt }]);
+  const blocks1 = data1.content || [];
+  let finalText = blocks1.filter(b => b.type === 'text').map(b => b.text).join('');
+
+  const toolUseBlocks = blocks1.filter(b => b.type === 'tool_use');
+  if (toolUseBlocks.length && !finalText) {
+    const toolResults = toolUseBlocks.map(b => ({
+      type: 'tool_result',
+      tool_use_id: b.id,
+      content: b.input?.query || 'search completed',
+    }));
+    const data2 = await askClaude([
+      { role: 'user', content: prompt },
+      { role: 'assistant', content: blocks1 },
+      { role: 'user', content: toolResults },
+    ]);
+    finalText = (data2.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  }
+
+  if (!finalText) throw new HttpError(502, 'No response from news search');
+
+  let articles = [];
+  try {
+    const clean = finalText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
+    articles = JSON.parse(clean);
+  } catch (e) {
+    const match = finalText.match(/\[[\s\S]*\]/);
+    if (match) articles = JSON.parse(match[0]);
+    else throw new HttpError(502, 'Could not parse news response');
+  }
+  return json({ articles }, 200, env);
+}
+
 // ── Redemption retry sweep (Cron Trigger, hourly, alongside runSettlementSweep) ──
 export async function runRedemptionRetrySweep(env) {
   const allFailed = await firestoreQuery(env, 'coinRedemptions', [{ field: 'status', op: 'EQUAL', value: 'failed' }]);
@@ -1286,6 +1373,9 @@ export default {
       }
       if (request.method === 'POST' && url.pathname === '/coins/claim') {
         return await handleCoinsClaim(request, env);
+      }
+      if (request.method === 'POST' && url.pathname === '/news') {
+        return await handleNewsSearch(request, env);
       }
       if (request.method === 'GET' && /^\/challenges\/[^/]+\/standings$/.test(url.pathname)) {
         await requireUser(request, env); // any signed-in user, not admin-only - this moves no money

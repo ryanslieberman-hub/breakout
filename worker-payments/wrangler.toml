@@ -11,6 +11,10 @@ crons = ["0 * * * *"]
 #   STRIPE_SECRET_KEY        - Stripe test/live secret key (sk_test_... / sk_live_...)
 #   STRIPE_WEBHOOK_SECRET    - from the Stripe Dashboard webhook endpoint (whsec_...)
 #   FIREBASE_SERVICE_ACCOUNT - the full JSON of your Firebase service account key, as one string
+#   ANTHROPIC_API_KEY        - for POST /news (player news search). Server-side
+#     only now - never put this in Firestore or ship it to the client again;
+#     that's what leaked the previous key (see firestore.rules' config/{doc}
+#     comment).
 #   STRIPE_IDENTITY_RESTRICTED_KEY - OPTIONAL (rk_...). Stripe treats a verified
 #     date of birth as a sensitive result and refuses it to the standard secret
 #     key, so the 18+ check needs a RESTRICTED key granting "Access recent

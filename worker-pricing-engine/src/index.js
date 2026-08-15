@@ -16,6 +16,7 @@ import {
   firestoreBatchGetDocs, firestoreBatchWriteDocs, firestoreListCollection, firestorePatchDoc,
 } from './lib/firestore.js';
 import { notifyAllTokens, notifyUid } from './lib/notify.js';
+import { verifyFirebaseIdToken, bearerToken } from './lib/auth.js';
 
 const TZ = 'America/New_York';
 
@@ -491,26 +492,55 @@ function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
+class HttpError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// These POST routes used to be reachable by anyone who found the URL - the
+// real cron trigger never calls them (scheduled() below calls the run*
+// functions directly), they exist only for manual/local testing, so there
+// was no legitimate reason for them to be open. runGameDayTick/runDailyRefresh
+// write priceEngine/{...} - the prices real-money challenge settlement trusts
+// - and runPortfolioSummary fires a push notification to every registered
+// device, so an unauthenticated caller could spam both. Same admin-custom-
+// claim gate worker-payments uses for its own /internal/run-settlement.
+async function requireAdmin(request, env) {
+  const token = bearerToken(request);
+  if (!token) throw new HttpError(401, 'Missing Authorization header');
+  let user;
+  try {
+    user = await verifyFirebaseIdToken(token, env.FIREBASE_PROJECT_ID);
+  } catch (e) {
+    throw new HttpError(401, `Invalid ID token: ${e.message}`);
+  }
+  if (!user.admin) throw new HttpError(403, 'Admin only');
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
-      // Manual triggers for local/dev testing and verification - not meant
-      // for public traffic; lock these down (or remove) before this Worker
-      // handles anything feeding real settlements unattended.
+      // Manual triggers for local/dev testing and verification.
       if (request.method === 'POST' && url.pathname === '/internal/tick') {
+        await requireAdmin(request, env);
         return json(await runGameDayTick(env));
       }
       if (request.method === 'POST' && url.pathname === '/internal/refresh-baselines') {
+        await requireAdmin(request, env);
         return json(await runDailyRefresh(env));
       }
       if (request.method === 'POST' && url.pathname === '/internal/portfolio-summary') {
+        await requireAdmin(request, env);
         return json(await runPortfolioSummary(env));
       }
       return json({ error: 'Not found' }, 404);
     } catch (e) {
-      console.error(e);
-      return json({ error: e.message }, 500);
+      const status = e instanceof HttpError ? e.status : 500;
+      if (status === 500) console.error(e);
+      return json({ error: e.message }, status);
     }
   },
 

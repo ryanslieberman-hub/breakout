@@ -5654,17 +5654,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
       <div class="modal-hint" style="color:#aaa;margin-top:4px;">Uses ESPN's free public API. Updates automatically in the background.</div>
     </div>
 
-<div class="modal-field" style="background:#0d1a2a;border:1px solid #1b3050;border-radius:8px;padding:12px;">
-      <label class="modal-label" style="color:var(--green);">Anthropic API Key (optional - for sentiment analysis)</label>
-      <div class="modal-hint" style="color:#aaa;margin-top:4px;margin-bottom:8px;">News loads from ESPN without a key. Add a key from console.anthropic.com to also get positive/negative sentiment labels.</div>
-      <input id="ant-key-input" type="password" placeholder="sk-ant-..." style="width:100%;background:var(--bg);border:1px solid var(--hairline);border-radius:6px;padding:8px 10px;color:var(--fg);font-family:var(--font-mono);font-size:11px;box-sizing:border-box;outline:none;">
-    </div>
-
     <div class="modal-btns">
       <button class="mbtn" onclick="closeSettings()">Cancel</button>
       <button class="mbtn" onclick="debugMovers()" style="color:#f2b843;">Debug Chart</button>
-      <button class="mbtn" onclick="loadCloudPortfolio().then(()=&gt;closeSettings())" style="color:#12d47e;">️ Sync from Cloud</button>
-      <button class="mbtn primary" onclick="saveKeys()">Save &amp; Apply</button>
+      <button class="mbtn primary" onclick="loadCloudPortfolio().then(()=&gt;closeSettings())" style="color:#12d47e;">️ Sync from Cloud</button>
     </div>
   </div>
 </div>
@@ -8916,39 +8909,13 @@ function get7DPrices(rank){const hx=priceHx[rank];return hx.length>=7?hx.slice(-
 // ═══════════════════════════════════════════
 //  API KEYS + SETTINGS
 // ═══════════════════════════════════════════
-let ANT_KEY = localStorage.getItem('ant_key') || '';
-let _antKeyResolve;
-const _antKeyReady = new Promise(res => { _antKeyResolve = res; });
-if (ANT_KEY) _antKeyResolve(); // already have it locally
-
 async function openSettings(){
   await refreshAdminClaim();
   if (!isAdminUser) { showToast('Admin access only'); return; }
   updateSettingsAccount();
   document.getElementById('settings-modal').classList.add('open');
-  const keyEl = document.getElementById('ant-key-input');
-  if (keyEl) keyEl.value = ANT_KEY || '';
 }
 function closeSettings(){ document.getElementById('settings-modal').classList.remove('open'); }
-function saveKeys(){
-  const keyEl = document.getElementById('ant-key-input');
-  if (keyEl) {
-    ANT_KEY = keyEl.value.trim();
-    localStorage.setItem('ant_key', ANT_KEY);
-    // Save to shared Firestore config - readable by all users
-    if (db) {
-      window._fbSetDoc(window._fbDoc(db, 'config', 'app'), { antKey: ANT_KEY }, { merge: true })
-        .catch(e => console.warn('Could not sync key:', e));
-    }
-  }
-  updateKeyStatusDots();
-  closeSettings();
-  showToast('Saved');
-}
-function updateKeyStatusDots(){
-  const dot = document.getElementById('ant-key-dot');
-  if (dot) dot.style.background = ANT_KEY ? 'var(--green)' : 'var(--red)';
-}
 function updateModeBadge(){
   const live = document.getElementById('live-badge-nav');
   const sim  = document.getElementById('sim-badge-nav');
@@ -10859,116 +10826,63 @@ function showEventTag(ev){
 // ═══════════════════════════════════════════
 //  NEWS - Claude with live web search
 // ═══════════════════════════════════════════
+// Wires up the click-to-open handlers on rendered news items. Split out from
+// loadNews() because cached HTML (see the newsCache short-circuit below) is
+// re-inserted via innerHTML too, which drops any listeners from the first
+// render - this has to run after EVERY innerHTML assignment, not just the
+// fresh-fetch path.
+function _wireNewsLinks(content){
+  content.querySelectorAll('[data-news-url]').forEach(el => {
+    el.addEventListener('click', () => window.open(el.dataset.newsUrl, '_blank', 'noopener'));
+  });
+}
+
 async function loadNews(playerName){
   const content=document.getElementById('news-content');
-  if(newsCache[playerName]){content.innerHTML=newsCache[playerName];return;}
-  content.innerHTML=`<div class="news-loading"><div class="news-spinner"></div>Fetching latest news for ${playerName}…</div>`;
+  if(newsCache[playerName]){content.innerHTML=newsCache[playerName];_wireNewsLinks(content);return;}
+  content.innerHTML=`<div class="news-loading"><div class="news-spinner"></div>Fetching latest news for ${escHtml(playerName)}…</div>`;
 
-  // Load key from Firestore if not cached locally
-  if (!ANT_KEY && db) {
-    try {
-      const snap = await window._fbGetDoc(window._fbDoc(db, 'config', 'app'));
-      if (snap.exists() && snap.data().antKey) {
-        ANT_KEY = snap.data().antKey;
-        localStorage.setItem('ant_key', ANT_KEY);
-        updateKeyStatusDots();
-      }
-    } catch(e) {}
-  }
-
-  if (!ANT_KEY) {
-    content.innerHTML=`<div class="news-loading" style="color:var(--muted);">News unavailable - admin key not configured.</div>`;
+  if (!currentUser) {
+    content.innerHTML=`<div class="news-loading" style="color:var(--muted);">Sign in to see news.</div>`;
     return;
   }
 
   try {
-    // First call - ask Claude to search
-    const res1 = await fetch('https://api.anthropic.com/v1/messages', {
+    // Proxied through worker-payments' POST /news - the Anthropic key lives
+    // there as a server secret now, never in the client (see that handler's
+    // comment for why this moved).
+    const { articles } = await paymentsWorkerFetch('/news', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANT_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{
-          role: 'user',
-          content: `Search for the latest ${currentLeague} news about ${playerName} from the past week. Then return ONLY a JSON array of up to 5 real articles found, no markdown, no backticks. Each object: {"headline":"...","source":"...","date":"...","summary":"2-3 sentences.","sentiment":"positive|negative|neutral","url":"https://..."}`
-        }]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerName, league: currentLeague }),
     });
-    const data1 = await res1.json();
-    if (!res1.ok) throw new Error(data1.error?.message || `API error ${res1.status}`);
 
-    const blocks1 = data1.content || [];
-    const textBlocks1 = blocks1.filter(b => b.type === 'text');
-    const toolUseBlocks = blocks1.filter(b => b.type === 'tool_use');
+    if (!articles || !articles.length) throw new Error('No articles found');
 
-    let finalText = textBlocks1.map(b => b.text).join('');
-
-    // If tool was used, send results back for final answer
-    if (toolUseBlocks.length && !finalText) {
-      const toolResults = toolUseBlocks.map(b => ({
-        type: 'tool_result',
-        tool_use_id: b.id,
-        content: b.input?.query || 'search completed',
-      }));
-      const res2 = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANT_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1024,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          messages: [
-            { role: 'user', content: `Search for the latest ${currentLeague} news about ${playerName} from the past week. Then return ONLY a JSON array of up to 5 real articles found, no markdown, no backticks. Each object: {"headline":"...","source":"...","date":"...","summary":"2-3 sentences.","sentiment":"positive|negative|neutral","url":"https://..."}` },
-            { role: 'assistant', content: blocks1 },
-            { role: 'user', content: toolResults },
-          ]
-        })
-      });
-      const data2 = await res2.json();
-      finalText = (data2.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
-    }
-
-    if (!finalText) throw new Error('No response from API');
-
-    let articles = [];
-    try {
-      const clean = finalText.replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-      articles = JSON.parse(clean);
-    } catch(e) {
-      const match = finalText.match(/\[[\s\S]*\]/);
-      if (match) articles = JSON.parse(match[0]);
-      else throw new Error('Could not parse response');
-    }
-
-    if (!articles.length) throw new Error('No articles found');
-
-    const html = articles.map(a=>`
-      <div class="news-item" ${a.url ? `onclick="window.open('${a.url}','_blank')" style="cursor:pointer;"` : ''}>
-        <div class="news-headline">${a.headline} ${a.url ? '<span style="color:var(--muted);font-size:9px;"></span>' : ''}</div>
+    // Article fields (and especially `url`) come from live web search results
+    // via an LLM, not a trusted source - escHtml everything, and never splice
+    // `url` into an inline onclick (a stray quote in it would break out of the
+    // JS string). data-news-url + _wireNewsLinks keeps it in an attribute,
+    // which escHtml actually protects.
+    const html = articles.map(a=>{
+      const safeUrl = typeof a.url === 'string' && /^https?:\/\//i.test(a.url) ? a.url : '';
+      return `
+      <div class="news-item" ${safeUrl ? `data-news-url="${escHtml(safeUrl)}" style="cursor:pointer;"` : ''}>
+        <div class="news-headline">${escHtml(a.headline||'')}</div>
         <div class="news-meta">
-          <span class="news-sentiment ns-${a.sentiment==='positive'?'pos':a.sentiment==='negative'?'neg':'neu'}">${a.sentiment}</span>
-          ${a.source} · ${a.date}
+          <span class="news-sentiment ns-${a.sentiment==='positive'?'pos':a.sentiment==='negative'?'neg':'neu'}">${escHtml(a.sentiment||'')}</span>
+          ${escHtml(a.source||'')} · ${escHtml(a.date||'')}
         </div>
-        ${a.summary?`<div class="news-summary">${a.summary}</div>`:''}
-      </div>`).join('');
+        ${a.summary?`<div class="news-summary">${escHtml(a.summary)}</div>`:''}
+      </div>`;
+    }).join('');
 
     newsCache[playerName] = html;
     content.innerHTML = html;
+    _wireNewsLinks(content);
 
   } catch(e) {
-    content.innerHTML=`<div class="news-loading" style="color:var(--red);">News error: ${e.message}</div>`;
+    content.innerHTML=`<div class="news-loading" style="color:var(--red);">News error: ${escHtml(e.message)}</div>`;
   }
 }
 // ═══════════════════════════════════════════
@@ -14185,7 +14099,6 @@ window.addEventListener('resize',()=>{
 //  INIT
 // ═══════════════════════════════════════════
 updateModeBadge();
-updateKeyStatusDots();
 updateNav();
 renderList();
 selectPlayer(players[0].rank);
@@ -14786,20 +14699,9 @@ async function _backgroundSync() {
   if (dbInst) {
 
     // Fire all Firestore reads simultaneously
-    const [cfgSnap, pgSnap] = await Promise.allSettled([
-      window._fbGetDoc(window._fbDoc(dbInst, 'config', 'app')).catch(() => null),
+    const [pgSnap] = await Promise.allSettled([
       window._fbGetDoc(window._fbDoc(dbInst, 'config', 'pregame')).catch(() => null),
     ]);
-
-    // Apply API key
-    try {
-      const cfg = cfgSnap.value;
-      if (cfg?.exists() && cfg.data().antKey) {
-        ANT_KEY = cfg.data().antKey;
-        localStorage.setItem('ant_key', ANT_KEY);
-        updateKeyStatusDots();
-      }
-    } catch(e) {}
 
     // Apply pregame - only use if it's from TODAY, ignore anything else
     try {
@@ -14967,19 +14869,6 @@ function initFirebase() {
   }
   auth = window._firebaseAuth;
   db   = window._firebaseDb;
-
-  // Load shared API key from config doc - works for ALL users without signing in
-  window._fbGetDoc(window._fbDoc(db, 'config', 'app')).then(snap => {
-    if (snap.exists()) {
-      const cfg = snap.data();
-      if (cfg.antKey && !ANT_KEY) {
-        ANT_KEY = cfg.antKey;
-        localStorage.setItem('ant_key', ANT_KEY);
-        updateKeyStatusDots();
-        _antKeyResolve();
-      }
-    }
-  }).catch(e => console.warn('Could not load config:', e));
 
   // Load shared pregame snapshot so all devices share the same price baseline
   const _todayStr = localDateStr();
