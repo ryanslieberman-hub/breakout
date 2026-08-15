@@ -5718,9 +5718,18 @@ const START_VALUE = 100000; // legacy: the old $100k Practice/challenge baseline
 // callers can distinguish "no data yet" from "0% gain" - the leaderboard
 // sort already treats a null returnPct as "sorts last" (see ~17914).
 let _coinsTotalGranted = 0; // cached from /coins/account - refreshed on sign-in, claim, and purchase
+// userProfile.coinsBaseline: a one-time correction for accounts that carried
+// real cash over from the old $100k Practice portfolio when 'gold' became the
+// default wallet (b430c85) - that leftover cash isn't accounted for by
+// totalGranted (which only tracks real coin claims/purchases going forward),
+// so without this offset it reads as a huge bogus "% gain" from nothing but
+// claiming free coins. Computed once in handleAuthChange and persisted, so it
+// never re-fires and never affects genuinely new accounts (they start with
+// val === totalGranted already, giving a baseline of 0).
 function computeCoinsReturnPct(val, totalGranted = _coinsTotalGranted) {
   if (!totalGranted || totalGranted <= 0) return null;
-  return Math.round(((val - totalGranted) / totalGranted) * 1000) / 10;
+  const baseline = userProfile?.coinsBaseline || 0;
+  return Math.round((((val - baseline) - totalGranted) / totalGranted) * 1000) / 10;
 }
 async function refreshCoinsTotalGranted() {
   if (!currentUser) return;
@@ -11703,7 +11712,29 @@ function _dayOpenBase(rank){
 }
 
 function getTodayPct(rank){
-  return ENGINE.pct(rank, 1);
+  const todayStr = localDateStr(0);
+  const ln = lastNight[rank];
+  const hasGameToday = ln && ln.played && ln.date === todayStr;
+  if (hasGameToday) return ENGINE.pct(rank, 1);
+  // No game yet today (pre-slate, e.g. every morning before first pitch/tip-off) -
+  // ENGINE.pct(rank,1) compares today's live price to today's BASE, which is just
+  // yesterday's close carried forward untouched at this point, so it's always
+  // exactly 0. That read as the whole app being broken: literally every single
+  // player's row showed "+0.0%" while the movers ticker right above the list
+  // (which diffs closes directly, see buildFromLastNight below) correctly showed
+  // real ±9% moves off THE SAME closes history - confirmed live, not just guessed
+  // (Machado 2-for-5 showing 2H/2-5 correctly in his own box score, but +0.0% in
+  // the list, same as literally every other MLB player that morning). Fall back to
+  // the last completed slate's close-to-close move so the number stays meaningful
+  // until today's games actually start, same fallback buildFromLastNight already
+  // uses for the movers ticker. Gated to the last ~2 days so a player who hasn't
+  // played in a while doesn't keep showing a stale game's move indefinitely.
+  const cutoff = localDateStr(2);
+  const c = closes[rank] || {};
+  const dates = Object.keys(c).filter(d => c[d] > 0).sort();
+  if (dates.length < 2 || dates[dates.length - 1] < cutoff) return 0;
+  const cur = c[dates[dates.length - 1]], prev = c[dates[dates.length - 2]];
+  return prev > 0 ? Math.round((cur - prev) / prev * 1000) / 10 : 0;
 }
 function _getTodayPct_statBased(rank){
   const cur = liveP[rank];
@@ -15071,6 +15102,13 @@ async function handleAuthChange(user) {
 
       // Compute accurate returnPct and update Firestore
       const val = portVal();
+      // One-time legacy correction - see coinsBaseline comment above
+      // computeCoinsReturnPct. Only ever sets this once per account (guarded by
+      // the undefined check); only fires when there's real grant history to
+      // compare against, so brand-new accounts always compute a baseline of 0.
+      if (userProfile.coinsBaseline === undefined && _coinsTotalGranted > 0) {
+        userProfile.coinsBaseline = Math.max(0, Math.round(val - _coinsTotalGranted));
+      }
       const ret = computeCoinsReturnPct(val);
       userProfile.displayName = user.displayName || userProfile.displayName;
       // Same rule as above - never let this clobber a self-uploaded photo, since this
@@ -17165,7 +17203,24 @@ async function claimDailyFree() {
       if (coins) parts.push(`${coins.toLocaleString()} Coins`);
       if (bucksCents) parts.push(`💵 $${(bucksCents/100).toFixed(2)} Bucks`);
       showToast(`Claimed ${parts.join(' + ')}!`);
-      if (coins) refreshCoinsTotalGranted(); // keep the % gain leaderboard baseline in sync
+      if (coins) {
+        refreshCoinsTotalGranted(); // keep the % gain leaderboard baseline in sync
+        // The server already bumped portfolios/{uid}/wallets/gold.cash directly
+        // (worker-payments' handleCoinsClaim) so the claim is spendable - but the
+        // client's bare `cash` global has no idea that happened, so the balance
+        // shown here (hero header, portfolio switcher, Profile tab) sat stale
+        // until the next full reload re-pulled it from Firestore. Mirror the
+        // bump locally so it's instant.
+        if (activePortfolioId === 'gold') {
+          cash += coins;
+          pushPortHx();
+          renderAll();
+          saveLocalPortfolio();
+          if (currentUser && db) saveCloudPortfolio(true);
+        } else if (_portfolios['gold']) {
+          _portfolios['gold'].cash = (_portfolios['gold'].cash || 0) + coins;
+        }
+      }
     } else {
       showToast(`Nothing to claim yet - next free grant in ${fmtCountdown(result.nextEligibleAt - Date.now())}`);
     }
