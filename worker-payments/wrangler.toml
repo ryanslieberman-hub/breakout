@@ -35,3 +35,24 @@ CHECKOUT_CANCEL_URL = "https://square-block-4d1b.ryanslieberman.workers.dev/?cha
 IDENTITY_RETURN_URL = "https://square-block-4d1b.ryanslieberman.workers.dev/?identity_return=1"
 CONNECT_RETURN_URL = "https://square-block-4d1b.ryanslieberman.workers.dev/?connect_return=1"
 PLATFORM_FEE_BPS = "1000"
+
+# Native Cloudflare rate limiting, keyed per-uid in code (see checkRateLimit
+# in index.js) - guards the handful of endpoints that cost real money per
+# call: Anthropic API (news), Stripe Identity verification attempts, and
+# Stripe Checkout session creation. `period` is fixed by Cloudflare to 10 or
+# 60 seconds - no other values are accepted. namespace_id just needs to be
+# unique per binding; it isn't a resource you create separately.
+[[ratelimits]]
+name = "NEWS_RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 8, period = 60 }
+
+[[ratelimits]]
+name = "IDENTITY_RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 5, period = 60 }
+
+[[ratelimits]]
+name = "CHECKOUT_RATE_LIMITER"
+namespace_id = "1003"
+simple = { limit = 10, period = 60 }

@@ -60,9 +60,27 @@ class HttpError extends Error {
   }
 }
 
+// Cloudflare's native Rate Limiting binding (see wrangler.toml's [[ratelimits]]
+// entries) - gates the handful of endpoints that cost real money per call
+// (Anthropic API, Stripe Identity verification attempts, Stripe Checkout
+// session creation) so a signed-in-but-malicious/compromised account can't
+// just loop them. Keyed per-uid rather than IP: everything this guards is
+// already behind requireUser, so uid is a tighter key than a shared NAT/VPN
+// IP and can't false-positive multiple legitimate users on one connection.
+// Fails OPEN if the binding is somehow missing (e.g. a local run without
+// wrangler.toml's ratelimits picked up) - auth still applies either way, this
+// is a cost/abuse guard, not the security boundary itself.
+async function checkRateLimit(env, limiterName, key) {
+  const limiter = env[limiterName];
+  if (!limiter) return;
+  const { success } = await limiter.limit({ key });
+  if (!success) throw new HttpError(429, 'Too many requests - slow down and try again shortly');
+}
+
 // ── POST /challenges/:id/checkout ──
 async function handleCheckout(request, env, challengeId) {
   const user = await requireUser(request, env);
+  await checkRateLimit(env, 'CHECKOUT_RATE_LIMITER', user.uid);
   const challenge = await firestoreGetDoc(env, `challenges/${challengeId}`);
   if (!challenge) throw new HttpError(404, 'Challenge not found');
   if (Date.now() > challenge.joinDeadline) throw new HttpError(400, 'Join deadline has passed');
@@ -326,6 +344,7 @@ async function syncIdentitySession(env, uid, sessionId) {
 // (request.cf), never from anything the client claims.
 async function handleIdentitySession(request, env) {
   const user = await requireUser(request, env);
+  await checkRateLimit(env, 'IDENTITY_RATE_LIMITER', user.uid);
   const userDoc = (await firestoreGetDoc(env, `users/${user.uid}`)) || {};
 
   const geoCountry = request.cf?.country || null;
@@ -820,6 +839,7 @@ async function handleChallengeStandings(request, env, challengeId) {
 // by handleCoinDeposit below once payment actually completes.
 async function handleCoinCheckout(request, env) {
   const user = await requireUser(request, env);
+  await checkRateLimit(env, 'CHECKOUT_RATE_LIMITER', user.uid);
   const body = await request.json().catch(() => ({}));
   const { packageId, clientNonce } = body || {};
   const pkg = getCoinPackage(packageId);
@@ -1231,7 +1251,8 @@ async function handleCoinsClaim(request, env) {
 // requireUser() below keeps it from being a fully-anonymous cost sink.
 const NEWS_MAX_LEN = 60;
 async function handleNewsSearch(request, env) {
-  await requireUser(request, env); // any signed-in user - just keeps this from being anonymous-abusable
+  const user = await requireUser(request, env); // any signed-in user - just keeps this from being anonymous-abusable
+  await checkRateLimit(env, 'NEWS_RATE_LIMITER', user.uid);
   const body = await request.json().catch(() => ({}));
   const { playerName, league } = body || {};
   if (!playerName || typeof playerName !== 'string' || playerName.length > NEWS_MAX_LEN) {
