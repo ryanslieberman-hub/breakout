@@ -289,6 +289,11 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .mt.sell.active{background:rgba(245,68,95,.1);border-color:rgba(245,68,95,.5);color:var(--red);}
 .inp-grp{display:flex;flex-direction:column;gap:3px;}
 .inp-lbl{font-family:var(--font-mono);font-size:8px;color:var(--muted);letter-spacing:1px;}
+.inp-lbl-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.unit-toggle{display:flex;border:1px solid var(--hairline);border-radius:6px;overflow:hidden;}
+.ut-btn{font-family:var(--font-mono);font-size:8px;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:all .12s;}
+.ut-btn+.ut-btn{border-left:1px solid var(--hairline);}
+.ut-btn.active{background:rgba(18,212,126,.12);color:var(--green);}
 .inp-row{display:flex;gap:4px;align-items:center;}
 .sinp{width:80px;background:var(--card);border:1px solid var(--hairline);color:var(--text);font-family:var(--font-mono);font-size:15px;padding:6px 8px;outline:none;transition:border-color .15s,box-shadow .15s;-moz-appearance:textfield;border-radius:8px;}
 .sinp::-webkit-inner-spin-button,.sinp::-webkit-outer-spin-button{-webkit-appearance:none;}
@@ -5464,23 +5469,23 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
           <div class="mt sell" id="mt-sell" onclick="setMode(&#39;sell&#39;)">Sell</div>
         </div>
         <div class="inp-grp">
-          <div class="inp-lbl">Shares</div>
-          <div class="inp-row">
-            <input class="sinp" id="sinp" type="number" value="10" min="1" aria-label="Shares">
-            <div class="qcs">
-              <div class="qc" onclick="setQ(5)">5</div>
-              <div class="qc" onclick="setQ(10)">10</div>
-              <div class="qc" onclick="setQ(25)">25</div>
-              <div class="qc" onclick="setQ(50)">50</div>
-              <div class="qc" onclick="setQ(100)">100</div>
+          <div class="inp-lbl-row">
+            <div class="inp-lbl" id="inp-lbl">Shares</div>
+            <div class="unit-toggle" role="group" aria-label="Trade by shares or coins">
+              <button type="button" class="ut-btn active" id="ut-shares" onclick="setTradeUnit('shares')">Shares</button>
+              <button type="button" class="ut-btn" id="ut-coins" onclick="setTradeUnit('coins')">Coins</button>
             </div>
+          </div>
+          <div class="inp-row">
+            <input class="sinp" id="sinp" type="number" value="10" min="0" step="0.001" aria-label="Shares">
+            <div class="qcs" id="qcs"></div>
           </div>
         </div>
         <div class="prev-row">
           <div class="pv"><div class="pvl">Price</div><div class="pvv" id="pv-price">$156.82</div></div>
           <div class="pv"><div class="pvl">Avg/Share</div><div class="pvv" id="pv-avg">$156.82</div></div>
           <div class="pv"><div class="pvl">Impact</div><div class="pvv up" id="pv-impact">+0.0%</div></div>
-          <div class="pv"><div class="pvl">Total</div><div class="pvv gold" id="pv-total">$1,568.20</div></div>
+          <div class="pv"><div class="pvl" id="pv-total-lbl">Total</div><div class="pvv gold" id="pv-total">$1,568.20</div></div>
           <div class="pv"><div class="pvl">You Hold</div><div class="pvv" id="pv-hold">0</div></div>
         </div>
         <div style="display:flex;gap:8px;">
@@ -8860,6 +8865,29 @@ function ammSell(rank,shares){
   const nx=p.x+shares,ny=p.k/nx,ret=p.y-ny,np=ny/nx,avg=ret/shares,imp=(np-p.y/p.x)/(p.y/p.x)*100;
   return{returned:ret,newX:nx,newY:ny,newPrice:np,avgPrice:avg,impact:imp};
 }
+// Inverse of ammBuy - given a coin budget instead of a share count, how many
+// shares does that buy? Solves ammBuy's cost = k/(x-shares) - y for shares:
+//   k/(x-shares) = y+cost  =>  x-shares = k/(y+cost)  =>  shares = x - k/(y+cost)
+// Letting the trade bar's $ mode feed the result straight back into ammBuy
+// (rather than duplicating the cost/avg/impact math here) keeps buying by $
+// on the exact same execution path as buying by shares - same applyBuy,
+// same live-trade queue, same trade log shape.
+function sharesForBuyBudget(rank,budget){
+  const p=activePool(rank);
+  if(budget<=0)return 0;
+  const nx=p.k/(p.y+budget);
+  if(!(nx>0)||nx>=p.x)return null; // budget too large for this pool to fill
+  return p.x-nx;
+}
+// Inverse of ammSell - given a desired coin payout, how many shares need
+// selling? Solves ammSell's ret = y - k/(x+shares) for shares:
+//   k/(x+shares) = y-ret  =>  x+shares = k/(y-ret)  =>  shares = k/(y-ret) - x
+function sharesForSellProceeds(rank,proceeds){
+  const p=activePool(rank);
+  if(proceeds<=0||proceeds>=p.y)return null; // can't drain the whole pool
+  const nx=p.k/(p.y-proceeds);
+  return nx-p.x;
+}
 // Takes the pool object directly (not a rank) so it works for both the bare
 // global pool and a challenge's own isolated pool.
 function syncPool(pool){pool.k=pool.x*pool.y;}
@@ -8878,6 +8906,10 @@ function dcls(s){return s>=75?'hot':s>=55?'high':s>=35?'mid':'low';}
 // button, the buy-coins package cards), not stamped on every number.
 function fmt(n){return Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtS(n){return(n>=0?'+':'-')+fmt(n);}
+// Shares can now be fractional (buying/selling by $ amount rarely lands on a
+// whole share) - rounds to 3 decimals and drops trailing zeros, so a whole-
+// share trade still reads as "10", not "10.000".
+function fmtShares(n){return(Math.round((n||0)*1000)/1000).toString();}
 function fmtP(n){return(n>=0?'+':'')+n.toFixed(1)+'%';}
 // The brand mark, generated rather than hand-copied so the nav logo, the
 // onboarding logo, and a real mover's HOT/COLD tag are provably the same
@@ -10895,7 +10927,7 @@ async function executeTrade(){
     setTimeout(()=>openProfile(), 800);
     return;
   }
-  const shares=parseInt(document.getElementById('sinp').value)||0;
+  const shares=resolveTradeShares(selRank,tradeMode,document.getElementById('sinp').value);
   if(shares<=0)return;
 
   // MLB live games: 90s delay (TV broadcast ~15-30s lag + time to trade = ~60s edge)
@@ -10965,7 +10997,7 @@ async function sellAll(rank){
     clearTimeout(window._autoSaveTimer);
     window._autoSaveTimer = setTimeout(()=>saveCloudPortfolio(true),3000);
   }
-  showToast(`Sold all ${held} shares of ${p.name}`);
+  showToast(`Sold all ${fmtShares(held)} shares of ${p.name}`);
   buildPortfolio();
 }
 
@@ -11131,7 +11163,7 @@ function renderPendingTrades(){
     card.style.cssText = `pointer-events:auto;background:#1a1a2e;border:1px solid ${isBuy?'#00c896':'#ff6b6b'};border-radius:10px;padding:8px 14px;width:100%;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.5);`;
     card.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-        <span style="font-weight:700;color:${isBuy?'#00c896':'#ff6b6b'};font-size:13px;">${isBuy?'\u{1F7E2} BUY':'\u{1F534} SELL'} ${t.shares}× ${t.name}</span>
+        <span style="font-weight:700;color:${isBuy?'#00c896':'#ff6b6b'};font-size:13px;">${isBuy?'\u{1F7E2} BUY':'\u{1F534} SELL'} ${fmtShares(t.shares)}× ${t.name}</span>
         <span style="color:#aaa;font-size:12px;">${fmt(amt)} &nbsp;\u23F3 ${secsLeft}s</span>
       </div>
       <div style="background:#0d0d1a;border-radius:4px;height:4px;overflow:hidden;">
@@ -11331,7 +11363,7 @@ function updateHero(){
   document.getElementById('bnum').textContent=ds;
 
   updatePreview();
-  document.getElementById('pv-hold').textContent=ownShares;
+  document.getElementById('pv-hold').textContent=fmtShares(ownShares);
   const sellAllBtn = document.getElementById('sell-all-btn');
   if(sellAllBtn) sellAllBtn.style.display = ownShares > 0 ? '' : 'none';
 
@@ -11575,16 +11607,21 @@ function updateHero(){
 }
 
 function updatePreview(){
-  const shares=parseInt(document.getElementById('sinp').value)||0;
+  const shares=resolveTradeShares(selRank,tradeMode,document.getElementById('sinp').value);
   const price=activePrice(selRank);
   document.getElementById('pv-price').textContent=fmt(price);
+  const totalLbl=document.getElementById('pv-total-lbl');
+  // Coin mode: the input IS the coin total already, so echoing it back in
+  // "Total" is redundant - show the resolved share count there instead (the
+  // one thing coin mode doesn't otherwise surface anywhere in this panel).
+  totalLbl.textContent = tradeUnit==='coins' ? '≈ Shares' : 'Total';
   if(tradeMode==='buy'){
     const r=shares>0?ammBuy(selRank,shares):null;
     document.getElementById('pv-avg').textContent=r?fmt(r.avgPrice):'—';
     const ie=document.getElementById('pv-impact');
     ie.textContent=r?fmtP(r.impact):'—';
     ie.className='pvv '+(r?(r.impact>=0?'up':'dn'):'');
-    document.getElementById('pv-total').textContent=r?fmt(r.cost):'—';
+    document.getElementById('pv-total').textContent = !r ? '—' : (tradeUnit==='coins' ? fmtShares(shares) : fmt(r.cost));
   }else{
     const held=holdings[selRank]?.shares||0;
     const sell=Math.min(shares,held);
@@ -11593,7 +11630,7 @@ function updatePreview(){
     const ie=document.getElementById('pv-impact');
     ie.textContent=r?fmtP(r.impact):'—';
     ie.className='pvv dn';
-    document.getElementById('pv-total').textContent=r?fmt(r.returned):'—';
+    document.getElementById('pv-total').textContent = !r ? '—' : (tradeUnit==='coins' ? fmtShares(sell) : fmt(r.returned));
   }
 }
 
@@ -12964,9 +13001,49 @@ function setMode(m){
   updatePreview();
 }
 
+// 'shares': #sinp is a literal share count (fractional allowed, e.g. 0.5).
+// 'coins': #sinp is a coin budget (buy) or desired payout (sell) - resolved
+// to shares via sharesForBuyBudget/sharesForSellProceeds in resolveTradeShares.
+let tradeUnit='shares';
+// Quick-pick values differ by unit - 5/10/25/50/100 shares would be either a
+// trivial or a meaningless coin amount depending on the player's price, so
+// coin mode gets its own scale roughly matching typical trade sizes instead.
+const QUICK_SHARES=[5,10,25,50,100];
+const QUICK_COINS=[100,250,500,1000,2500];
+function renderQuickChips(){
+  const vals = tradeUnit==='shares' ? QUICK_SHARES : QUICK_COINS;
+  document.getElementById('qcs').innerHTML = vals.map(v=>`<div class="qc" onclick="setQ(${v})">${v.toLocaleString()}</div>`).join('');
+}
+function setTradeUnit(u){
+  tradeUnit=u;
+  document.getElementById('ut-shares').classList.toggle('active',u==='shares');
+  document.getElementById('ut-coins').classList.toggle('active',u==='coins');
+  document.getElementById('inp-lbl').textContent = u==='shares' ? 'Shares' : 'Coins';
+  document.getElementById('sinp').setAttribute('aria-label', u==='shares' ? 'Shares' : 'Coins');
+  document.getElementById('sinp').step = u==='shares' ? '0.001' : '1';
+  renderQuickChips();
+  updatePreview();
+}
+
 function setQ(n){document.getElementById('sinp').value=n;updatePreview();}
 
+// Resolves the raw #sinp value into an actual share count, honoring the
+// current Shares/Coins toggle - a $ trade still flows through the exact same
+// ammBuy/ammSell/applyBuy/applySell path as a share-count trade (live-trade
+// queue, confirm modal, trade log, all of it), just with the share count
+// pre-computed from the coin budget instead of typed directly. Returns 0
+// (not null) when there's nothing tradeable, so callers can keep their
+// existing `shares>0` guards unchanged.
+function resolveTradeShares(rank,mode,rawValue){
+  const v=parseFloat(rawValue)||0;
+  if(v<=0)return 0;
+  if(tradeUnit==='shares')return Math.round(v*1000)/1000;
+  const shares = mode==='buy' ? sharesForBuyBudget(rank,v) : sharesForSellProceeds(rank,v);
+  return shares>0 ? Math.round(shares*1000)/1000 : 0;
+}
+
 document.getElementById('sinp').addEventListener('input',updatePreview);
+renderQuickChips();
 
 function setRange(r,el){
   chartRange=r;
@@ -13583,7 +13660,7 @@ function buildPortfolio(){
         const todayBase = (dayOpen[r] && dayOpen[r].price > 0) ? dayOpen[r].price : avg;
         const todayH = (cur - todayBase) * h.shares;
         html+=`<tr onclick="goMarket(${rank})">
-          <td style="white-space:nowrap">${p.name}</td><td>${h.shares}</td>
+          <td style="white-space:nowrap">${p.name}</td><td>${fmtShares(h.shares)}</td>
           <td style="color:var(--muted)">${fmt(avg)}</td>
           <td>${fmt(cur)}</td>
           <td>${fmt(h.shares*cur)}</td>
@@ -13605,7 +13682,7 @@ function buildPortfolio(){
     logs.forEach(l=>{
       html+=`<tr>
         <td style="color:${l.type==='buy'?'var(--green)':'var(--red)'}">${l.type==='buy'?'▲ BUY':'▼ SELL'}</td>
-        <td style="white-space:nowrap">${l.name}</td><td>${l.shares}</td>
+        <td style="white-space:nowrap">${l.name}</td><td>${fmtShares(l.shares)}</td>
         <td style="color:${l.type==='buy'?'var(--red)':'var(--green)'}">${l.type==='buy'?'-':'+'}${fmt(l.amount)}</td>
         <td>${fmt(l.price)}</td>
       </tr>`;
@@ -13723,7 +13800,7 @@ function checkPriceAlerts() {
     if (Math.abs(pct) >= 3) {
       const name = players.find(p => p.rank === rank)?.name || '';
       const dir = pct > 0 ? '' : '';
-      showToast(`${dir} ${name} ${pct > 0 ? '+' : ''}${pct.toFixed(1)}% - you own ${h.shares} shares`);
+      showToast(`${dir} ${name} ${pct > 0 ? '+' : ''}${pct.toFixed(1)}% - you own ${fmtShares(h.shares)} shares`);
       _priceAlertSnap[rank] = cur; // reset so it doesn't re-alert
     }
   });
@@ -13920,7 +13997,7 @@ function showTradeConfirm(mode, shares, cost, player) {
           <div class="sheet-handle"></div>
           <div class="conf-title">${isBuy ? 'Confirm Buy' : 'Confirm Sell'}</div>
           <div class="conf-detail">
-            <strong style="color:var(--text)">${shares} shares of ${player}</strong><br>
+            <strong style="color:var(--text)">${fmtShares(shares)} shares of ${player}</strong><br>
             ${isBuy ? 'Cost' : 'Return'}: <strong style="color:${isBuy?'var(--red)':'var(--green)'}">${fmt(cost)}</strong><br>
             ${isBuy ? `Coins after: <strong>${fmt(cash - cost)}</strong>` : `Coins after: <strong>${fmt(cash + cost)}</strong>`}
           </div>
@@ -15373,7 +15450,7 @@ async function openPublicProfile(uid){
         holdingsHtml = rows.length
           ? rows.map(r => `
             <div class="ulb-card" style="padding:8px 12px;cursor:pointer;" onclick="closePublicProfile();goMarket(${r.rank})">
-              <div class="ulb-info"><div class="ulb-name" style="font-size:12px;">${escHtml(r.player.name)}</div><div class="ulb-sub">${r.shares} sh</div></div>
+              <div class="ulb-info"><div class="ulb-name" style="font-size:12px;">${escHtml(r.player.name)}</div><div class="ulb-sub">${fmtShares(r.shares)} sh</div></div>
               <div class="ulb-ret pos" style="font-size:12px;">${fmt(liveP[r.rank]*r.shares)}</div>
             </div>`).join('')
           : `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:12px 0;">No open positions.</div>`;
@@ -15899,7 +15976,7 @@ function renderChat() {
       <div class="chat-trade-card" onclick="goMarket(${m.trade.rank})">
         <span class="chat-trade-type ${m.trade.type}">${m.trade.type === 'buy' ? 'BOUGHT' : 'SOLD'}</span>
         <span class="chat-trade-name">${escHtml(m.trade.playerName||'')}</span>
-        <span class="chat-trade-sub">${m.trade.shares} sh @ $${Number(m.trade.price||0).toFixed(2)}</span>
+        <span class="chat-trade-sub">${fmtShares(m.trade.shares)} sh @ $${Number(m.trade.price||0).toFixed(2)}</span>
         ${m.trade.pct != null ? `<span class="chat-trade-pct ${m.trade.pct>=0?'up':'down'}">${fmtP(m.trade.pct)}</span>` : ''}
       </div>` : '';
     // Username, not first/last name - falls back to display name for anyone who
@@ -16056,7 +16133,7 @@ function toggleTradePicker() {
         <div class="chat-trade-pick" onclick="postTradeToChat(${i})">
           <span class="chat-trade-type ${t.type}">${t.type === 'buy' ? 'BOUGHT' : 'SOLD'}</span>
           <span class="chat-trade-name">${escHtml(t.playerName||'')}</span>
-          <span class="chat-trade-sub">${t.shares} sh @ $${Number(t.price||0).toFixed(2)} · ${feedTimeAgo(t.ts)}</span>
+          <span class="chat-trade-sub">${fmtShares(t.shares)} sh @ $${Number(t.price||0).toFixed(2)} · ${feedTimeAgo(t.ts)}</span>
           <span class="chat-trade-pct ${pct>=0?'up':'down'}">${fmtP(pct)}</span>
         </div>`;
       }).join('')
@@ -17377,13 +17454,24 @@ function _renderGlobalLbRows(){
       : status === 'outgoing' ? `<span class="ulb-friend-icon outline" title="Request sent">···</span>`
       : status === 'incoming' ? `<span class="ulb-friend-icon clickable" title="Accept friend request" onclick="acceptFriendRequest('${_friendshipId(currentUser.uid,u.uid)}')">✓</span>`
       : `<span class="ulb-friend-icon clickable" title="Add friend" onclick="sendFriendRequestFromGlobalLb(${i})">+</span>`;
+    // Whichever stat this list is actually sorted by belongs in the big
+    // right-hand slot - a % badge next to a Total Coins ranking was showing
+    // a number that has nothing to do with why that row is in that position.
+    // Balance mode leads with coins there instead; % (still worth knowing)
+    // moves down into the sub-line either way.
+    const rightMetric = _lbSortMode === 'gain'
+      ? `<div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>`
+      : `<div class="ulb-ret" style="color:var(--gold);">${coinIcon(13)} ${(u.portfolioValue||0).toLocaleString()}</div>`;
+    const subLine = _lbSortMode === 'gain'
+      ? `${coinIcon(9)} ${(u.portfolioValue||0).toLocaleString()}`
+      : `<span style="color:${ret>=0?'var(--green)':'var(--red)'}">${ret>=0?'+':''}${ret.toFixed(1)}%</span>`;
     return `<div class="ulb-card ${isYou?'ulb-you':''}">
       <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
       <div class="ulb-info">
         ${_ulbNameBlock(u, isYou)}
-        <div class="ulb-sub">${coinIcon(9)} ${(u.portfolioValue||0).toLocaleString()}</div>
+        <div class="ulb-sub">${subLine}</div>
       </div>
-      <div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>
+      ${rightMetric}
       ${friendAction}
     </div>`;
   }).join('');
