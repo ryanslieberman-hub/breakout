@@ -72,6 +72,13 @@ export function detectMovers({ rank, name, perf, value, st, dateKey, now }) {
 
 const SPORT_EMOJI = { nba: '🏀', mlb: '⚾', golf: '⛳', nfl: '🏈' };
 
+// Coins is the app's only currency (not real money) - matches index.html's
+// fmt(): plain number, no $ and no symbol at all. Push copy had been left
+// showing "$" from before the Practice->Coins switch (see b430c85).
+function fmtCoins(n) {
+  return Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 // Formats and fires one push per mover event, broadcast to every opted-in
 // device. Returns how many devices got at least one push (for tick stats).
 async function announceMovers(env, movers) {
@@ -85,7 +92,7 @@ async function announceMovers(env, movers) {
     const moveEmoji = up ? '🔥' : '🧊';
     const sent = await notifyAllTokens(env, {
       title: `${moveEmoji}${sportEmoji} ${m.name} is ${direction} ${pct}% ${windowText}`,
-      body: `Now $${m.value.toFixed(2)}`,
+      body: `Now ${fmtCoins(m.value)}`,
     }, { rank: String(m.rank), kind: `${m.kind}_move` });
     notified += sent;
   }
@@ -456,7 +463,7 @@ export async function runPortfolioSummary(env) {
       }
 
       const last = portfolio.lastDailySummary;
-      const amount = `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+      const amount = fmtCoins(value);
       let body = amount;
       if (last && last.value > 0) {
         const pct = ((value - last.value) / last.value) * 100;

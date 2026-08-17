@@ -15976,7 +15976,7 @@ function renderChat() {
       <div class="chat-trade-card" onclick="goMarket(${m.trade.rank})">
         <span class="chat-trade-type ${m.trade.type}">${m.trade.type === 'buy' ? 'BOUGHT' : 'SOLD'}</span>
         <span class="chat-trade-name">${escHtml(m.trade.playerName||'')}</span>
-        <span class="chat-trade-sub">${fmtShares(m.trade.shares)} sh @ $${Number(m.trade.price||0).toFixed(2)}</span>
+        <span class="chat-trade-sub">${fmtShares(m.trade.shares)} sh @ ${fmt(Number(m.trade.price||0))}</span>
         ${m.trade.pct != null ? `<span class="chat-trade-pct ${m.trade.pct>=0?'up':'down'}">${fmtP(m.trade.pct)}</span>` : ''}
       </div>` : '';
     // Username, not first/last name - falls back to display name for anyone who
@@ -16133,7 +16133,7 @@ function toggleTradePicker() {
         <div class="chat-trade-pick" onclick="postTradeToChat(${i})">
           <span class="chat-trade-type ${t.type}">${t.type === 'buy' ? 'BOUGHT' : 'SOLD'}</span>
           <span class="chat-trade-name">${escHtml(t.playerName||'')}</span>
-          <span class="chat-trade-sub">${fmtShares(t.shares)} sh @ $${Number(t.price||0).toFixed(2)} · ${feedTimeAgo(t.ts)}</span>
+          <span class="chat-trade-sub">${fmtShares(t.shares)} sh @ ${fmt(Number(t.price||0))} · ${feedTimeAgo(t.ts)}</span>
           <span class="chat-trade-pct ${pct>=0?'up':'down'}">${fmtP(pct)}</span>
         </div>`;
       }).join('')
