@@ -9996,37 +9996,47 @@ async function fetchMLBLiveStats(isFinal=false) {
 //   rushing labels : [CAR, YDS, AVG, TD, LONG]                    → YDS=1, TD=3
 //   receiving labels:[REC, YDS, AVG, TD, LONG, TGTS]              → REC=0, YDS=1, TD=3
 // Standard (non-PPR-ish, half-PPR) fantasy scoring.
-function _nflFantasyPoints(cat, stats) {
+// Raw per-category stat line for one player's game, merged across categories
+// since one player can show up in more than one (a rushing QB appears in
+// both 'passing' and 'rushing' in the same box score). Same index/label
+// mapping the old _nflFantasyPoints/_nflDefPoints used - column order was
+// probe-verified live for passing/rushing/receiving; defensive stays
+// label-driven since ESPN's defensive column order isn't stable.
+// Kept as individual numbers (not collapsed to a score) so the same
+// extraction feeds pricing (_nflFptsFromRaw), the hero panel, lastNight, and
+// the Last 10 Games log - one source of truth instead of four guesses.
+function _nflRawLine(cat, labels, stats, into) {
   const n = i => parseFloat((stats[i]||'0').toString().replace(/[^0-9.\-]/g,'')) || 0;
-  if (cat === 'passing')   return n(1)*0.04 + n(3)*4 - n(4)*2;                 // yds, TD, INT
-  if (cat === 'rushing')   return n(1)*0.1  + n(3)*6;                           // yds, TD
-  if (cat === 'receiving') return n(0)*0.5  + n(1)*0.1 + n(3)*6;                // rec(half-PPR), yds, TD
-  if (cat === 'kicking')   return 0; // could parse FG/XP later
-  return 0;
+  if (cat === 'passing') {
+    into.py = (into.py||0) + n(1); into.ptd = (into.ptd||0) + n(3); into.ints = (into.ints||0) + n(4);
+  } else if (cat === 'rushing') {
+    into.car = (into.car||0) + n(0); into.ry = (into.ry||0) + n(1); into.rtd = (into.rtd||0) + n(3);
+  } else if (cat === 'receiving') {
+    into.rec = (into.rec||0) + n(0); into.recy = (into.recy||0) + n(1);
+    into.rectd = (into.rectd||0) + n(3); into.tgt = (into.tgt||0) + n(5);
+  } else if (cat === 'defensive' || cat === 'interceptions') {
+    const get = (names) => {
+      for (const name of names) {
+        const idx = (labels||[]).findIndex(l => (l||'').toUpperCase() === name);
+        if (idx >= 0) return parseFloat((stats[idx]||'0').toString().replace(/[^0-9.\-]/g,'')) || 0;
+      }
+      return 0;
+    };
+    into.tkl = (into.tkl||0) + (get(['TOT','TACK','TCKL']) || get(['SOLO']));
+    into.sack = (into.sack||0) + get(['SACK','SCK']);
+    into.defint = (into.defint||0) + (cat === 'interceptions' ? get(['INT']) : 0);
+    into.ffum = (into.ffum||0) + get(['FF']);
+    into.deftd = (into.deftd||0) + get(['TD']);
+  }
+  return into;
 }
-
-// Defensive scoring is parsed by LABEL (not fixed index) because the probe confirmed the
-// passing/rushing/receiving column order but NOT the defensive one, and ESPN's defensive
-// table columns vary. Standard IDP-style weights: tackle 1, sack 2, INT 3, PD 1, FF/FR 2, TD 6.
-function _nflDefPoints(cat, labels, stats) {
-  if (!labels || !stats) return 0;
-  const get = (names) => {
-    for (const name of names) {
-      const idx = labels.findIndex(l => (l||'').toUpperCase() === name);
-      if (idx >= 0) return parseFloat((stats[idx]||'0').toString().replace(/[^0-9.\-]/g,'')) || 0;
-    }
-    return 0;
-  };
-  const tot   = get(['TOT','TACK','TCKL']);        // total tackles
-  const solo  = get(['SOLO']);                      // solo (fallback if no TOT)
-  const sacks = get(['SACK','SCK']);
-  const tfl   = get(['TFL']);
-  const pd    = get(['PD','PDEF']);                 // passes defended
-  const ints  = (cat === 'interceptions') ? get(['INT']) : 0;
-  const ffum  = get(['FF']);
-  const td    = get(['TD']);
-  const tackles = tot || solo;
-  return tackles*1 + sacks*2 + tfl*0.5 + pd*1 + ints*3 + ffum*2 + td*6;
+// Standard IDP/PPR-ish weights - same as the old _nflFantasyPoints/_nflDefPoints,
+// just computed from the merged raw line instead of per-category in isolation.
+function _nflFptsFromRaw(s) {
+  return (s.py||0)*0.04 + (s.ptd||0)*4 - (s.ints||0)*2
+    + (s.ry||0)*0.1 + (s.rtd||0)*6
+    + (s.rec||0)*0.5 + (s.recy||0)*0.1 + (s.rectd||0)*6
+    + (s.tkl||0)*1 + (s.sack||0)*2 + (s.defint||0)*3 + (s.ffum||0)*2 + (s.deftd||0)*6;
 }
 
 let _nflNameIndex = null;
@@ -10049,7 +10059,7 @@ async function nflTick() {
   const relevant = [...finals, ...live];
   if (!relevant.length) return; // no NFL games today (off-season / off-day)
 
-  const fptsByRank = {};   // rank -> total fantasy points this game
+  const lineByRank = {};   // rank -> merged raw stat line this game (see _nflRawLine)
   for (const ev of relevant) {
     const sum = await espnFetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${ev.id}`).catch(()=>null);
     const teams = sum?.boxscore?.players || [];
@@ -10063,26 +10073,44 @@ async function nflTick() {
           if (!nm) return;
           const p = _nflNameIndex[_normName(nm)];
           if (!p) return; // not on our roster
-          const pts = isDefense
-            ? _nflDefPoints(cat.name, cat.labels, a.stats || [])
-            : _nflFantasyPoints(cat.name, a.stats || []);
-          fptsByRank[p.rank] = (fptsByRank[p.rank] || 0) + pts;
+          const line = lineByRank[p.rank] || (lineByRank[p.rank] = {});
+          _nflRawLine(cat.name, cat.labels, a.stats || [], line);
         });
       });
     });
   }
 
-  // Feed the engine: write fpts stat + lastNight, then derive.
-  window._engineStats = window._engineStats || {};
+  // An event is complete only once every relevant event this tick is (mirrors
+  // worker-pricing-engine's tickNfl) - an early Thursday final shouldn't lock
+  // in closes while Sunday/Monday games from the same week are still live.
+  const isFinal = live.length === 0;
   const isLive = live.length > 0;
-  Object.entries(fptsByRank).forEach(([rank, fpts]) => {
+
+  // Feed the engine: write fpts stat + a full lastNight stat line (not just
+  // the aggregate score - the hero panel and Last 10 Games read the
+  // individual fields), then derive and, once the game is actually final,
+  // lock in today's close the same way every other league does. NFL prices
+  // previously never called finalize() at all, so they never locked in a
+  // persisted daily close - today's move just kept floating indefinitely.
+  window._engineStats = window._engineStats || {};
+  let moved = 0;
+  Object.entries(lineByRank).forEach(([rank, line]) => {
     const r = +rank;
+    const fpts = _nflFptsFromRaw(line);
     window._engineStats[r] = { fpts };
-    lastNight[r] = { played:true, date: today, live: isLive, nfl:true, fpts: Math.round(fpts*10)/10 };
+    lastNight[r] = { played:true, date: today, live: isLive, nfl:true, fpts: Math.round(fpts*10)/10, ...line };
+    moved++;
   });
   try { if (ENGINE.deriveAll) ENGINE.deriveAll(); } catch(e){}
+  if (isFinal) {
+    nflPlayers.forEach(p => { if (lineByRank[p.rank]) ENGINE.finalize(p, today); });
+  }
+  if (moved > 0) {
+    _saveCloses(); _saveLastNight();
+    saveLocalPortfolio(); syncPricesToFirestore();
+  }
   if (currentLeague === 'NFL') { try { renderAll(); updateMovers(); } catch(e){} }
-  console.log(`[nfl] scored ${Object.keys(fptsByRank).length} players from ${relevant.length} game(s)`);
+  console.log(`[nfl] scored ${moved} players from ${relevant.length} game(s)${isFinal ? ' (finalized)' : ' (live)'}`);
 }
 
 // ── GOLF - LIVE DATA FETCHING ───────────────────────────────────────────────
@@ -11334,6 +11362,34 @@ function updateHero(){
     if(ppgLbl) ppgLbl.textContent = 'AVG';
     if(rpgLbl) rpgLbl.textContent = 'HR';
     if(apgLbl) apgLbl.textContent = 'RBI';
+  } else if (p.role === 'QB') {
+    if(ppgEl) ppgEl.textContent = p.py != null ? Math.round(p.py) : '—';
+    if(rpgEl) rpgEl.textContent = p.ptd != null ? p.ptd.toFixed(1) : '—';
+    if(apgEl) apgEl.textContent = p.ints != null ? p.ints.toFixed(1) : '—';
+    if(ppgLbl) ppgLbl.textContent = 'PASS YDS';
+    if(rpgLbl) rpgLbl.textContent = 'PASS TD';
+    if(apgLbl) apgLbl.textContent = 'INT';
+  } else if (p.role === 'RB') {
+    if(ppgEl) ppgEl.textContent = p.ry != null ? Math.round(p.ry) : '—';
+    if(rpgEl) rpgEl.textContent = p.rtd != null ? p.rtd.toFixed(1) : '—';
+    if(apgEl) apgEl.textContent = p.rec != null ? p.rec.toFixed(1) : '—';
+    if(ppgLbl) ppgLbl.textContent = 'RUSH YDS';
+    if(rpgLbl) rpgLbl.textContent = 'RUSH TD';
+    if(apgLbl) apgLbl.textContent = 'REC';
+  } else if (p.role === 'WR' || p.role === 'TE') {
+    if(ppgEl) ppgEl.textContent = p.rec != null ? p.rec.toFixed(1) : '—';
+    if(rpgEl) rpgEl.textContent = p.recy != null ? Math.round(p.recy) : '—';
+    if(apgEl) apgEl.textContent = p.rtd != null ? p.rtd.toFixed(1) : '—';
+    if(ppgLbl) ppgLbl.textContent = 'REC';
+    if(rpgLbl) rpgLbl.textContent = 'REC YDS';
+    if(apgLbl) apgLbl.textContent = 'TD';
+  } else if (p.role === 'DEF') {
+    if(ppgEl) ppgEl.textContent = p.tkl != null ? p.tkl.toFixed(1) : '—';
+    if(rpgEl) rpgEl.textContent = p.sack != null ? p.sack.toFixed(1) : '—';
+    if(apgEl) apgEl.textContent = p.defint != null ? p.defint.toFixed(1) : '—';
+    if(ppgLbl) ppgLbl.textContent = 'TKL';
+    if(rpgLbl) rpgLbl.textContent = 'SACK';
+    if(apgLbl) apgLbl.textContent = 'INT';
   } else {
     if(ppgEl) ppgEl.textContent = p.ppg;
     if(rpgEl) rpgEl.textContent = p.rpg;
@@ -18401,6 +18457,77 @@ async function loadLast10(rank) {
     return;
   }
 
+  if (rank >= 3001) {
+    // NFL game log. Games cluster Thu/Sun/Mon (not daily like NBA/MLB), so
+    // getting to 10 games can mean spanning most of a season - scan a much
+    // wider window than the other leagues, but skip cheaply (scoreboard call
+    // only, no summary fetch) on any day with nothing scheduled at all.
+    _buildNflIndex();
+    try {
+      const games = [];
+      for (let ago = 1; ago <= 200 && games.length < 10; ago++) {
+        const d = new Date(); d.setDate(d.getDate() - ago);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth()+1).padStart(2,'0');
+        const dd = String(d.getDate()).padStart(2,'0');
+        const dateStr = `${yyyy}${mm}${dd}`;
+
+        let sbData;
+        try { sbData = await espnFetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${dateStr}`); }
+        catch(__) { continue; }
+        const events = (sbData?.events || []).filter(e => e.status?.type?.completed);
+        if (!events.length) continue;
+
+        for (const ev of events) {
+          if (games.length >= 10) break;
+          let sum;
+          try { sum = await espnFetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${ev.id}`); }
+          catch(__) { continue; }
+
+          const teams = sum?.boxscore?.players || [];
+          const line = {};
+          let myBlock = null;
+          teams.forEach(tm => {
+            (tm.statistics || []).forEach(cat => {
+              const isOffense = ['passing','rushing','receiving'].includes(cat.name);
+              const isDefense = ['defensive','interceptions'].includes(cat.name);
+              if (!isOffense && !isDefense) return;
+              (cat.athletes || []).forEach(a => {
+                const nm = (a.athlete?.displayName || '').toLowerCase();
+                if (nm !== pNameLower) return;
+                myBlock = tm;
+                _nflRawLine(cat.name, cat.labels, a.stats || [], line);
+              });
+            });
+          });
+          if (!myBlock) continue; // player didn't appear in this game
+
+          const comps = sum?.header?.competitions?.[0];
+          const teamsC = comps?.competitors || [];
+          const myTeam = teamsC.find(t => t.team?.id === myBlock.team?.id);
+          const oppTeam = teamsC.find(t => t.team?.id !== myBlock.team?.id);
+          const wl = myTeam?.winner ? 'W' : (oppTeam?.winner ? 'L' : '');
+          const oppAbbr = oppTeam?.team?.abbreviation || oppTeam?.team?.shortDisplayName || '?';
+
+          games.push({
+            date: `${yyyy}-${mm}-${dd}`, opp: oppAbbr,
+            result: `${wl} ${myTeam?.score||''}-${oppTeam?.score||''}`,
+            nfl: true, role: p.role, ...line,
+          });
+        }
+        if (games.length > 0 && games.length < 10) {
+          el.innerHTML = `<div class="g10-loading">Found ${games.length}/10 games… going further back</div>`;
+        }
+      }
+      if (!games.length) { el.innerHTML = '<div class="g10-loading">No recent game data found for this player.</div>'; return; }
+      g10Cache[rank] = games;
+      renderG10(rank, games);
+    } catch(e) {
+      el.innerHTML = `<div class="g10-loading">Couldn't load game log.</div>`;
+    }
+    return;
+  }
+
   // NBA game log (original logic)
   const espnId = String(ESPN_IDS[rank] || '');
   try {
@@ -18548,6 +18675,100 @@ function renderG10(rank, games) {
       <table class="g10-table">
         <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
         <th>H/AB</th><th>AVG</th><th>HR</th><th>RBI</th><th>BB</th><th>K</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    return;
+  }
+
+  if (games[0]?.nfl) {
+    // NFL game log - columns differ by role (QB/RB/WR-TE/DEF care about
+    // different stat lines), same "different table per role" split MLB uses
+    // for pitchers vs hitters above.
+    const wlClass = g => (g.result||'').startsWith('W') ? 'g10-great' : (g.result||'').startsWith('L') ? 'g10-bad' : '';
+    const bars = (vals, ref) => {
+      const max = Math.max(...vals, 1);
+      return vals.map(v => {
+        const h = Math.max(4, Math.round((v / max) * 28));
+        const col = v >= ref ? '#12d47e' : v >= ref * 0.6 ? '#7c83fd' : '#f5445f';
+        return `<div class="g10-bar" style="height:${h}px;background:${col};flex:1;"></div>`;
+      }).join('');
+    };
+
+    if (p.role === 'QB') {
+      const sparkHTML = bars(games.map(g => g.py||0), p.py||200);
+      const rows = games.map(g => `<tr>
+        <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
+        <td style="text-align:right">${Math.round(g.py||0)}</td>
+        <td style="text-align:right;color:${(g.ptd||0)>0?'var(--green)':'inherit'}">${(g.ptd||0).toFixed(0)}</td>
+        <td style="text-align:right;color:${(g.ints||0)>0?'var(--red)':'var(--muted)'}">${(g.ints||0).toFixed(0)}</td>
+        <td style="text-align:right;color:var(--muted)">${Math.round(g.ry||0)}</td>
+      </tr>`).join('');
+      el.innerHTML = `
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Pass yards last ${games.length} games</div>
+        <div class="g10-sparkline">${sparkHTML}</div>
+        <table class="g10-table">
+          <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
+          <th>PASS YD</th><th>TD</th><th>INT</th><th>RUSH YD</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      return;
+    }
+    if (p.role === 'RB') {
+      const sparkHTML = bars(games.map(g => g.ry||0), p.ry||50);
+      const rows = games.map(g => {
+        const td = (g.rtd||0) + (g.rectd||0);
+        return `<tr>
+        <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
+        <td style="text-align:right">${(g.car||0).toFixed(0)}</td>
+        <td style="text-align:right">${Math.round(g.ry||0)}</td>
+        <td style="text-align:right;color:${td>0?'var(--green)':'inherit'}">${td.toFixed(0)}</td>
+        <td style="text-align:right;color:var(--muted)">${(g.rec||0).toFixed(0)}</td>
+        <td style="text-align:right;color:var(--muted)">${Math.round(g.recy||0)}</td>
+      </tr>`;
+      }).join('');
+      el.innerHTML = `
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Rush yards last ${games.length} games</div>
+        <div class="g10-sparkline">${sparkHTML}</div>
+        <table class="g10-table">
+          <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
+          <th>CAR</th><th>RUSH YD</th><th>TD</th><th>REC</th><th>REC YD</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      return;
+    }
+    if (p.role === 'WR' || p.role === 'TE') {
+      const sparkHTML = bars(games.map(g => g.recy||0), p.recy||50);
+      const rows = games.map(g => `<tr>
+        <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
+        <td style="text-align:right">${(g.rec||0).toFixed(0)}</td>
+        <td style="text-align:right;color:var(--muted)">${(g.tgt||0).toFixed(0)}</td>
+        <td style="text-align:right">${Math.round(g.recy||0)}</td>
+        <td style="text-align:right;color:${(g.rectd||0)>0?'var(--green)':'inherit'}">${(g.rectd||0).toFixed(0)}</td>
+      </tr>`).join('');
+      el.innerHTML = `
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Receiving yards last ${games.length} games</div>
+        <div class="g10-sparkline">${sparkHTML}</div>
+        <table class="g10-table">
+          <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
+          <th>REC</th><th>TGT</th><th>REC YD</th><th>TD</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      return;
+    }
+    // DEF
+    const sparkHTML = bars(games.map(g => g.tkl||0), p.tkl||4);
+    const rows = games.map(g => `<tr>
+      <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
+      <td style="text-align:right">${(g.tkl||0).toFixed(0)}</td>
+      <td style="text-align:right;color:${(g.sack||0)>0?'var(--green)':'inherit'}">${(g.sack||0).toFixed(1)}</td>
+      <td style="text-align:right;color:${(g.defint||0)>0?'var(--green)':'var(--muted)'}">${(g.defint||0).toFixed(0)}</td>
+    </tr>`).join('');
+    el.innerHTML = `
+      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Tackles last ${games.length} games</div>
+      <div class="g10-sparkline">${sparkHTML}</div>
+      <table class="g10-table">
+        <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
+        <th>TKL</th><th>SACK</th><th>INT</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
     return;
