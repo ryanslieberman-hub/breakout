@@ -178,7 +178,16 @@ export function golfPerf(p, s, fieldAvg) {
   let move = upRaw + downRaw;
   const upScale = { S: 1.00, A: 1.06, B: 1.13, C: 1.22, D: 1.32 }[p.tier] || 1.1;
   const downScale = { S: 0.85, A: 0.92, B: 1.00, C: 1.08, D: 1.16 }[p.tier] || 1.0;
-  move = move >= 0 ? move * upScale : move * downScale;
+  // Already-elite dampening, upside only. Tier alone treats every S-tier golfer
+  // the same, but Scheffler (~$885 statPrice) isn't just "tier S" the way a $260
+  // tier-S golfer is - he's already priced well above his own tier's peers, so
+  // a dominant week (an 8-stroke win) shouldn't move him by the SAME percentage
+  // a cheaper golfer would get for an equally great round. Kicks in above $300
+  // statPrice, does nothing below that. Downside is untouched - a bad week
+  // should still hurt just as much regardless of price. Mirrored in
+  // index.html's embedded golfPerf.
+  const priceDamp = move >= 0 ? Math.max(0.55, 1 - Math.max(0, (p.statPrice || 0) - 300) / 1800) : 1;
+  move = move >= 0 ? move * upScale * priceDamp : move * downScale;
   return Math.max(-0.15, Math.min(0.22, move));
 }
 
