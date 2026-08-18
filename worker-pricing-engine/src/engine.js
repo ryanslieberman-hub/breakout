@@ -40,6 +40,16 @@ export function golfStatPrice(p) {
   return Math.max(0.01, raw * MULT[p.tier] * PRICE_SCALE);
 }
 
+// NFL's raw formula below borrows real fantasy-scoring weights, which top out
+// around 15-20 raw points for a great QB/RB/WR game - NBA/MLB/Golf's formulas
+// were each independently tuned so a tier-S superstar lands around $400-900
+// (Jokic $586, Ohtani $645, Scheffler $885), but NFL's never got that same
+// tuning pass and left every NFL player under $25 regardless of how good they
+// were (Lamar Jackson priced at $22, next to nobody). NFL_SCALE closes that
+// gap without touching the per-position weights, which already balance
+// QB/RB/WR/TE reasonably against each other - it just moves the whole NFL
+// price curve up to the same range every other league already sits in.
+const NFL_SCALE = 25;
 export function nflStatPrice(p) {
   let raw = 0;
   const r = p.role;
@@ -51,7 +61,7 @@ export function nflStatPrice(p) {
   else raw = (p.tkl || 0) * 1 + (p.sack || 0) * 4 + (p.defint || 0) * 6; // DEF
   const within = (p.rank || 3001) - 3001;
   const spread = Math.max(0.35, 1 - within * 0.006);
-  return Math.max(0.01, raw * (MULT[p.tier] || 1) * PRICE_SCALE * spread);
+  return Math.max(0.01, raw * (MULT[p.tier] || 1) * PRICE_SCALE * spread * NFL_SCALE);
 }
 
 export function statPriceFor(league, p) {
