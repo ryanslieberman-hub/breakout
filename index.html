@@ -337,6 +337,31 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .dtable td:first-child{text-align:left;font-weight:600;}
 .dtable tbody tr{cursor:pointer;transition:background .1s;}
 .dtable tbody tr:hover{background:var(--card);}
+
+/* Mobile card views for the Holdings/Trade History tables - swapped in for
+   .dtable-wrap below the mobile breakpoint (see the 768px media query) so a
+   9-column table never needs horizontal scroll to read. Hidden by default;
+   the media query is what turns them on. */
+.mobile-cards{display:none;}
+.hcard{background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .12s;}
+.hcard:active{border-color:var(--border2);}
+.hcard-row1{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;}
+.hcard-name{font-family:var(--font-display);font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hcard-sell{flex-shrink:0;padding:4px 10px;background:#ff335518;border:1px solid #ff335544;border-radius:6px;color:var(--red);font-family:var(--font-mono);font-size:10px;font-weight:600;cursor:pointer;}
+.hcard-row2{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;}
+.hcard-sub{font-family:var(--font-mono);font-size:10px;color:var(--muted);}
+.hcard-val{font-family:var(--font-mono);font-size:15px;font-weight:700;flex-shrink:0;}
+.hcard-row3{display:flex;gap:12px;font-family:var(--font-mono);font-size:10px;font-weight:600;}
+
+.tlcard{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 4px;border-bottom:1px solid var(--border);}
+.tlcard-left{display:flex;align-items:center;gap:8px;min-width:0;}
+.tlcard-badge{flex-shrink:0;font-family:var(--font-mono);font-size:9px;font-weight:700;letter-spacing:.5px;padding:3px 6px;border-radius:4px;}
+.tlcard-badge.buy{background:#12d47e18;color:var(--green);}
+.tlcard-badge.sell{background:#ff335518;color:var(--red);}
+.tlcard-name{font-family:var(--font-mono);font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tlcard-right{text-align:right;flex-shrink:0;}
+.tlcard-amt{font-family:var(--font-mono);font-size:12px;font-weight:700;}
+.tlcard-sub{font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-top:2px;}
 .port-chart-wrap{background:var(--card);border:1px solid var(--hairline);padding:16px 18px;margin-bottom:24px;border-radius:12px;}
 .port-chart-lbl{font-family:var(--font-mono);font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;}
 .pchart-head{margin-bottom:14px;}
@@ -1044,13 +1069,14 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 
   /* Portfolio */
   .port-chart-wrap { padding: 10px; }
-  .dtable { font-size: 9px; min-width: 480px; }
   .pgrid { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
   .pcard { padding: 12px 14px; }
   .pcval { font-size: 20px; }
   .ptitle { font-size: 26px; }
-  .dtable th, .dtable td { padding: 6px 6px; white-space: nowrap; }
-  .dtable-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
+  /* Holdings/Trade History swap from a horizontally-scrolling table to a
+     stacked card list - see .hcard/.tlcard above. */
+  .dtable-wrap { display: none; }
+  .mobile-cards { display: block; }
 
   /* Schedule */
   .sched-score { font-size: 18px; min-width: 55px; }
@@ -13721,6 +13747,7 @@ function buildPortfolio(){
     <table class="dtable"><thead><tr>
       <th>Player</th><th>Shares</th><th>Avg Buy</th><th>Cur Price</th><th>Value</th><th>Today</th><th>Total P&L</th><th>P&L %</th><th></th>
     </tr></thead><tbody>`;
+    let cardsHtml = '';
     held.sort(([a],[b])=>holdings[b].shares*activePrice(b)-holdings[a].shares*activePrice(a))
       .forEach(([rank,h])=>{
         const r = parseInt(rank);
@@ -13733,18 +13760,38 @@ function buildPortfolio(){
         // shows the move since purchase rather than a blank.
         const todayBase = (dayOpen[r] && dayOpen[r].price > 0) ? dayOpen[r].price : avg;
         const todayH = (cur - todayBase) * h.shares;
+        const todayPp = todayBase>0 ? (cur-todayBase)/todayBase*100 : 0;
+        const todayColor = todayH>=0?'var(--green)':'var(--red)';
+        const pnlColor = pnlH>=0?'var(--green)':'var(--red)';
         html+=`<tr onclick="goMarket(${rank})">
           <td style="white-space:nowrap">${p.name}</td><td>${fmtShares(h.shares)}</td>
           <td style="color:var(--muted)">${fmt(avg)}</td>
           <td>${fmt(cur)}</td>
           <td>${fmt(h.shares*cur)}</td>
-          <td style="color:${todayH>=0?'var(--green)':'var(--red)'}">${fmtS(todayH)}</td>
-          <td style="color:${pnlH>=0?'var(--green)':'var(--red)'}">${fmtS(pnlH)}</td>
-          <td style="color:${pnlH>=0?'var(--green)':'var(--red)'}">${fmtP(ppH)}</td>
+          <td style="color:${todayColor}">${fmtS(todayH)}</td>
+          <td style="color:${pnlColor}">${fmtS(pnlH)}</td>
+          <td style="color:${pnlColor}">${fmtP(ppH)}</td>
           <td><button onclick="event.stopPropagation();sellAll(${r})" style="padding:3px 8px;background:#ff335518;border:1px solid #ff335544;border-radius:4px;color:var(--red);font-family:var(--font-mono);font-size:10px;cursor:pointer">Sell All</button></td>
         </tr>`;
+        // Mobile card equivalent of the row above - see .hcard, shown instead
+        // of the table below the mobile breakpoint (no horizontal scroll).
+        cardsHtml += `<div class="hcard" onclick="goMarket(${rank})">
+          <div class="hcard-row1">
+            <div class="hcard-name">${p.name}</div>
+            <button class="hcard-sell" onclick="event.stopPropagation();sellAll(${r})">Sell</button>
+          </div>
+          <div class="hcard-row2">
+            <div class="hcard-sub">${fmtShares(h.shares)} sh · avg ${fmt(avg)}</div>
+            <div class="hcard-val">${fmt(h.shares*cur)}</div>
+          </div>
+          <div class="hcard-row3">
+            <div style="color:${todayColor}">Today ${fmtS(todayH)} (${fmtP(todayPp)})</div>
+            <div style="color:${pnlColor}">${fmtS(pnlH)} (${fmtP(ppH)})</div>
+          </div>
+        </div>`;
       });
     html+='</tbody></table></div>';
+    html+=`<div class="mobile-cards">${cardsHtml}</div>`;
   }
 
   if(logs.length){
@@ -13753,6 +13800,7 @@ function buildPortfolio(){
     <table class="dtable"><thead><tr>
       <th>Action</th><th>Player</th><th>Shares</th><th>Amount</th><th>Price</th>
     </tr></thead><tbody>`;
+    let historyCardsHtml = '';
     logs.forEach(l=>{
       html+=`<tr>
         <td style="color:${l.type==='buy'?'var(--green)':'var(--red)'}">${l.type==='buy'?'▲ BUY':'▼ SELL'}</td>
@@ -13760,8 +13808,20 @@ function buildPortfolio(){
         <td style="color:${l.type==='buy'?'var(--red)':'var(--green)'}">${l.type==='buy'?'-':'+'}${fmt(l.amount)}</td>
         <td>${fmt(l.price)}</td>
       </tr>`;
+      // Mobile card equivalent - see .tlcard.
+      historyCardsHtml += `<div class="tlcard">
+        <div class="tlcard-left">
+          <span class="tlcard-badge ${l.type}">${l.type==='buy'?'BUY':'SELL'}</span>
+          <span class="tlcard-name">${l.name}</span>
+        </div>
+        <div class="tlcard-right">
+          <div class="tlcard-amt" style="color:${l.type==='buy'?'var(--red)':'var(--green)'}">${l.type==='buy'?'-':'+'}${fmt(l.amount)}</div>
+          <div class="tlcard-sub">${fmtShares(l.shares)} sh @ ${fmt(l.price)}</div>
+        </div>
+      </div>`;
     });
     html+='</tbody></table></div>';
+    html+=`<div class="mobile-cards">${historyCardsHtml}</div>`;
   }
 
   document.getElementById('port-view-inner').innerHTML=html;
