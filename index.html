@@ -8030,7 +8030,12 @@ const ENGINE = (() => {
 
   function mlbHitterPerf(p, s){
     // s: { ab, h, hr, rbi, k, bb }
-    if (!s) return 0;                        // no game → flat
+    if (!s) {
+      // No game today. If he's on the IL, drift down instead of freezing flat -
+      // see mlbInjuryPerf below for why "no game" and "hurt" need different prices.
+      const inj = mlbInjuryPerf(p);
+      return inj != null ? inj : 0;
+    }
     const ab = parseInt(s.ab)||0, bb = s.bb||0;
     if (ab < 1 && bb < 1) return 0;          // hasn't come to the plate
     const h = s.h||0, hr = s.hr||0, rbi = s.rbi||0, k = s.k||0;
@@ -8093,9 +8098,9 @@ const ENGINE = (() => {
 
   function mlbPitcherPerf(p, s){
     // s: { ip, kp, er, bb, h }
-    if (!s) return startAnticipation(p);     // no game → anticipation only
+    if (!s) return noStartPerf(p);           // no game → flat, unless hurt
     const ip = parseFloat(s.ip)||0;
-    if (ip < 1) return startAnticipation(p);   // not pitching → anticipation only
+    if (ip < 1) return noStartPerf(p);         // not pitching → flat, unless hurt
     const k = s.kp||0, er = s.er||0;
     const eraPace = er*9/ip;
     // ERA term: how much better than his season ERA he's pitching. A shutout (eraPace 0)
@@ -8125,17 +8130,14 @@ const ENGINE = (() => {
     return Math.max(-CAP, Math.min(CAP, scaled));
   }
 
-  // Pitcher price drifts up approaching a start - DERIVED (recomputed), never stacked.
-  function startAnticipation(p){
-    if (p.role !== 'SP') return 0;
-    const ls = (typeof pitcherLastStart !== 'undefined') ? pitcherLastStart[p.rank] : null;
-    if (!ls) return 0;
-    const days = Math.round((new Date(localDateStr()) - new Date(ls)) / 86400000);
-    if (days === 4) return 0.006;
-    if (days === 5) return 0.012;
-    if (days === 6) return 0.008;
-    if (days >= 7)  return -0.006;
-    return 0;
+  // A starter with no game today: flat, unless he's actually hurt, in which case
+  // apply the injury decay. mlbInjuryPerf lives in the MLB STATSAPI module below;
+  // it's a plain global function so it's available by the time this actually runs.
+  // (Previously also drifted price UP the closer he got to his next expected start -
+  // removed as noise; a rest day between starts isn't a reason to move the price.)
+  function noStartPerf(p){
+    const inj = mlbInjuryPerf(p);
+    return inj != null ? inj : 0;
   }
 
   function golfPerf(p, s){
@@ -8556,6 +8558,104 @@ async function mlbFetchBoxes(gamePks){
   return map;
 }
 
+// ── MLB INJURY / IL TRACKING ────────────────────────────────────────────────
+// The schedule/boxscore feeds never say WHY a player has no game - a starter who's
+// actually hurt looked identical to one just resting between starts, so a pitcher
+// on the 15-day IL kept earning the "approaching next start" anticipation bump
+// forever, and a hurt hitter just sat flat at his pre-injury price indefinitely.
+// The official 40-man roster status (statsapi.mlb.com) is the only feed that
+// actually knows someone's hurt, so pull it once a day and let it override both.
+const MLB_TEAM_IDS = [108,109,110,111,112,113,114,115,116,117,118,119,120,121,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,158];
+
+function _loadMlbInjuryStatus(){
+  try { return JSON.parse(localStorage.getItem('ax_mlb_injury') || '{}'); } catch(e){ return {}; }
+}
+function _saveMlbInjuryStatus(obj){
+  try { localStorage.setItem('ax_mlb_injury', JSON.stringify(obj)); } catch(e){}
+}
+window._mlbInjuryStatus = _loadMlbInjuryStatus();
+
+function _loadInjurySetbackApplied(){
+  try { return JSON.parse(localStorage.getItem('ax_mlb_injury_applied') || '{}'); } catch(e){ return {}; }
+}
+function _saveInjurySetbackApplied(obj){
+  try { localStorage.setItem('ax_mlb_injury_applied', JSON.stringify(obj)); } catch(e){}
+}
+
+// One-time price hit the day a player NEWLY lands on the IL - real news, real
+// reaction. Idempotent per injury stint (keyed by rank + onset date), so re-running
+// the same day's tick, or reloading the page, can never apply it twice.
+const MLB_INJURY_SETBACK = { S:-0.045, A:-0.048, B:-0.052, C:-0.056, D:-0.06 };
+function applyInjurySetback(rank, since){
+  const p = mlbPlayers.find(x => x.rank === rank);
+  if (!p) return;
+  const applied = _loadInjurySetbackApplied();
+  if (applied[rank] === since) return;
+  const base = ENGINE.baseFor(p);
+  const hit = MLB_INJURY_SETBACK[p.tier] || -0.05;
+  const val = Math.max(0.01, base * (1 + hit));
+  if (!closes[p.rank]) closes[p.rank] = {};
+  closes[p.rank][since] = val;
+  liveP[p.rank] = val;
+  if (ENGINE.BASE && ENGINE.BASE[p.rank]) delete ENGINE.BASE[p.rank];   // force base to pick up the hit
+  applied[rank] = since;
+  _saveInjurySetbackApplied(applied);
+}
+
+// Ongoing drift while sidelined - the market gradually discounts an absent player
+// instead of freezing him flat forever. Ramps for ~53 days then caps at -8%; a
+// season-ending injury shouldn't erode a price to nothing, the market just moves on.
+const MLB_INJURY_DECAY_DAILY = 0.0015;
+const MLB_INJURY_DECAY_MAX   = 0.08;
+function mlbInjuryPerf(p){
+  const inj = window._mlbInjuryStatus && window._mlbInjuryStatus[p.rank];
+  if (!inj) return null;                       // not hurt → caller uses its normal path
+  const days = Math.max(0, Math.round((new Date(localDateStr(0)) - new Date(inj.since)) / 86400000));
+  return -Math.min(MLB_INJURY_DECAY_MAX, days * MLB_INJURY_DECAY_DAILY);
+}
+
+// Refresh the IL map (30 roster calls - expensive, so once per calendar day only).
+async function mlbFetchInjuries(){
+  const today = localDateStr(0);
+  const prev = window._mlbInjuryStatus || {};
+  if (prev._fetchedDate === today) return prev;
+
+  // First time this feature has ever run, "everyone currently hurt" isn't NEWS -
+  // there's no prior snapshot to diff against. Back-date their onset instead of
+  // firing a fake setback hit the day we happen to ship this, so someone who's
+  // "been out a while" (e.g. a long IL stint) already reads as partly decayed
+  // instead of freshly injured.
+  const isColdStart = Object.keys(prev).filter(k => k !== '_fetchedDate').length === 0;
+  const backdated = localDateStr(20);
+
+  const lookup = _mlbNameLookup();
+  const next = { _fetchedDate: today };
+  const settled = await Promise.allSettled(
+    MLB_TEAM_IDS.map(id => fetch(`${MLB_API_BASE}/teams/${id}/roster?rosterType=40Man`).then(r => r.json()))
+  );
+  settled.forEach(res => {
+    if (res.status !== 'fulfilled') return;
+    (res.value?.roster || []).forEach(entry => {
+      const code = entry.status?.code || 'A';
+      if (!/^D/.test(code)) return;             // D10/D15/D60 = injured list; anything else (active, restricted, etc.) is not an injury
+      const p = lookup[_normName(entry.person?.fullName || '')];
+      if (!p) return;
+      const priorEntry = prev[p.rank];
+      const wasInjured = priorEntry && priorEntry.code;
+      next[p.rank] = {
+        code,
+        note: entry.note || entry.status?.description || '',
+        since: wasInjured ? priorEntry.since : (isColdStart ? backdated : today),
+      };
+      if (!wasInjured && !isColdStart) applyInjurySetback(p.rank, today);
+    });
+  });
+
+  window._mlbInjuryStatus = next;
+  _saveMlbInjuryStatus(next);
+  return next;
+}
+
 // ── The MLB tick: fetch schedule + boxscores, stage into engine, derive. ────
 // Replaces fetchMLBLiveStats. Live games and final games both handled cleanly by
 // the official state field, so afternoon games and night games work identically.
@@ -8563,6 +8663,7 @@ async function mlbTick(isFinal=false){
   try{
     const today = localDateStr(0);                 // YYYY-MM-DD
     const yday  = localDateStr(1);                 // yesterday
+    await mlbFetchInjuries();                       // refresh IL status (once/day) before pricing
     const sched = await mlbFetchSchedule(today);
 
     // Live-team set (for the "game in progress" display gate).
@@ -8585,11 +8686,6 @@ async function mlbTick(isFinal=false){
         const stat = statMap[p.rank];
         if (!stat) return;
         writeMLBStatLineOfficial(p, stat, today, !!liveStatMap[p.rank]);
-        // Record today as this SP's last start, for the anticipation-drift mechanic.
-        if (p.role === 'SP' && stat.ip > 0 && pitcherLastStart[p.rank] !== today) {
-          pitcherLastStart[p.rank] = today;
-          _savePitcherLastStart();
-        }
       });
     }
 
@@ -9359,21 +9455,11 @@ async function espnFetch(url) {
 // ═══════════════════════════════════════════
 
 // MLB ESPN team ID map (for filtering which teams played)
-// Pitcher last-start tracking - used for anticipation drift mechanic
-// Key: player rank, value: date string of last start (YYYY-MM-DD)
-const pitcherLastStart = (() => {
-  try { return JSON.parse(localStorage.getItem('ax_mlb_pitcher_starts') || '{}'); } catch(e) { return {}; }
-})();
-function _savePitcherLastStart() {
-  try { localStorage.setItem('ax_mlb_pitcher_starts', JSON.stringify(pitcherLastStart)); } catch(e) {}
-}
 
-// Pitcher anticipation drift - call once daily to nudge SP prices based on rotation cycle
-// Pitchers on a ~5 day rotation: price recovers day 1-2, peaks day 4-5 (anticipation), settles after start
 // Derive EVERY MLB player's price from base × (1 + todayPerf). This is the single
 // authority for MLB pricing - pure, idempotent, no accumulation. Players with a live
-// or final line move by that line; players with no game sit at base (+ any pitcher
-// anticipation, itself derived). Replaces the old compounding drift mutation.
+// or final line move by that line; players with no game sit at base (+ injury decay
+// if hurt). Replaces the old compounding drift mutation.
 function applyPitcherAnticipation() {
   // Was deriveAllMLB() → resolveMLBStats(), a retired ESPN-era name matcher with no
   // accent stripping (unlike mlbTick's _normName path) that could silently drop
