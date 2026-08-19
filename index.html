@@ -17151,10 +17151,15 @@ async function renderFriendsLeaderboard(){
 // normal large size) for anyone who hasn't claimed a username yet.
 function _ulbNameBlock(u, isYou){
   const youTag = isYou ? '<span style="color:var(--green);font-size:9px;">(you)</span>' : '';
+  // .ulb-name truncates with an ellipsis by default (fine for player/display
+  // names elsewhere), but a username is the thing being looked up here - cut
+  // it short and it reads as a different, wrong handle. Override to wrap
+  // instead of clipping for this one line.
+  const wrapStyle = 'white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word;';
   if (u.username) {
-    return `<div class="ulb-name">@${escHtml(u.username)} ${youTag}</div><div class="ulb-sub ulb-realname">${escHtml(u.displayName||'Trader')}</div>`;
+    return `<div class="ulb-name" style="${wrapStyle}">@${escHtml(u.username)} ${youTag}</div><div class="ulb-sub ulb-realname">${escHtml(u.displayName||'Trader')}</div>`;
   }
-  return `<div class="ulb-name">${escHtml(u.displayName||'Anonymous')} ${youTag}</div>`;
+  return `<div class="ulb-name" style="${wrapStyle}">${escHtml(u.displayName||'Anonymous')} ${youTag}</div>`;
 }
 
 async function _renderFriendsLbList(){
