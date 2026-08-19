@@ -6693,11 +6693,11 @@ const golfPlayers = GOLF_RAW.map(p => ({
 //  NFL PLAYER DATA (ranks 3001+)
 // ═══════════════════════════════════════════
 const NFL_RAW = [
-  // ── QB ── (kept ranks preserve existing ESPN headshot IDs where the name/rank pair was already correct)
-  {rank:3001, name:'Lamar Jackson', team:'Baltimore Ravens', pos:'QB', role:'QB', tier:'S', fpts:22, py:270, ptd:2.0, ints:0.6, ry:45},
+  // ── QB ──
+  {rank:3001, name:'Lamar Jackson', team:'Baltimore Ravens', pos:'QB', role:'QB', tier:'S', fpts:22, py:270, ptd:2, ints:0.6, ry:45},
   {rank:3002, name:'Josh Allen', team:'Buffalo Bills', pos:'QB', role:'QB', tier:'S', fpts:21, py:265, ptd:2.1, ints:0.6, ry:35},
   {rank:3005, name:'Jalen Hurts', team:'Philadelphia Eagles', pos:'QB', role:'QB', tier:'S', fpts:20.5, py:230, ptd:1.6, ints:0.5, ry:45},
-  {rank:3003, name:'Joe Burrow', team:'Cincinnati Bengals', pos:'QB', role:'QB', tier:'S', fpts:20, py:290, ptd:2.0, ints:0.6, ry:8},
+  {rank:3003, name:'Joe Burrow', team:'Cincinnati Bengals', pos:'QB', role:'QB', tier:'S', fpts:20, py:290, ptd:2, ints:0.6, ry:8},
   {rank:3004, name:'Patrick Mahomes', team:'Kansas City Chiefs', pos:'QB', role:'QB', tier:'S', fpts:19.5, py:275, ptd:1.9, ints:0.7, ry:12},
   {rank:3023, name:'Jayden Daniels', team:'Washington Commanders', pos:'QB', role:'QB', tier:'A', fpts:18.5, py:230, ptd:1.5, ints:0.5, ry:40},
   {rank:3019, name:'Dak Prescott', team:'Dallas Cowboys', pos:'QB', role:'QB', tier:'A', fpts:17.5, py:265, ptd:1.7, ints:0.7, ry:10},
@@ -6707,26 +6707,25 @@ const NFL_RAW = [
   {rank:3021, name:'Jordan Love', team:'Green Bay Packers', pos:'QB', role:'QB', tier:'A', fpts:16.5, py:245, ptd:1.6, ints:0.7, ry:8},
   {rank:3072, name:'Bo Nix', team:'Denver Broncos', pos:'QB', role:'QB', tier:'A', fpts:16.5, py:235, ptd:1.5, ints:0.6, ry:20},
   {rank:3022, name:'Trevor Lawrence', team:'Jacksonville Jaguars', pos:'QB', role:'QB', tier:'A', fpts:16, py:245, ptd:1.5, ints:0.7, ry:12},
-  {rank:3048, name:'Tua Tagovailoa', team:'Miami Dolphins', pos:'QB', role:'QB', tier:'A', fpts:16, py:255, ptd:1.6, ints:0.7, ry:5},
+  {rank:3048, name:'Tua Tagovailoa', team:'Atlanta Falcons', pos:'QB', role:'QB', tier:'A', fpts:16, py:255, ptd:1.6, ints:0.7, ry:5},
   {rank:3045, name:'Michael Penix Jr.', team:'Atlanta Falcons', pos:'QB', role:'QB', tier:'A', fpts:16.5, py:240, ptd:1.5, ints:0.7, ry:5},
   {rank:3409, name:'Justin Herbert', team:'Los Angeles Chargers', pos:'QB', role:'QB', tier:'A', fpts:17, py:255, ptd:1.6, ints:0.6, ry:10},
   {rank:3410, name:'Matthew Stafford', team:'Los Angeles Rams', pos:'QB', role:'QB', tier:'A', fpts:16.5, py:250, ptd:1.6, ints:0.6, ry:5},
   {rank:3411, name:'Brock Purdy', team:'San Francisco 49ers', pos:'QB', role:'QB', tier:'A', fpts:16.5, py:245, ptd:1.5, ints:0.6, ry:8},
   {rank:3412, name:'Baker Mayfield', team:'Tampa Bay Buccaneers', pos:'QB', role:'QB', tier:'A', fpts:17, py:250, ptd:1.6, ints:0.6, ry:10},
-  {rank:3413, name:'Kyler Murray', team:'Arizona Cardinals', pos:'QB', role:'QB', tier:'A', fpts:18, py:225, ptd:1.4, ints:0.6, ry:35},
+  {rank:3413, name:'Kyler Murray', team:'Minnesota Vikings', pos:'QB', role:'QB', tier:'A', fpts:18, py:225, ptd:1.4, ints:0.6, ry:35},
   {rank:3252, name:'Daniel Jones', team:'Indianapolis Colts', pos:'QB', role:'QB', tier:'B', fpts:15.5, py:225, ptd:1.4, ints:0.7, ry:22},
   {rank:3414, name:'Sam Darnold', team:'Seattle Seahawks', pos:'QB', role:'QB', tier:'B', fpts:16.5, py:240, ptd:1.5, ints:0.7, ry:10},
-  {rank:3415, name:'Geno Smith', team:'Las Vegas Raiders', pos:'QB', role:'QB', tier:'B', fpts:15, py:230, ptd:1.3, ints:0.8, ry:8},
+  {rank:3415, name:'Geno Smith', team:'New York Jets', pos:'QB', role:'QB', tier:'B', fpts:15, py:230, ptd:1.3, ints:0.8, ry:8},
   {rank:3057, name:'Bryce Young', team:'Carolina Panthers', pos:'QB', role:'QB', tier:'B', fpts:13.5, py:200, ptd:1.1, ints:0.8, ry:12},
   {rank:3416, name:'Drake Maye', team:'New England Patriots', pos:'QB', role:'QB', tier:'B', fpts:16.5, py:245, ptd:1.5, ints:0.7, ry:15},
-  {rank:3417, name:'Justin Fields', team:'New York Jets', pos:'QB', role:'QB', tier:'B', fpts:16, py:200, ptd:1.2, ints:0.6, ry:35},
+  {rank:3417, name:'Justin Fields', team:'Kansas City Chiefs', pos:'QB', role:'QB', tier:'B', fpts:16, py:200, ptd:1.2, ints:0.6, ry:35},
   {rank:3418, name:'Aaron Rodgers', team:'Pittsburgh Steelers', pos:'QB', role:'QB', tier:'B', fpts:15.5, py:220, ptd:1.4, ints:0.7, ry:3},
   {rank:3419, name:'J.J. McCarthy', team:'Minnesota Vikings', pos:'QB', role:'QB', tier:'B', fpts:15, py:215, ptd:1.3, ints:0.8, ry:12},
   {rank:3420, name:'Jaxson Dart', team:'New York Giants', pos:'QB', role:'QB', tier:'B', fpts:15, py:200, ptd:1.1, ints:0.8, ry:20},
   {rank:3421, name:'Cam Ward', team:'Tennessee Titans', pos:'QB', role:'QB', tier:'B', fpts:14.5, py:210, ptd:1.2, ints:0.9, ry:15},
   {rank:3065, name:'Dillon Gabriel', team:'Cleveland Browns', pos:'QB', role:'QB', tier:'C', fpts:11.5, py:175, ptd:0.9, ints:0.9, ry:10},
-  {rank:3422, name:'Spencer Rattler', team:'New Orleans Saints', pos:'QB', role:'QB', tier:'C', fpts:12.5, py:195, ptd:1.0, ints:0.9, ry:8},
-
+  {rank:3422, name:'Spencer Rattler', team:'New Orleans Saints', pos:'QB', role:'QB', tier:'C', fpts:12.5, py:195, ptd:1, ints:0.9, ry:8},
   // ── RB ──
   {rank:3006, name:'Bijan Robinson', team:'Atlanta Falcons', pos:'RB', role:'RB', tier:'S', fpts:19, ry:95, rtd:0.9, rec:4, recy:32},
   {rank:3007, name:'Saquon Barkley', team:'Philadelphia Eagles', pos:'RB', role:'RB', tier:'S', fpts:18.5, ry:100, rtd:0.8, rec:2.5, recy:20},
@@ -6743,8 +6742,8 @@ const NFL_RAW = [
   {rank:3426, name:'Omarion Hampton', team:'Los Angeles Chargers', pos:'RB', role:'RB', tier:'B', fpts:13, ry:70, rtd:0.5, rec:2.5, recy:18},
   {rank:3427, name:'Bucky Irving', team:'Tampa Bay Buccaneers', pos:'RB', role:'RB', tier:'B', fpts:12.5, ry:65, rtd:0.4, rec:3.5, recy:25},
   {rank:3105, name:'Chuba Hubbard', team:'Carolina Panthers', pos:'RB', role:'RB', tier:'B', fpts:12.5, ry:65, rtd:0.5, rec:2.5, recy:18},
-  {rank:3257, name:'Isiah Pacheco', team:'Kansas City Chiefs', pos:'RB', role:'RB', tier:'B', fpts:11, ry:60, rtd:0.5, rec:2, recy:12},
-  {rank:3292, name:'Kenneth Walker III', team:'Seattle Seahawks', pos:'RB', role:'RB', tier:'B', fpts:12.5, ry:70, rtd:0.5, rec:2.5, recy:18},
+  {rank:3257, name:'Isiah Pacheco', team:'Detroit Lions', pos:'RB', role:'RB', tier:'B', fpts:11, ry:60, rtd:0.5, rec:2, recy:12},
+  {rank:3292, name:'Kenneth Walker III', team:'Kansas City Chiefs', pos:'RB', role:'RB', tier:'B', fpts:12.5, ry:70, rtd:0.5, rec:2.5, recy:18},
   {rank:3428, name:'De\'Von Achane', team:'Miami Dolphins', pos:'RB', role:'RB', tier:'A', fpts:15, ry:70, rtd:0.6, rec:4, recy:35},
   {rank:3429, name:'James Cook', team:'Buffalo Bills', pos:'RB', role:'RB', tier:'A', fpts:14, ry:80, rtd:0.6, rec:2.5, recy:18},
   {rank:3122, name:'Quinshon Judkins', team:'Cleveland Browns', pos:'RB', role:'RB', tier:'B', fpts:11.5, ry:65, rtd:0.5, rec:2, recy:15},
@@ -6754,19 +6753,50 @@ const NFL_RAW = [
   {rank:3112, name:'D\'Andre Swift', team:'Chicago Bears', pos:'RB', role:'RB', tier:'B', fpts:11.5, ry:60, rtd:0.4, rec:3, recy:20},
   {rank:3430, name:'Rhamondre Stevenson', team:'New England Patriots', pos:'RB', role:'RB', tier:'B', fpts:11, ry:65, rtd:0.4, rec:2.5, recy:15},
   {rank:3431, name:'Jaylen Warren', team:'Pittsburgh Steelers', pos:'RB', role:'RB', tier:'B', fpts:11.5, ry:60, rtd:0.4, rec:3, recy:22},
-  {rank:3432, name:'Nick Chubb', team:'Houston Texans', pos:'RB', role:'RB', tier:'B', fpts:10.5, ry:65, rtd:0.5, rec:1.5, recy:10},
-  {rank:3433, name:'Travis Etienne Jr.', team:'Jacksonville Jaguars', pos:'RB', role:'RB', tier:'B', fpts:12, ry:60, rtd:0.5, rec:3, recy:22},
+  {rank:3432, name:'David Montgomery', team:'Houston Texans', pos:'RB', role:'RB', tier:'B', fpts:10.5, ry:65, rtd:0.5, rec:1.5, recy:10},
+  {rank:3433, name:'Travis Etienne Jr.', team:'New Orleans Saints', pos:'RB', role:'RB', tier:'B', fpts:12, ry:60, rtd:0.5, rec:3, recy:22},
   {rank:3434, name:'Tony Pollard', team:'Tennessee Titans', pos:'RB', role:'RB', tier:'B', fpts:12, ry:65, rtd:0.4, rec:3, recy:20},
   {rank:3435, name:'Tyrone Tracy Jr.', team:'New York Giants', pos:'RB', role:'RB', tier:'B', fpts:11, ry:60, rtd:0.4, rec:3, recy:18},
-  {rank:3436, name:'Austin Ekeler', team:'Washington Commanders', pos:'RB', role:'RB', tier:'B', fpts:12, ry:50, rtd:0.4, rec:4, recy:30},
+  {rank:3436, name:'Rachaad White', team:'Washington Commanders', pos:'RB', role:'RB', tier:'B', fpts:12, ry:50, rtd:0.4, rec:4, recy:30},
   {rank:3437, name:'Aaron Jones', team:'Minnesota Vikings', pos:'RB', role:'RB', tier:'B', fpts:11.5, ry:60, rtd:0.4, rec:3, recy:20},
-
+  {rank:3499, name:'Tyler Allgeier', team:'Arizona Cardinals', pos:'RB', role:'RB', tier:'B', fpts:9, ry:44, rtd:0.36, rec:1.6, recy:18.8},
+  {rank:3503, name:'Nathan Carter', team:'Atlanta Falcons', pos:'RB', role:'RB', tier:'B', fpts:9, ry:49.8, rtd:0.4, rec:2, recy:18.5},
+  {rank:3509, name:'Rasheen Ali', team:'Baltimore Ravens', pos:'RB', role:'RB', tier:'B', fpts:9, ry:52.4, rtd:0.3, rec:1.1, recy:14.5},
+  {rank:3512, name:'Ray Davis', team:'Buffalo Bills', pos:'RB', role:'RB', tier:'B', fpts:9, ry:47.6, rtd:0.38, rec:1.8, recy:15.8},
+  {rank:3518, name:'Jonathon Brooks', team:'Carolina Panthers', pos:'RB', role:'RB', tier:'B', fpts:9, ry:38.9, rtd:0.29, rec:2.9, recy:13},
+  {rank:3526, name:'Salvon Ahmed', team:'Chicago Bears', pos:'RB', role:'RB', tier:'B', fpts:9, ry:37.7, rtd:0.36, rec:1.6, recy:17.4},
+  {rank:3532, name:'Gary Brightwell', team:'Cincinnati Bengals', pos:'RB', role:'RB', tier:'B', fpts:9, ry:41.5, rtd:0.37, rec:1.8, recy:12.3},
+  {rank:3538, name:'Davon Booth', team:'Cleveland Browns', pos:'RB', role:'RB', tier:'B', fpts:9, ry:39.3, rtd:0.27, rec:2.8, recy:14.1},
+  {rank:3545, name:'Israel Abanikanda', team:'Dallas Cowboys', pos:'RB', role:'RB', tier:'B', fpts:9, ry:38, rtd:0.24, rec:2.5, recy:13.1},
+  {rank:3548, name:'Tyler Badie', team:'Denver Broncos', pos:'RB', role:'RB', tier:'B', fpts:9, ry:47.1, rtd:0.37, rec:1.8, recy:17.1},
+  {rank:3555, name:'Chris Brooks', team:'Green Bay Packers', pos:'RB', role:'RB', tier:'B', fpts:9, ry:38.6, rtd:0.38, rec:1.9, recy:15.4},
+  {rank:3559, name:'British Brooks', team:'Houston Texans', pos:'RB', role:'RB', tier:'B', fpts:9, ry:43.8, rtd:0.28, rec:2.9, recy:12.4},
+  {rank:3565, name:'Ulysses Bentley IV', team:'Indianapolis Colts', pos:'RB', role:'RB', tier:'B', fpts:9, ry:48.9, rtd:0.36, rec:1.6, recy:20},
+  {rank:3571, name:'Ameer Abdullah', team:'Jacksonville Jaguars', pos:'RB', role:'RB', tier:'B', fpts:9, ry:39, rtd:0.4, rec:2, recy:9.5},
+  {rank:3572, name:'LeQuint Allen Jr.', team:'Jacksonville Jaguars', pos:'RB', role:'RB', tier:'C', fpts:5.5, ry:23, rtd:0.06, rec:1.1, recy:8.1},
+  {rank:3579, name:'Emari Demercado', team:'Kansas City Chiefs', pos:'RB', role:'RB', tier:'B', fpts:9, ry:44.1, rtd:0.39, rec:2, recy:13.5},
+  {rank:3585, name:'Greg Desrosiers Jr.', team:'Los Angeles Chargers', pos:'RB', role:'RB', tier:'B', fpts:9, ry:46.3, rtd:0.36, rec:1.7, recy:19},
+  {rank:3589, name:'Dean Connors', team:'Los Angeles Rams', pos:'RB', role:'RB', tier:'B', fpts:9, ry:49.1, rtd:0.38, rec:1.8, recy:20},
+  {rank:3595, name:'Roman Hemby', team:'Las Vegas Raiders', pos:'RB', role:'RB', tier:'B', fpts:9, ry:44.3, rtd:0.23, rec:2.4, recy:20},
+  {rank:3602, name:'Donovan Edwards', team:'Miami Dolphins', pos:'RB', role:'RB', tier:'B', fpts:9, ry:37.3, rtd:0.38, rec:1.8, recy:17},
+  {rank:3610, name:'Demond Claiborne', team:'Minnesota Vikings', pos:'RB', role:'RB', tier:'B', fpts:9, ry:46.1, rtd:0.4, rec:2, recy:19.6},
+  {rank:3617, name:'Hassan Haskins', team:'New England Patriots', pos:'RB', role:'RB', tier:'B', fpts:9, ry:42, rtd:0.37, rec:1.8, recy:19.1},
+  {rank:3630, name:'Damon Bankston', team:'New York Giants', pos:'RB', role:'RB', tier:'B', fpts:9, ry:41.6, rtd:0.37, rec:1.8, recy:18},
+  {rank:3637, name:'Braelon Allen', team:'New York Jets', pos:'RB', role:'RB', tier:'B', fpts:9, ry:46.4, rtd:0.32, rec:1.3, recy:16.3},
+  {rank:3645, name:'Tank Bigsby', team:'Philadelphia Eagles', pos:'RB', role:'RB', tier:'B', fpts:9, ry:49.3, rtd:0.25, rec:2.5, recy:16.8},
+  {rank:3651, name:'Rico Dowdle', team:'Pittsburgh Steelers', pos:'RB', role:'RB', tier:'B', fpts:9, ry:42.5, rtd:0.39, rec:1.9, recy:9.8},
+  {rank:3654, name:'Zach Charbonnet', team:'Seattle Seahawks', pos:'RB', role:'RB', tier:'B', fpts:9, ry:42.4, rtd:0.23, rec:2.4, recy:10},
+  {rank:3655, name:'Anthony Hankerson', team:'Seattle Seahawks', pos:'RB', role:'RB', tier:'C', fpts:5.5, ry:22.6, rtd:0.1, rec:1.6, recy:12.2},
+  {rank:3662, name:'Kaelon Black', team:'San Francisco 49ers', pos:'RB', role:'RB', tier:'B', fpts:9, ry:40.2, rtd:0.33, rec:1.4, recy:19.2},
+  {rank:3666, name:'Kenny Gainwell', team:'Tampa Bay Buccaneers', pos:'RB', role:'RB', tier:'B', fpts:9, ry:46, rtd:0.2, rec:2.1, recy:14},
+  {rank:3672, name:'Michael Carter', team:'Tennessee Titans', pos:'RB', role:'RB', tier:'B', fpts:9, ry:40.8, rtd:0.23, rec:2.4, recy:13.6},
+  {rank:3680, name:'Kaytron Allen', team:'Washington Commanders', pos:'RB', role:'RB', tier:'B', fpts:9, ry:47, rtd:0.37, rec:1.7, recy:10},
   // ── WR ──
   {rank:3009, name:'Ja\'Marr Chase', team:'Cincinnati Bengals', pos:'WR', role:'WR', tier:'S', fpts:17, rec:7, recy:95, rtd:0.6, tgt:10},
   {rank:3010, name:'Justin Jefferson', team:'Minnesota Vikings', pos:'WR', role:'WR', tier:'S', fpts:16.5, rec:6.5, recy:90, rtd:0.5, tgt:9.5},
   {rank:3356, name:'Amon-Ra St. Brown', team:'Detroit Lions', pos:'WR', role:'WR', tier:'S', fpts:16, rec:7, recy:88, rtd:0.5, tgt:9.5},
   {rank:3011, name:'CeeDee Lamb', team:'Dallas Cowboys', pos:'WR', role:'WR', tier:'S', fpts:16, rec:6.5, recy:85, rtd:0.5, tgt:9.5},
-  {rank:3012, name:'A.J. Brown', team:'Philadelphia Eagles', pos:'WR', role:'WR', tier:'A', fpts:14.5, rec:5.5, recy:75, rtd:0.5, tgt:8},
+  {rank:3012, name:'A.J. Brown', team:'New England Patriots', pos:'WR', role:'WR', tier:'A', fpts:14.5, rec:5.5, recy:75, rtd:0.5, tgt:8},
   {rank:3028, name:'Drake London', team:'Atlanta Falcons', pos:'WR', role:'WR', tier:'A', fpts:13.5, rec:6, recy:75, rtd:0.5, tgt:9},
   {rank:3031, name:'Puka Nacua', team:'Los Angeles Rams', pos:'WR', role:'WR', tier:'A', fpts:13.5, rec:6.5, recy:80, rtd:0.4, tgt:9},
   {rank:3032, name:'Malik Nabers', team:'New York Giants', pos:'WR', role:'WR', tier:'A', fpts:13.5, rec:6.5, recy:80, rtd:0.4, tgt:10},
@@ -6779,36 +6809,60 @@ const NFL_RAW = [
   {rank:3330, name:'George Pickens', team:'Dallas Cowboys', pos:'WR', role:'WR', tier:'A', fpts:12, rec:5, recy:70, rtd:0.5, tgt:7.5},
   {rank:3440, name:'DK Metcalf', team:'Pittsburgh Steelers', pos:'WR', role:'WR', tier:'A', fpts:12.5, rec:5, recy:70, rtd:0.5, tgt:7},
   {rank:3441, name:'Davante Adams', team:'Los Angeles Rams', pos:'WR', role:'WR', tier:'A', fpts:12, rec:5.5, recy:65, rtd:0.5, tgt:8},
-  {rank:3442, name:'Tyreek Hill', team:'Miami Dolphins', pos:'WR', role:'WR', tier:'A', fpts:13, rec:5.5, recy:75, rtd:0.5, tgt:8},
+  {rank:3442, name:'Tutu Atwell', team:'Miami Dolphins', pos:'WR', role:'WR', tier:'C', fpts:6, rec:2.5, recy:30, rtd:0.2, tgt:4},
   {rank:3202, name:'Rome Odunze', team:'Chicago Bears', pos:'WR', role:'WR', tier:'A', fpts:11.5, rec:5.5, recy:70, rtd:0.4, tgt:8},
   {rank:3187, name:'Tetairoa McMillan', team:'Carolina Panthers', pos:'WR', role:'WR', tier:'A', fpts:11.5, rec:5.5, recy:68, rtd:0.4, tgt:8},
   {rank:3443, name:'Terry McLaurin', team:'Washington Commanders', pos:'WR', role:'WR', tier:'A', fpts:12, rec:5, recy:70, rtd:0.5, tgt:7},
-  {rank:3444, name:'Mike Evans', team:'Tampa Bay Buccaneers', pos:'WR', role:'WR', tier:'A', fpts:12, rec:5, recy:70, rtd:0.5, tgt:7},
+  {rank:3444, name:'Mike Evans', team:'San Francisco 49ers', pos:'WR', role:'WR', tier:'A', fpts:12, rec:5, recy:70, rtd:0.5, tgt:7},
   {rank:3207, name:'Tee Higgins', team:'Cincinnati Bengals', pos:'WR', role:'WR', tier:'A', fpts:11.5, rec:5, recy:65, rtd:0.5, tgt:7},
   {rank:3159, name:'Zay Flowers', team:'Baltimore Ravens', pos:'WR', role:'WR', tier:'B', fpts:10, rec:5, recy:60, rtd:0.4, tgt:7},
-  {rank:3174, name:'DJ Moore', team:'Chicago Bears', pos:'WR', role:'WR', tier:'B', fpts:10, rec:4.5, recy:55, rtd:0.4, tgt:6.5},
+  {rank:3174, name:'DJ Moore', team:'Buffalo Bills', pos:'WR', role:'WR', tier:'B', fpts:10, rec:4.5, recy:55, rtd:0.4, tgt:6.5},
   {rank:3317, name:'Jerry Jeudy', team:'Cleveland Browns', pos:'WR', role:'WR', tier:'B', fpts:10, rec:5, recy:60, rtd:0.4, tgt:7},
   {rank:3345, name:'Courtland Sutton', team:'Denver Broncos', pos:'WR', role:'WR', tier:'B', fpts:10.5, rec:5, recy:65, rtd:0.4, tgt:7.5},
-  {rank:3346, name:'Jaylen Waddle', team:'Miami Dolphins', pos:'WR', role:'WR', tier:'B', fpts:10.5, rec:5, recy:62, rtd:0.4, tgt:7.5},
+  {rank:3346, name:'Jaylen Waddle', team:'Denver Broncos', pos:'WR', role:'WR', tier:'B', fpts:10.5, rec:5, recy:62, rtd:0.4, tgt:7.5},
   {rank:3365, name:'Jayden Reed', team:'Green Bay Packers', pos:'WR', role:'WR', tier:'B', fpts:10, rec:4.5, recy:58, rtd:0.4, tgt:6.5},
   {rank:3361, name:'Matthew Golden', team:'Green Bay Packers', pos:'WR', role:'WR', tier:'C', fpts:8.5, rec:4, recy:50, rtd:0.3, tgt:6},
   {rank:3445, name:'Xavier Worthy', team:'Kansas City Chiefs', pos:'WR', role:'WR', tier:'B', fpts:10, rec:4.5, recy:60, rtd:0.4, tgt:7},
   {rank:3446, name:'Khalil Shakir', team:'Buffalo Bills', pos:'WR', role:'WR', tier:'B', fpts:10.5, rec:5, recy:60, rtd:0.4, tgt:7},
   {rank:3447, name:'Keon Coleman', team:'Buffalo Bills', pos:'WR', role:'WR', tier:'C', fpts:9.5, rec:4, recy:55, rtd:0.4, tgt:7},
-  {rank:3448, name:'Stefon Diggs', team:'New England Patriots', pos:'WR', role:'WR', tier:'B', fpts:10.5, rec:5, recy:60, rtd:0.4, tgt:7},
-  {rank:3449, name:'Michael Pittman Jr.', team:'Indianapolis Colts', pos:'WR', role:'WR', tier:'B', fpts:10, rec:5, recy:60, rtd:0.4, tgt:7},
+  {rank:3448, name:'Stefon Diggs', team:'Washington Commanders', pos:'WR', role:'WR', tier:'B', fpts:10.5, rec:5, recy:60, rtd:0.4, tgt:7},
+  {rank:3449, name:'Michael Pittman Jr.', team:'Pittsburgh Steelers', pos:'WR', role:'WR', tier:'B', fpts:10, rec:5, recy:60, rtd:0.4, tgt:7},
   {rank:3450, name:'Calvin Ridley', team:'Tennessee Titans', pos:'WR', role:'WR', tier:'B', fpts:10, rec:5, recy:60, rtd:0.4, tgt:7},
-  {rank:3451, name:'Jakobi Meyers', team:'Las Vegas Raiders', pos:'WR', role:'WR', tier:'C', fpts:8.5, rec:4.5, recy:50, rtd:0.3, tgt:6},
+  {rank:3451, name:'Jakobi Meyers', team:'Jacksonville Jaguars', pos:'WR', role:'WR', tier:'C', fpts:8.5, rec:4.5, recy:50, rtd:0.3, tgt:6},
   {rank:3452, name:'Ricky Pearsall', team:'San Francisco 49ers', pos:'WR', role:'WR', tier:'B', fpts:9.5, rec:4.5, recy:55, rtd:0.4, tgt:6},
   {rank:3453, name:'Chris Olave', team:'New Orleans Saints', pos:'WR', role:'WR', tier:'B', fpts:10, rec:5, recy:60, rtd:0.4, tgt:7},
   {rank:3454, name:'Emeka Egbuka', team:'Tampa Bay Buccaneers', pos:'WR', role:'WR', tier:'B', fpts:9.5, rec:4.5, recy:55, rtd:0.4, tgt:6},
-
+  {rank:3500, name:'Kendrick Bourne', team:'Arizona Cardinals', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:2.1, recy:37.3, rtd:0.25, tgt:3.4},
+  {rank:3504, name:'Vinny Anthony II', team:'Atlanta Falcons', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3.7, recy:26.7, rtd:0.22, tgt:5.3},
+  {rank:3510, name:'Rashod Bateman', team:'Baltimore Ravens', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3.2, recy:25.6, rtd:0.18, tgt:4.7},
+  {rank:3519, name:'Jalen Coker', team:'Carolina Panthers', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:2, recy:34.1, rtd:0.25, tgt:3.3},
+  {rank:3527, name:'Maurice Alexander', team:'Chicago Bears', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3, recy:35.9, rtd:0.32, tgt:4.5},
+  {rank:3539, name:'Isaiah Bond', team:'Cleveland Browns', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:2.9, recy:35.1, rtd:0.32, tgt:4.4},
+  {rank:3552, name:'Tarik Black', team:'Detroit Lions', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3.2, recy:36.1, rtd:0.18, tgt:4.8},
+  {rank:3560, name:'Lewis Bond', team:'Houston Texans', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3.5, recy:39.9, rtd:0.2, tgt:5.1},
+  {rank:3566, name:'Keenan Allen', team:'Indianapolis Colts', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:2.8, recy:38, rtd:0.31, tgt:4.3},
+  {rank:3567, name:'Deion Burks', team:'Indianapolis Colts', pos:'WR', role:'WR', tier:'C', fpts:4, rec:1.6, recy:21.5, rtd:0.21, tgt:2.8},
+  {rank:3580, name:'Cyrus Allen', team:'Kansas City Chiefs', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3.6, recy:27, rtd:0.21, tgt:5.2},
+  {rank:3586, name:'Sincere Brown', team:'Los Angeles Chargers', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:2.8, recy:34.7, rtd:0.31, tgt:4.2},
+  {rank:3596, name:'Jack Bech', team:'Las Vegas Raiders', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:2.3, recy:34, rtd:0.27, tgt:3.6},
+  {rank:3597, name:'Malik Benson', team:'Las Vegas Raiders', pos:'WR', role:'WR', tier:'C', fpts:4, rec:1.9, recy:25.7, rtd:0.07, tgt:3.1},
+  {rank:3603, name:'Chris Bell', team:'Miami Dolphins', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3.3, recy:37.4, rtd:0.19, tgt:4.8},
+  {rank:3611, name:'Jordan Addison', team:'Minnesota Vikings', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:2.3, recy:43.1, rtd:0.27, tgt:3.6},
+  {rank:3618, name:'Kayshon Boutte', team:'New England Patriots', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3, recy:30.6, rtd:0.32, tgt:4.5},
+  {rank:3623, name:'Kevin Austin Jr.', team:'New Orleans Saints', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3.9, recy:38.1, rtd:0.23, tgt:5.5},
+  {rank:3631, name:'Calvin Austin III', team:'New York Giants', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:2.2, recy:41.8, rtd:0.26, tgt:3.6},
+  {rank:3638, name:'Junior Bergen', team:'New York Jets', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3.8, recy:35.2, rtd:0.22, tgt:5.4},
+  {rank:3646, name:'Hollywood Brown', team:'Philadelphia Eagles', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3.4, recy:38.4, rtd:0.2, tgt:5},
+  {rank:3647, name:'Darius Cooper', team:'Philadelphia Eagles', pos:'WR', role:'WR', tier:'C', fpts:4, rec:1.4, recy:14.9, rtd:0.2, tgt:2.6},
+  {rank:3656, name:'Jake Bobo', team:'Seattle Seahawks', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:2.2, recy:32.7, rtd:0.26, tgt:3.6},
+  {rank:3667, name:'Chris Godwin Jr.', team:'Tampa Bay Buccaneers', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3.2, recy:34.2, rtd:0.18, tgt:4.8},
+  {rank:3673, name:'Elic Ayomanor', team:'Tennessee Titans', pos:'WR', role:'WR', tier:'B', fpts:6.5, rec:3.5, recy:38, rtd:0.21, tgt:5.1},
   // ── TE ──
   {rank:3013, name:'Travis Kelce', team:'Kansas City Chiefs', pos:'TE', role:'TE', tier:'A', fpts:12.5, rec:5.5, recy:60, rtd:0.4, tgt:7.5},
   {rank:3455, name:'Brock Bowers', team:'Las Vegas Raiders', pos:'TE', role:'TE', tier:'S', fpts:14, rec:6, recy:70, rtd:0.4, tgt:9},
   {rank:3034, name:'Trey McBride', team:'Arizona Cardinals', pos:'TE', role:'TE', tier:'A', fpts:13, rec:6, recy:65, rtd:0.4, tgt:8},
   {rank:3037, name:'George Kittle', team:'San Francisco 49ers', pos:'TE', role:'TE', tier:'A', fpts:11, rec:4.5, recy:60, rtd:0.5, tgt:6},
-  {rank:3456, name:'David Njoku', team:'Cleveland Browns', pos:'TE', role:'TE', tier:'A', fpts:9, rec:5, recy:50, rtd:0.4, tgt:6},
+  {rank:3456, name:'David Njoku', team:'Los Angeles Chargers', pos:'TE', role:'TE', tier:'A', fpts:9, rec:5, recy:50, rtd:0.4, tgt:6},
   {rank:3036, name:'Sam LaPorta', team:'Detroit Lions', pos:'TE', role:'TE', tier:'B', fpts:9, rec:4, recy:42, rtd:0.4, tgt:5.5},
   {rank:3035, name:'Mark Andrews', team:'Baltimore Ravens', pos:'TE', role:'TE', tier:'B', fpts:9.5, rec:4, recy:45, rtd:0.4, tgt:6},
   {rank:3218, name:'Kyle Pitts Sr.', team:'Atlanta Falcons', pos:'TE', role:'TE', tier:'B', fpts:9, rec:4.5, recy:55, rtd:0.3, tgt:7},
@@ -6819,34 +6873,50 @@ const NFL_RAW = [
   {rank:3380, name:'Jake Ferguson', team:'Dallas Cowboys', pos:'TE', role:'TE', tier:'B', fpts:7.5, rec:4.5, recy:40, rtd:0.4, tgt:6},
   {rank:3457, name:'T.J. Hockenson', team:'Minnesota Vikings', pos:'TE', role:'TE', tier:'B', fpts:8, rec:4.5, recy:45, rtd:0.4, tgt:6},
   {rank:3458, name:'Pat Freiermuth', team:'Pittsburgh Steelers', pos:'TE', role:'TE', tier:'C', fpts:7.5, rec:4, recy:40, rtd:0.4, tgt:6},
-
-  // ── DEF ── (previously just 7 players total across the whole league - expanded significantly)
+  {rank:3520, name:'Mitchell Evans', team:'Carolina Panthers', pos:'TE', role:'TE', tier:'B', fpts:6, rec:3.3, recy:28, rtd:0.19, tgt:4.8},
+  {rank:3533, name:'Erick All Jr.', team:'Cincinnati Bengals', pos:'TE', role:'TE', tier:'B', fpts:6, rec:3.5, recy:44.1, rtd:0.2, tgt:5.1},
+  {rank:3540, name:'Harold Fannin Jr.', team:'Cleveland Browns', pos:'TE', role:'TE', tier:'B', fpts:6, rec:3.9, recy:34.5, rtd:0.24, tgt:5.6},
+  {rank:3561, name:'Louis Hansen', team:'Houston Texans', pos:'TE', role:'TE', tier:'B', fpts:6, rec:2.2, recy:36.9, rtd:0.26, tgt:3.5},
+  {rank:3568, name:'Mo Alie-Cox', team:'Indianapolis Colts', pos:'TE', role:'TE', tier:'B', fpts:6, rec:2.1, recy:26.3, rtd:0.26, tgt:3.5},
+  {rank:3573, name:'Nate Boerkircher', team:'Jacksonville Jaguars', pos:'TE', role:'TE', tier:'B', fpts:6, rec:2.7, recy:34.3, rtd:0.3, tgt:4.1},
+  {rank:3590, name:'Davis Allen', team:'Los Angeles Rams', pos:'TE', role:'TE', tier:'B', fpts:6, rec:3.7, recy:38.1, rtd:0.22, tgt:5.4},
+  {rank:3604, name:'Greg Dulcich', team:'Miami Dolphins', pos:'TE', role:'TE', tier:'B', fpts:6, rec:2.9, recy:36.3, rtd:0.31, tgt:4.4},
+  {rank:3619, name:'Tanner Arkin', team:'New England Patriots', pos:'TE', role:'TE', tier:'B', fpts:6, rec:3.3, recy:41.6, rtd:0.19, tgt:4.9},
+  {rank:3624, name:'Oscar Delp', team:'New Orleans Saints', pos:'TE', role:'TE', tier:'B', fpts:6, rec:3.4, recy:28, rtd:0.2, tgt:5},
+  {rank:3632, name:'Tanner Conner', team:'New York Giants', pos:'TE', role:'TE', tier:'B', fpts:6, rec:3.3, recy:39.5, rtd:0.19, tgt:4.9},
+  {rank:3639, name:'Chase Curtis', team:'New York Jets', pos:'TE', role:'TE', tier:'B', fpts:6, rec:4, recy:26.1, rtd:0.24, tgt:5.7},
+  {rank:3648, name:'Grant Calcaterra', team:'Philadelphia Eagles', pos:'TE', role:'TE', tier:'B', fpts:6, rec:2.6, recy:39.2, rtd:0.29, tgt:4},
+  {rank:3657, name:'Elijah Arroyo', team:'Seattle Seahawks', pos:'TE', role:'TE', tier:'B', fpts:6, rec:2.8, recy:30.8, rtd:0.31, tgt:4.2},
+  {rank:3668, name:'Devin Culp', team:'Tampa Bay Buccaneers', pos:'TE', role:'TE', tier:'B', fpts:6, rec:3, recy:30.3, rtd:0.32, tgt:4.5},
+  {rank:3674, name:'Daniel Bellinger', team:'Tennessee Titans', pos:'TE', role:'TE', tier:'B', fpts:6, rec:2.5, recy:40.5, rtd:0.28, tgt:3.9},
+  {rank:3681, name:'John Bates', team:'Washington Commanders', pos:'TE', role:'TE', tier:'B', fpts:6, rec:3.6, recy:41.5, rtd:0.21, tgt:5.2},
+  // ── DEF (DE/DT/LB/CB/S) ──
   {rank:3014, name:'Micah Parsons', team:'Green Bay Packers', pos:'DE', role:'DEF', tier:'S', fpts:14, tkl:4.5, sack:1.1, defint:0.05},
-  {rank:3015, name:'Myles Garrett', team:'Cleveland Browns', pos:'DE', role:'DEF', tier:'S', fpts:14.5, tkl:4, sack:1.2, defint:0.05},
-  {rank:3016, name:'T.J. Watt', team:'Pittsburgh Steelers', pos:'LB', role:'DEF', tier:'S', fpts:14, tkl:4.5, sack:1.0, defint:0.1},
+  {rank:3015, name:'Myles Garrett', team:'Los Angeles Rams', pos:'DE', role:'DEF', tier:'S', fpts:14.5, tkl:4, sack:1.2, defint:0.05},
+  {rank:3016, name:'T.J. Watt', team:'Pittsburgh Steelers', pos:'LB', role:'DEF', tier:'S', fpts:14, tkl:4.5, sack:1, defint:0.1},
   {rank:3017, name:'Nick Bosa', team:'San Francisco 49ers', pos:'DE', role:'DEF', tier:'A', fpts:11.5, tkl:3.5, sack:0.8, defint:0.05},
   {rank:3038, name:'Aidan Hutchinson', team:'Detroit Lions', pos:'DE', role:'DEF', tier:'A', fpts:11, tkl:3.5, sack:0.8, defint:0.05},
   {rank:3040, name:'Maxx Crosby', team:'Las Vegas Raiders', pos:'DE', role:'DEF', tier:'A', fpts:11.5, tkl:4, sack:0.85, defint:0.03},
-  {rank:3039, name:'Sauce Gardner', team:'New York Jets', pos:'CB', role:'DEF', tier:'A', fpts:8.5, tkl:3.5, sack:0, defint:0.15},
-  {rank:3459, name:'Trey Hendrickson', team:'Cincinnati Bengals', pos:'DE', role:'DEF', tier:'S', fpts:13.5, tkl:3, sack:1.15, defint:0.03},
+  {rank:3039, name:'Sauce Gardner', team:'Indianapolis Colts', pos:'CB', role:'DEF', tier:'A', fpts:8.5, tkl:3.5, sack:0, defint:0.15},
+  {rank:3459, name:'Trey Hendrickson', team:'Baltimore Ravens', pos:'DE', role:'DEF', tier:'S', fpts:13.5, tkl:3, sack:1.15, defint:0.03},
   {rank:3460, name:'Fred Warner', team:'San Francisco 49ers', pos:'LB', role:'DEF', tier:'S', fpts:13, tkl:8, sack:0.15, defint:0.1},
   {rank:3461, name:'Roquan Smith', team:'Baltimore Ravens', pos:'LB', role:'DEF', tier:'A', fpts:12, tkl:8, sack:0.1, defint:0.08},
-  {rank:3462, name:'Patrick Surtain II', team:'Denver Broncos', pos:'CB', role:'DEF', tier:'S', fpts:9, tkl:3, sack:0, defint:0.2},
+  {rank:3462, name:'Pat Surtain II', team:'Denver Broncos', pos:'CB', role:'DEF', tier:'S', fpts:9, tkl:3, sack:0, defint:0.2},
   {rank:3463, name:'Jalen Carter', team:'Philadelphia Eagles', pos:'DT', role:'DEF', tier:'A', fpts:9.5, tkl:3.5, sack:0.5, defint:0.02},
-  {rank:3464, name:'Quinnen Williams', team:'New York Jets', pos:'DT', role:'DEF', tier:'A', fpts:9, tkl:3.5, sack:0.5, defint:0.02},
+  {rank:3464, name:'Quinnen Williams', team:'Dallas Cowboys', pos:'DT', role:'DEF', tier:'A', fpts:9, tkl:3.5, sack:0.5, defint:0.02},
   {rank:3465, name:'Chris Jones', team:'Kansas City Chiefs', pos:'DT', role:'DEF', tier:'A', fpts:9.5, tkl:3, sack:0.6, defint:0.02},
-  {rank:3466, name:'Dexter Lawrence', team:'New York Giants', pos:'DT', role:'DEF', tier:'A', fpts:9, tkl:3.5, sack:0.55, defint:0.02},
+  {rank:3466, name:'Dexter Lawrence', team:'Cincinnati Bengals', pos:'DT', role:'DEF', tier:'A', fpts:9, tkl:3.5, sack:0.55, defint:0.02},
   {rank:3467, name:'Will Anderson Jr.', team:'Houston Texans', pos:'DE', role:'DEF', tier:'A', fpts:10.5, tkl:3.5, sack:0.7, defint:0.03},
   {rank:3468, name:'Danielle Hunter', team:'Houston Texans', pos:'DE', role:'DEF', tier:'A', fpts:10, tkl:3, sack:0.75, defint:0.02},
   {rank:3469, name:'Brian Burns', team:'New York Giants', pos:'DE', role:'DEF', tier:'A', fpts:10, tkl:3, sack:0.7, defint:0.03},
   {rank:3470, name:'Josh Sweat', team:'Arizona Cardinals', pos:'DE', role:'DEF', tier:'B', fpts:9, tkl:3, sack:0.6, defint:0.02},
   {rank:3471, name:'Montez Sweat', team:'Chicago Bears', pos:'DE', role:'DEF', tier:'B', fpts:9, tkl:3.5, sack:0.55, defint:0.03},
-  {rank:3472, name:'Rashan Gary', team:'Green Bay Packers', pos:'DE', role:'DEF', tier:'B', fpts:8.5, tkl:3, sack:0.55, defint:0.02},
-  {rank:3473, name:'Harold Landry III', team:'Tennessee Titans', pos:'DE', role:'DEF', tier:'B', fpts:8, tkl:3, sack:0.5, defint:0.02},
-  {rank:3474, name:'Jared Verse', team:'Los Angeles Rams', pos:'DE', role:'DEF', tier:'A', fpts:9.5, tkl:3.5, sack:0.6, defint:0.03},
+  {rank:3472, name:'Rashan Gary', team:'Dallas Cowboys', pos:'DE', role:'DEF', tier:'B', fpts:8.5, tkl:3, sack:0.55, defint:0.02},
+  {rank:3473, name:'Harold Landry III', team:'New England Patriots', pos:'DE', role:'DEF', tier:'B', fpts:8, tkl:3, sack:0.5, defint:0.02},
+  {rank:3474, name:'Jared Verse', team:'Cleveland Browns', pos:'DE', role:'DEF', tier:'A', fpts:9.5, tkl:3.5, sack:0.6, defint:0.03},
   {rank:3475, name:'Khalil Mack', team:'Los Angeles Chargers', pos:'LB', role:'DEF', tier:'B', fpts:8.5, tkl:3, sack:0.55, defint:0.02},
   {rank:3476, name:'Zack Baun', team:'Philadelphia Eagles', pos:'LB', role:'DEF', tier:'A', fpts:11, tkl:7.5, sack:0.2, defint:0.08},
-  {rank:3477, name:'Bobby Okereke', team:'Indianapolis Colts', pos:'LB', role:'DEF', tier:'B', fpts:10.5, tkl:7.5, sack:0.1, defint:0.05},
+  {rank:3477, name:'Austin Ajiake', team:'Indianapolis Colts', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:4, sack:0.1, defint:0.03},
   {rank:3478, name:'Jack Campbell', team:'Detroit Lions', pos:'LB', role:'DEF', tier:'B', fpts:10, tkl:7.5, sack:0.1, defint:0.05},
   {rank:3479, name:'Zaven Collins', team:'Arizona Cardinals', pos:'LB', role:'DEF', tier:'B', fpts:9.5, tkl:6.5, sack:0.2, defint:0.05},
   {rank:3480, name:'Nik Bonitto', team:'Denver Broncos', pos:'LB', role:'DEF', tier:'B', fpts:9, tkl:4, sack:0.5, defint:0.03},
@@ -6855,8 +6925,8 @@ const NFL_RAW = [
   {rank:3483, name:'Antoine Winfield Jr.', team:'Tampa Bay Buccaneers', pos:'S', role:'DEF', tier:'A', fpts:9, tkl:6, sack:0.15, defint:0.12},
   {rank:3484, name:'Budda Baker', team:'Arizona Cardinals', pos:'S', role:'DEF', tier:'B', fpts:9, tkl:6.5, sack:0.05, defint:0.08},
   {rank:3485, name:'Xavier McKinney', team:'Green Bay Packers', pos:'S', role:'DEF', tier:'B', fpts:8, tkl:5, sack:0.05, defint:0.15},
-  {rank:3486, name:'Justin Simmons', team:'Atlanta Falcons', pos:'S', role:'DEF', tier:'C', fpts:7, tkl:4.5, sack:0.02, defint:0.1},
-  {rank:3487, name:'Trevon Diggs', team:'Dallas Cowboys', pos:'CB', role:'DEF', tier:'B', fpts:7.5, tkl:3, sack:0, defint:0.15},
+  {rank:3486, name:'Jessie Bates III', team:'Atlanta Falcons', pos:'S', role:'DEF', tier:'C', fpts:7, tkl:4.5, sack:0.02, defint:0.1},
+  {rank:3487, name:'Trevon Diggs', team:'Seattle Seahawks', pos:'CB', role:'DEF', tier:'B', fpts:7.5, tkl:3, sack:0, defint:0.15},
   {rank:3488, name:'DaRon Bland', team:'Dallas Cowboys', pos:'CB', role:'DEF', tier:'B', fpts:7, tkl:3, sack:0, defint:0.13},
   {rank:3489, name:'Jalen Ramsey', team:'Pittsburgh Steelers', pos:'CB', role:'DEF', tier:'B', fpts:7, tkl:3, sack:0, defint:0.12},
   {rank:3490, name:'Marlon Humphrey', team:'Baltimore Ravens', pos:'CB', role:'DEF', tier:'B', fpts:6.5, tkl:3, sack:0, defint:0.1},
@@ -6868,6 +6938,120 @@ const NFL_RAW = [
   {rank:3496, name:'Alim McNeill', team:'Detroit Lions', pos:'DT', role:'DEF', tier:'C', fpts:7, tkl:2.5, sack:0.35, defint:0.02},
   {rank:3497, name:'Cameron Heyward', team:'Pittsburgh Steelers', pos:'DT', role:'DEF', tier:'B', fpts:7.5, tkl:3, sack:0.35, defint:0.02},
   {rank:3498, name:'Vita Vea', team:'Tampa Bay Buccaneers', pos:'DT', role:'DEF', tier:'B', fpts:7, tkl:2.5, sack:0.35, defint:0.02},
+  {rank:3501, name:'Andrew Billings', team:'Arizona Cardinals', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:1.5, sack:0.3, defint:0},
+  {rank:3502, name:'Denzel Burke', team:'Arizona Cardinals', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:1.9, sack:0.09, defint:0.09},
+  {rank:3505, name:'Keshawn Banks', team:'Atlanta Falcons', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:1.9, sack:0.33, defint:0},
+  {rank:3506, name:'Carlos Allen Jr.', team:'Atlanta Falcons', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:1.6, sack:0.23, defint:0.03},
+  {rank:3507, name:'JD Bertrand', team:'Atlanta Falcons', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:3.6, sack:0.24, defint:0.05},
+  {rank:3508, name:'Billy Bowman Jr.', team:'Atlanta Falcons', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:2.4, sack:0, defint:0.04},
+  {rank:3511, name:'Rayshaun Benny', team:'Baltimore Ravens', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:2.4, sack:0.2, defint:0.01},
+  {rank:3513, name:'Mike Danna', team:'Buffalo Bills', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:2.2, sack:0.27, defint:0.03},
+  {rank:3514, name:'Tommy Akingbesote', team:'Buffalo Bills', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:1.4, sack:0.37, defint:0},
+  {rank:3515, name:'Joe Andreessen', team:'Buffalo Bills', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:3.7, sack:0.22, defint:0.03},
+  {rank:3516, name:'Dee Alford', team:'Buffalo Bills', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:2.3, sack:0.07, defint:0.06},
+  {rank:3517, name:'Cole Bishop', team:'Buffalo Bills', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:3.2, sack:0.09, defint:0.06},
+  {rank:3521, name:'Elijah Garcia', team:'Carolina Panthers', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:1.8, sack:0.2, defint:0.01},
+  {rank:3522, name:'Kyon Barrs', team:'Carolina Panthers', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:1.5, sack:0.4, defint:0.02},
+  {rank:3523, name:'Claudin Cherelus', team:'Carolina Panthers', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:3.7, sack:0.25, defint:0.01},
+  {rank:3524, name:'Akayleb Evans', team:'Carolina Panthers', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:2.7, sack:0.03, defint:0.05},
+  {rank:3525, name:'Tre\'von Moehrig', team:'Carolina Panthers', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.2, sack:0.13, defint:0.03},
+  {rank:3528, name:'Gervon Dexter Sr.', team:'Chicago Bears', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:2.3, sack:0.18, defint:0},
+  {rank:3529, name:'Devin Bush', team:'Chicago Bears', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:3.6, sack:0.15, defint:0.01},
+  {rank:3530, name:'Beanie Bishop Jr.', team:'Chicago Bears', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:3.3, sack:0, defint:0.03},
+  {rank:3531, name:'Coby Bryant', team:'Chicago Bears', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:3.1, sack:0, defint:0.04},
+  {rank:3534, name:'Isaiah Foskey', team:'Cincinnati Bengals', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:3, sack:0.24, defint:0.03},
+  {rank:3535, name:'Liam Anderson', team:'Cincinnati Bengals', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:3.8, sack:0.2, defint:0.01},
+  {rank:3536, name:'Jalen Davis', team:'Cincinnati Bengals', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:3.4, sack:0.04, defint:0.03},
+  {rank:3537, name:'Daijahn Anthony', team:'Cincinnati Bengals', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.9, sack:0.01, defint:0.09},
+  {rank:3541, name:'Travis Bell', team:'Cleveland Browns', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:1.4, sack:0.19, defint:0},
+  {rank:3542, name:'Easton Mascarenas-Arnold', team:'Cleveland Browns', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:4.4, sack:0.04, defint:0.01},
+  {rank:3543, name:'Tre Avery', team:'Cleveland Browns', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:3.1, sack:0.1, defint:0.05},
+  {rank:3544, name:'Grant Delpit', team:'Cleveland Browns', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.4, sack:0, defint:0.05},
+  {rank:3546, name:'Jaishawn Barham', team:'Dallas Cowboys', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:4.5, sack:0.1, defint:0.05},
+  {rank:3547, name:'Markquese Bell', team:'Dallas Cowboys', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.2, sack:0.1, defint:0.05},
+  {rank:3549, name:'Zach Allen', team:'Denver Broncos', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:1.7, sack:0.37, defint:0},
+  {rank:3550, name:'Jordan Jackson', team:'Denver Broncos', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:2, sack:0.21, defint:0.04},
+  {rank:3551, name:'Tycen Anderson', team:'Denver Broncos', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.8, sack:0, defint:0.07},
+  {rank:3553, name:'Keith Abney II', team:'Detroit Lions', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:3.2, sack:0, defint:0.05},
+  {rank:3554, name:'Brian Branch', team:'Detroit Lions', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.8, sack:0.14, defint:0.04},
+  {rank:3556, name:'Warren Brinson', team:'Green Bay Packers', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:1.9, sack:0.19, defint:0.01},
+  {rank:3557, name:'Edgerrin Cooper', team:'Green Bay Packers', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:4.1, sack:0.28, defint:0.05},
+  {rank:3558, name:'Shemar Bartholomew', team:'Green Bay Packers', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:2.4, sack:0, defint:0.09},
+  {rank:3562, name:'Dominic Bailey', team:'Houston Texans', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:1.7, sack:0.27, defint:0.01},
+  {rank:3563, name:'Azeez Al-Shaair', team:'Houston Texans', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:5.4, sack:0.11, defint:0.02},
+  {rank:3564, name:'Reed Blankenship', team:'Houston Texans', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:1.9, sack:0.01, defint:0.04},
+  {rank:3569, name:'Micheal Clemons', team:'Indianapolis Colts', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:1.8, sack:0.38, defint:0.03},
+  {rank:3570, name:'Austin Brown', team:'Indianapolis Colts', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:1.6, sack:0, defint:0.05},
+  {rank:3574, name:'Matt Dickerson', team:'Jacksonville Jaguars', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:2.1, sack:0.31, defint:0.01},
+  {rank:3575, name:'Arik Armstead', team:'Jacksonville Jaguars', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:1.8, sack:0.32, defint:0.03},
+  {rank:3576, name:'Yasir Abdullah', team:'Jacksonville Jaguars', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:4.3, sack:0.24, defint:0.04},
+  {rank:3577, name:'Corey Ballentine', team:'Jacksonville Jaguars', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:1.7, sack:0.03, defint:0.04},
+  {rank:3578, name:'Jalen Huskey', team:'Jacksonville Jaguars', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:1.6, sack:0.1, defint:0.03},
+  {rank:3581, name:'Vincent Anthony Jr.', team:'Kansas City Chiefs', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:2.9, sack:0.43, defint:0},
+  {rank:3582, name:'Kam Arnold', team:'Kansas City Chiefs', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:4.5, sack:0.19, defint:0.03},
+  {rank:3583, name:'Jadon Canady', team:'Kansas City Chiefs', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:1.7, sack:0, defint:0.07},
+  {rank:3584, name:'Chamarri Conner', team:'Kansas City Chiefs', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:3.5, sack:0.11, defint:0.06},
+  {rank:3587, name:'Nick Barrett', team:'Los Angeles Chargers', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:1.7, sack:0.36, defint:0.01},
+  {rank:3588, name:'Cam Hart', team:'Los Angeles Chargers', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:2.9, sack:0, defint:0.06},
+  {rank:3591, name:'Poona Ford', team:'Los Angeles Rams', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:3, sack:0.34, defint:0.01},
+  {rank:3592, name:'Wesley Bailey', team:'Los Angeles Rams', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:5.1, sack:0.07, defint:0.03},
+  {rank:3593, name:'Emmanuel Forbes Jr.', team:'Los Angeles Rams', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:2.9, sack:0.12, defint:0.07},
+  {rank:3594, name:'Nick Andersen', team:'Los Angeles Rams', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:1.9, sack:0.03, defint:0.04},
+  {rank:3598, name:'Thomas Booker IV', team:'Las Vegas Raiders', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:2.8, sack:0.38, defint:0},
+  {rank:3599, name:'Nakobe Dean', team:'Las Vegas Raiders', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:5.1, sack:0.24, defint:0.05},
+  {rank:3600, name:'Chigozie Anusiem', team:'Las Vegas Raiders', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:3.2, sack:0, defint:0.05},
+  {rank:3601, name:'Jeremy Chinn', team:'Las Vegas Raiders', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.5, sack:0, defint:0.07},
+  {rank:3605, name:'Robert Beal Jr.', team:'Miami Dolphins', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:1, sack:0.4, defint:0.02},
+  {rank:3606, name:'Zeek Biggers', team:'Miami Dolphins', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:2.4, sack:0.18, defint:0.04},
+  {rank:3607, name:'Jordyn Brooks', team:'Miami Dolphins', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:5.2, sack:0.29, defint:0.02},
+  {rank:3608, name:'Alex Austin', team:'Miami Dolphins', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:3.1, sack:0, defint:0.08},
+  {rank:3609, name:'Zayne Anderson', team:'Miami Dolphins', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.7, sack:0.12, defint:0.08},
+  {rank:3612, name:'Tyrion Ingram-Dawkins', team:'Minnesota Vikings', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:2.4, sack:0.4, defint:0.04},
+  {rank:3613, name:'Caleb Banks', team:'Minnesota Vikings', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:1.3, sack:0.41, defint:0.02},
+  {rank:3614, name:'Tyler Batty', team:'Minnesota Vikings', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:3.9, sack:0.02, defint:0.06},
+  {rank:3615, name:'Marcus Allen', team:'Minnesota Vikings', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:1.5, sack:0, defint:0.04},
+  {rank:3616, name:'Kahlef Hailassie', team:'Minnesota Vikings', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.8, sack:0.04, defint:0.06},
+  {rank:3620, name:'Christian Barmore', team:'New England Patriots', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:2.3, sack:0.34, defint:0.02},
+  {rank:3621, name:'K.J. Britt', team:'New England Patriots', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:4.3, sack:0.22, defint:0.02},
+  {rank:3622, name:'Mike Brown', team:'New England Patriots', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:1.8, sack:0, defint:0.05},
+  {rank:3625, name:'Myles Cole', team:'New Orleans Saints', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:2.2, sack:0.35, defint:0.01},
+  {rank:3626, name:'Khristian Boyd', team:'New Orleans Saints', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:1.3, sack:0.29, defint:0},
+  {rank:3627, name:'Kaden Elliss', team:'New Orleans Saints', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:4.2, sack:0.26, defint:0.01},
+  {rank:3628, name:'Dalys Beanum', team:'New Orleans Saints', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:2.6, sack:0.1, defint:0.04},
+  {rank:3629, name:'Julian Blackmon', team:'New Orleans Saints', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:3.5, sack:0.12, defint:0.04},
+  {rank:3633, name:'Darius Alexander', team:'New York Giants', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:2.3, sack:0.43, defint:0},
+  {rank:3634, name:'Zaire Barnes', team:'New York Giants', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:3.6, sack:0.08, defint:0.04},
+  {rank:3635, name:'Paulson Adebo', team:'New York Giants', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:1.9, sack:0, defint:0.06},
+  {rank:3636, name:'Ugo Amadi', team:'New York Giants', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.6, sack:0, defint:0.08},
+  {rank:3640, name:'Tyler Baron', team:'New York Jets', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:2.9, sack:0.31, defint:0},
+  {rank:3641, name:'Jowon Briggs', team:'New York Jets', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:2.1, sack:0.19, defint:0.04},
+  {rank:3642, name:'David Bailey', team:'New York Jets', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:3.6, sack:0.02, defint:0.03},
+  {rank:3643, name:'Mory Bamba', team:'New York Jets', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:2.7, sack:0.12, defint:0.07},
+  {rank:3644, name:'Dane Belton', team:'New York Jets', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:1.6, sack:0, defint:0.05},
+  {rank:3649, name:'AJ Epenesa', team:'Philadelphia Eagles', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:2.3, sack:0.25, defint:0.04},
+  {rank:3650, name:'Marcus Epps', team:'Philadelphia Eagles', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:3.2, sack:0, defint:0.05},
+  {rank:3652, name:'Yahya Black', team:'Pittsburgh Steelers', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:2.5, sack:0.26, defint:0.03},
+  {rank:3653, name:'Jaquan Brisker', team:'Pittsburgh Steelers', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.7, sack:0, defint:0.07},
+  {rank:3658, name:'Mike Morris', team:'Seattle Seahawks', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:3, sack:0.31, defint:0.02},
+  {rank:3659, name:'Deven Eastern', team:'Seattle Seahawks', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:2.3, sack:0.27, defint:0},
+  {rank:3660, name:'Power Echols', team:'Seattle Seahawks', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:4.3, sack:0.21, defint:0.04},
+  {rank:3661, name:'D\'Anthony Bell', team:'Seattle Seahawks', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.8, sack:0.01, defint:0.05},
+  {rank:3663, name:'Evan Anderson', team:'San Francisco 49ers', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:2.5, sack:0.39, defint:0},
+  {rank:3664, name:'Eli Apple', team:'San Francisco 49ers', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:2.3, sack:0.07, defint:0.06},
+  {rank:3665, name:'Ji\'Ayir Brown', team:'San Francisco 49ers', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.5, sack:0.11, defint:0.06},
+  {rank:3669, name:'Elijah Roberts', team:'Tampa Bay Buccaneers', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:3, sack:0.39, defint:0},
+  {rank:3670, name:'Alex Anzalone', team:'Tampa Bay Buccaneers', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:4.1, sack:0.16, defint:0.01},
+  {rank:3671, name:'Ayden Garnes', team:'Tampa Bay Buccaneers', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:3.5, sack:0, defint:0.05},
+  {rank:3675, name:'Earnest Brown IV', team:'Tennessee Titans', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:1.8, sack:0.23, defint:0},
+  {rank:3676, name:'Jordan Elliott', team:'Tennessee Titans', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:2.5, sack:0.31, defint:0.02},
+  {rank:3677, name:'Cody Barton', team:'Tennessee Titans', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:4.5, sack:0.1, defint:0.05},
+  {rank:3678, name:'Keydrain Calligan', team:'Tennessee Titans', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:2.2, sack:0, defint:0.08},
+  {rank:3679, name:'Tony Adams', team:'Tennessee Titans', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:2.8, sack:0, defint:0.04},
+  {rank:3682, name:'Dorance Armstrong', team:'Washington Commanders', pos:'DE', role:'DEF', tier:'C', fpts:4.5, tkl:2, sack:0.43, defint:0.01},
+  {rank:3683, name:'Ricky Barber', team:'Washington Commanders', pos:'DT', role:'DEF', tier:'C', fpts:4.5, tkl:2, sack:0.37, defint:0.02},
+  {rank:3684, name:'Krys Barnes', team:'Washington Commanders', pos:'LB', role:'DEF', tier:'C', fpts:6, tkl:4.3, sack:0.1, defint:0.01},
+  {rank:3685, name:'Trey Amos', team:'Washington Commanders', pos:'CB', role:'DEF', tier:'C', fpts:4.5, tkl:3.5, sack:0, defint:0.07},
+  {rank:3686, name:'Percy Butler', team:'Washington Commanders', pos:'S', role:'DEF', tier:'C', fpts:4.5, tkl:3.4, sack:0.06, defint:0.08},
 ];
 // ── NFL PRICING ──────────────────────────────────────────────────────────────
 // Position-specific fantasy-style scoring. Each position's baseline stat line seeds a
@@ -6901,7 +7085,7 @@ function nflStatPrice(p){
   return Math.max(0.01, raw * (MULT[p.tier]||1) * PRICE_SCALE * NFL_SCALE);
 }
 
-const NFL_IDS = {"3001": "3916387", "3002": "3918298", "3003": "3915511", "3004": "3139477", "3005": "4040715", "3006": "4430807", "3007": "3929630", "3008": "3117251", "3009": "4362628", "3010": "4262921", "3011": "4241389", "3012": "4047646", "3013": "15847", "3014": "4361423", "3015": "3122132", "3016": "3045282", "3017": "4040605", "3018": "4431611", "3019": "2577417", "3020": "3046779", "3021": "4036378", "3022": "4360310", "3023": "4426348", "3024": "3043078", "3025": "4429795", "3026": "4242335", "3027": "4427366", "3028": "4426502", "3029": "4258173", "3030": "4432773", "3031": "4426515", "3032": "4595348", "3033": "4569618", "3034": "4361307", "3035": "3116365", "3036": "4430027", "3037": "3040151", "3038": "4372099", "3039": "4427250", "3040": "3916655", "3041": "4430841", "3042": "2578570", "3043": "4038524", "3044": "4428512", "3045": "4360423", "3046": "2511109", "3047": "5344782", "3048": "4241479", "3049": "4429582", "3050": "4035671", "3051": "5084180", "3052": "4036419", "3053": "3115293", "3054": "4039034", "3055": "4428993", "3056": "4240703", "3057": "4685720", "3058": "4693331", "3059": "4434153", "3060": "15168", "3061": "4431580", "3062": "4259592", "3063": "11252", "3064": "11394", "3065": "4427238", "3066": "4431325", "3067": "4432762", "3068": "3122840", "3069": "4426875", "3070": "4360698", "3071": "4241820", "3072": "4426338", "3073": "3892775", "3074": "4597679", "3075": "16728", "3076": "4678010", "3077": "4433971", "3078": "14163", "3079": "4426335", "3080": "4242546", "3081": "4373626", "3082": "4429275", "3083": "3045147", "3084": "4431431", "3085": "4427728", "3086": "4870808", "3087": "4605841", "3088": "4429676", "3089": "4881826", "3090": "4241474", "3091": "4690013", "3092": "4038441", "3093": "4427971", "3094": "4685526", "3095": "4876311", "3096": "4379399", "3097": "4429501", "3098": "4429805", "3099": "3915411", "3100": "4579554", "3101": "4678008", "3102": "4613105", "3103": "4239934", "3104": "4685350", "3105": "4241416", "3106": "4709392", "3107": "4243315", "3108": "4694074", "3109": "4036032", "3110": "4426386", "3111": "4608686", "3112": "4259545", "3113": "4245645", "3114": "4429299", "3115": "4362238", "3116": "4430992", "3117": "4611995", "3118": "4429012", "3119": "3116389", "3120": "5153650", "3121": "5086027", "3122": "4685702", "3123": "4432374", "3124": "5081397", "3125": "4601080", "3126": "4429202", "3127": "4685279", "3128": "4240603", "3129": "4431562", "3130": "4430689", "3131": "4361579", "3132": "4362748", "3133": "4702555", "3134": "4241985", "3135": "4568490", "3136": "3045523", "3137": "4692835", "3138": "4039050", "3139": "4360739", "3140": "4432705", "3141": "4432708", "3142": "4875912", "3143": "4240573", "3144": "4869132", "3145": "4699354", "3146": "4428811", "3147": "4360761", "3148": "4869816", "3149": "4369886", "3150": "4870612", "3151": "4596010", "3152": "4361409", "3153": "4363551", "3154": "4604004", "3155": "4696062", "3156": "3917914", "3157": "4360939", "3158": "5081997", "3159": "4429615", "3160": "4695910", "3161": "4426479", "3162": "4870847", "3163": "5088338", "3164": "4869520", "3165": "4428763", "3166": "4696882", "3167": "4690143", "3168": "4683153", "3169": "4635008", "3170": "4431053", "3171": "4432215", "3172": "4035004", "3173": "4430270", "3174": "3915416", "3175": "4242433", "3176": "4373678", "3177": "4241476", "3178": "3122168", "3179": "4613050", "3180": "4878956", "3181": "4036448", "3182": "5091739", "3183": "3929637", "3184": "4695883", "3185": "4708486", "3186": "4430034", "3187": "4685472", "3188": "4570636", "3189": "4567096", "3190": "4212909", "3191": "4869965", "3192": "4876995", "3193": "4428532", "3194": "4360763", "3195": "4241478", "3196": "3914307", "3197": "4685278", "3198": "5065495", "3199": "4432784", "3200": "4701951", "3201": "3914397", "3202": "4431299", "3203": "2973405", "3204": "4685183", "3205": "4869748", "3206": "5160110", "3207": "4239993", "3208": "4368003", "3209": "4385430", "3210": "4257188", "3211": "4605858", "3212": "4588298", "3213": "4426844", "3214": "4374045", "3215": "4696700", "3216": "4044144", "3217": "3043275", "3218": "4360248", "3219": "4430482", "3220": "4832827", "3221": "4035020", "3222": "4876132", "3223": "4432260", "3224": "5084402", "3225": "3052897", "3226": "4573699", "3227": "4385690", "3228": "3930086", "3229": "4688552", "3230": "4608362", "3231": "4683243", "3232": "4034948", "3233": "4361988", "3234": "4431588", "3235": "4372780", "3236": "3948283", "3237": "4379769", "3238": "4916349", "3239": "4258595", "3240": "5150662", "3241": "4723086", "3242": "4685504", "3243": "4427834", "3244": "5085189", "3245": "3116164", "3246": "4700712", "3247": "3050481", "3248": "4819215", "3249": "3127310", "3250": "4362603", "3251": "4432577", "3252": "3917792", "3253": "4683423", "3254": "4722893", "3255": "4391845", "3256": "3116136", "3257": "4361529", "3258": "4880638", "3259": "4383429", "3260": "4432545", "3261": "4912274", "3262": "3149687", "3263": "4047365", "3264": "4429023", "3265": "4808830", "3266": "4683165", "3267": "4249836", "3268": "4373273", "3269": "4569609", "3270": "4429939", "3271": "4429059", "3272": "4035538", "3273": "5094042", "3274": "4432631", "3275": "4426689", "3276": "4612558", "3277": "4874509", "3278": "4686468", "3279": "4608607", "3280": "2576336", "3281": "4911851", "3282": "4240631", "3283": "4362619", "3284": "4713118", "3285": "4882093", "3286": "4682652", "3287": "4362478", "3288": "4832955", "3289": "4685489", "3290": "4596602", "3291": "4430825", "3292": "4567048", "3293": "4698191", "3294": "4688835", "3295": "4890973", "3296": "4366963", "3297": "4686658", "3298": "4691889", "3299": "4685382", "3300": "4878878", "3301": "4596334", "3302": "4362452", "3303": "4430968", "3304": "4384852", "3305": "4594444", "3306": "4035776", "3307": "4718457", "3308": "4690070", "3309": "4570738", "3310": "5092508", "3311": "4691138", "3312": "4808839", "3313": "4832800", "3314": "4870653", "3315": "4613104", "3316": "4566157", "3317": "4241463", "3318": "4877203", "3319": "4428678", "3320": "4369863", "3321": "4241424", "3322": "5096863", "3323": "4808759", "3324": "5083754", "3325": "4429172", "3326": "4685409", "3327": "2310331", "3328": "4035403", "3329": "4426485", "3330": "4426354", "3331": "4685110", "3332": "4581750", "3333": "3676833", "3334": "3051738", "3335": "4034704", "3336": "4600981", "3337": "3917940", "3338": "4431280", "3339": "4039057", "3340": "5225419", "3341": "4685424", "3342": "4683227", "3343": "4686472", "3344": "4569001", "3345": "3128429", "3346": "4372016", "3347": "4258170", "3348": "4240069", "3349": "4037235", "3350": "3915802", "3351": "3126997", "3352": "4372769", "3353": "4596439", "3354": "4245144", "3355": "4602788", "3356": "4374302", "3357": "5123663", "3358": "4426388", "3359": "4036335", "3360": "4685441", "3361": "4701936", "3362": "4259305", "3363": "4430191", "3364": "4428116", "3365": "4362249", "3366": "4686781", "3367": "4608679", "3368": "4635009", "3369": "4248528", "3370": "4431487", "3371": "4683159", "3372": "4366031", "3373": "4877706", "3374": "5083076", "3375": "4565859", "3376": "4685540", "3377": "4034862", "3378": "4362018", "3379": "4242442", "3380": "4242355", "3381": "4710711", "3382": "4372096", "3383": "4360967", "3384": "4594749", "3385": "4383440", "3386": "5159802", "3387": "3051876", "3388": "4912052", "3389": "4360231", "3390": "4432208", "3391": "3911853", "3392": "3915486", "3393": "4569615", "3394": "4877824", "3395": "5089453", "3396": "4242392", "3397": "4429466", "3398": "4572680", "3399": "4432338", "3400": "4702913", "3401": "4428085", "3402": "4362770", "3403": "4360086", "3404": "4569727", "3405": "4362504", "3406": "4695705", "3407": "3843945", "3408": "4878842"};
+const NFL_IDS = {"3001": "3916387", "3002": "3918298", "3003": "3915511", "3004": "3139477", "3005": "4040715", "3006": "4430807", "3007": "3929630", "3008": "3117251", "3009": "4362628", "3010": "4262921", "3011": "4241389", "3012": "4047646", "3013": "15847", "3014": "4361423", "3015": "3122132", "3016": "3045282", "3017": "4040605", "3018": "4431611", "3019": "2577417", "3020": "3046779", "3021": "4036378", "3022": "4360310", "3023": "4426348", "3024": "3043078", "3025": "4429795", "3026": "4242335", "3027": "4427366", "3028": "4426502", "3029": "4258173", "3030": "4432773", "3031": "4426515", "3032": "4595348", "3033": "4569618", "3034": "4361307", "3035": "3116365", "3036": "4430027", "3037": "3040151", "3038": "4372099", "3039": "4427250", "3040": "3916655", "3045": "4360423", "3048": "4241479", "3057": "4685720", "3065": "4427238", "3072": "4426338", "3083": "3045147", "3105": "4241416", "3112": "4259545", "3115": "4362238", "3122": "4685702", "3131": "4361579", "3135": "4568490", "3141": "4432708", "3159": "4429615", "3174": "3915416", "3187": "4685472", "3202": "4431299", "3207": "4239993", "3218": "4360248", "3227": "4385690", "3241": "4723086", "3251": "4432577", "3252": "3917792", "3257": "4361529", "3263": "4047365", "3292": "4567048", "3317": "4241463", "3330": "4426354", "3345": "3128429", "3346": "4372016", "3356": "4374302", "3361": "4701936", "3365": "4362249", "3380": "4242355", "3387": "3051876", "3398": "4572680", "3409": "4038941", "3410": "12483", "3411": "4361741", "3412": "3052587", "3413": "3917315", "3414": "3912547", "3415": "15864", "3416": "4431452", "3417": "4362887", "3418": "8439", "3419": "4433970", "3420": "4689114", "3421": "4688380", "3422": "4426339", "3423": "4890973", "3424": "3054850", "3425": "4430737", "3426": "4685382", "3427": "4596448", "3428": "4429160", "3429": "4379399", "3430": "4569173", "3431": "4569987", "3432": "4035538", "3433": "4239996", "3434": "3916148", "3435": "4360516", "3436": "4697815", "3437": "3042519", "3438": "4612826", "3439": "4430878", "3440": "4047650", "3441": "16800", "3442": "4360797", "3443": "3121422", "3444": "16737", "3445": "4683062", "3446": "4373678", "3447": "4635008", "3448": "2976212", "3449": "4035687", "3450": "3925357", "3451": "3916433", "3452": "4428209", "3453": "4361370", "3454": "4567750", "3455": "4432665", "3456": "3123076", "3457": "4036133", "3458": "4361411", "3459": "3052743", "3460": "3138826", "3461": "3915189", "3462": "4372012", "3463": "4685759", "3464": "4040982", "3465": "3044859", "3466": "4035483", "3467": "4685724", "3468": "2976560", "3469": "4035631", "3470": "3693166", "3471": "3134690", "3472": "4046523", "3473": "3122793", "3474": "4578085", "3475": "16710", "3476": "3917657", "3477": "4374171", "3478": "4569465", "3479": "4244606", "3480": "4360259", "3481": "3691739", "3482": "4575517", "3483": "4034790", "3484": "3127287", "3485": "4241470", "3486": "3919512", "3487": "4040966", "3488": "4248911", "3489": "3045373", "3490": "3126356", "3491": "4426434", "3492": "4686772", "3493": "4575431", "3494": "4682618", "3495": "2971282", "3496": "4361662", "3497": "13977", "3498": "3134362", "3499": "4373626", "3500": "3045523", "3501": "3051775", "3502": "4432668", "3503": "4605841", "3504": "4869816", "3505": "4361508", "3506": "4696117", "3507": "4428872", "3508": "4431194", "3509": "4690013", "3510": "4360939", "3511": "4432661", "3512": "4429501", "3513": "3915487", "3514": "4683450", "3515": "4366349", "3516": "4401823", "3517": "4676004", "3518": "4678008", "3519": "4695883", "3520": "4683243", "3521": "4039170", "3522": "4569135", "3523": "4256224", "3524": "4244607", "3525": "4362487", "3526": "4243315", "3527": "3914307", "3528": "4429014", "3529": "4036261", "3530": "4363052", "3531": "4239094", "3532": "4245645", "3533": "4427834", "3534": "4426457", "3535": "4368056", "3536": "3125356", "3537": "4874448", "3538": "5153650", "3539": "4808839", "3540": "5083076", "3541": "4246741", "3542": "5085888", "3543": "4259300", "3544": "4242208", "3545": "4429202", "3546": "4685266", "3547": "4241921", "3548": "4362748", "3549": "3915282", "3550": "4261090", "3551": "4257240", "3552": "4258170", "3553": "5093004", "3554": "4692025", "3555": "3149687", "3556": "4429136", "3557": "4430438", "3558": "4371336", "3559": "4373273", "3560": "4683159", "3561": "4569727", "3562": "4686304", "3563": "3919117", "3564": "4243956", "3565": "4426689", "3566": "15818", "3567": "4683151", "3568": "2998565", "3569": "4240896", "3570": "4827042", "3571": "2576336", "3572": "4911851", "3573": "4686248", "3574": "3134316", "3575": "2971275", "3576": "4360807", "3577": "4411769", "3578": "4912185", "3579": "4362478", "3580": "4912218", "3581": "4875123", "3582": "4429224", "3583": "4710706", "3584": "4361964", "3585": "4691889", "3586": "4568687", "3587": "4682818", "3588": "4427404", "3589": "5082269", "3590": "4426553", "3591": "3125114", "3592": "4430919", "3593": "4429767", "3594": "4690182", "3595": "4688835", "3596": "4603186", "3597": "5150247", "3598": "4360749", "3599": "4426340", "3600": "4360475", "3601": "4043169", "3602": "4431536", "3603": "4869961", "3604": "4367209", "3605": "4259558", "3606": "4683276", "3607": "4043130", "3608": "4426599", "3609": "3932335", "3610": "4832846", "3611": "4429205", "3612": "4629149", "3613": "4602019", "3614": "4608794", "3615": "5081412", "3616": "4373814", "3617": "4372071", "3618": "4429022", "3619": "4683308", "3620": "4372030", "3621": "4242521", "3622": "4244310", "3623": "4372758", "3624": "4702559", "3625": "4365303", "3626": "4384595", "3627": "3124890", "3628": "4695407", "3629": "4035661", "3630": "4876378", "3631": "4243389", "3632": "4047422", "3633": "4426542", "3634": "4362234", "3635": "4242547", "3636": "3886834", "3637": "4685247", "3638": "4887918", "3639": "4695223", "3640": "4692555", "3641": "4426676", "3642": "4685248", "3643": "5092196", "3644": "4426686", "3645": "4429013", "3646": "4241372", "3647": "4715355", "3648": "4241374", "3649": "4240585", "3650": "3139368", "3651": "4038815", "3652": "4430947", "3653": "4570044", "3654": "4426385", "3655": "4685385", "3656": "4360405", "3657": "4678006", "3658": "4572055", "3659": "4609203", "3660": "4432695", "3661": "4608386", "3662": "4696044", "3663": "4612182", "3664": "3040506", "3665": "4693644", "3666": "4371733", "3667": "3116165", "3668": "4361112", "3669": "4690795", "3670": "3043107", "3671": "4890885", "3672": "4240657", "3673": "4883647", "3674": "4361516", "3675": "4242292", "3676": "4039052", "3677": "3926229", "3678": "4606181", "3679": "4240532", "3680": "4685246", "3681": "4048228", "3682": "3928979", "3683": "4428343", "3684": "4035817", "3685": "4574689", "3686": "4363097"};
 
 const nflPlayers = NFL_RAW.map(p => ({
   ...p,
@@ -8723,11 +8907,23 @@ function autoRepairPrices(reason){
     if (typeof MLB_BASE !== 'undefined' && MLB_BASE[p.rank] && !_priceValid(p, MLB_BASE[p.rank].price)) {
       delete MLB_BASE[p.rank];
     }
+    // 4) Scrub the chart's own history array. closes/liveP getting repaired above
+    // never touched this - priceHx is a separate cache that both loadPricesFromFirestore
+    // and the "re-seed priceHx from closes" boot step push into directly, so a value
+    // that was valid under an old fundamental (e.g. NFL's pre-fix placeholder stats,
+    // see the NFL_RAW rewrite) stayed in every chart forever even after the price
+    // itself self-healed - the 30D/ALL chart kept plotting the old runaway trajectory.
+    const hx = priceHx[p.rank];
+    if (hx && hx.length) {
+      const cleanHx = hx.filter(h => _priceValid(p, h.price));
+      if (cleanHx.length !== hx.length) { priceHx[p.rank] = cleanHx; fixed++; }
+    }
   });
   if (fixed > 0) {
     try { localStorage.setItem('ax_liveP_cache', JSON.stringify(liveP)); } catch(e){}
     try { _saveCloses && _saveCloses(); } catch(e){}
     try { typeof _saveMlbBase === 'function' && _saveMlbBase(); } catch(e){}
+    try { localStorage.setItem('ax_priceHx', JSON.stringify(priceHx)); } catch(e){}
     console.log(`[auto-repair${reason?' '+reason:''}] healed ${fixed} corrupt value(s)`);
   }
   return fixed;
@@ -12033,6 +12229,10 @@ async function loadPricesFromFirestore() {
             // Skip stale entries AND entries that equal statPrice (backfill artifacts)
             if (price <= 0 || date < _closeCutoff) return;
             if (pl && Math.abs(price - pl.statPrice) < 0.01) return; // skip statPrice backfill
+            // Skip anything the player's CURRENT fundamental value says is impossible -
+            // otherwise a shared Firestore doc still holding pre-fix history (e.g. NFL
+            // before its pricing rewrite) reintroduces the same corruption on every load.
+            if (pl && !_priceValid(pl, price)) return;
             closes[r][date] = price;
             // Seed priceHx from closes so 7/30D chart has historical points
             if (!priceHx[r]) priceHx[r] = [];
@@ -14831,6 +15031,11 @@ async function _backgroundSync() {
         });
         if (priceHx[p.rank]) priceHx[p.rank].sort((a,b) => a.day - b.day);
       });
+      // Firestore's closes just got merged straight into priceHx above with no
+      // fundamental-value check, so anything corrupt in the shared doc (e.g. NFL
+      // history from before the pricing rewrite) would otherwise ride back in on
+      // every load no matter how clean the local copy already was.
+      autoRepairPrices('price-sync');
       renderAll();
       updateMovers();
     }
@@ -14852,6 +15057,39 @@ async function _backgroundSync() {
           if (Object.keys(fresh).length) cleaned[rank] = fresh;
         });
         window._fbSetDoc(window._fbDoc(dbInst, 'config', 'prices'), { closes: cleaned }, { merge: true }).catch(()=>{});
+      }).catch(()=>{});
+    }
+
+    // One-time: wipe NFL's stored close history in Firestore. The NFL_RAW rewrite
+    // (real per-player stats + tiers instead of one shared placeholder line, and
+    // no more rank-based spread) changed almost every NFL player's fundamental
+    // value, so history recorded under the old formula is fair-value-invalid now
+    // even though it looked fine when it was written - autoRepairPrices() filters
+    // it back out of priceHx/closes on every load already, but leaving it in the
+    // shared doc means every device pays that filtering cost forever. Just remove it.
+    if (!localStorage.getItem('ax_nfl_reprice_v1')) {
+      localStorage.setItem('ax_nfl_reprice_v1', '1');
+      window._fbGetDoc(window._fbDoc(dbInst, 'config', 'prices')).then(snap => {
+        if (!snap.exists()) return;
+        const d = snap.data();
+        // merge:true does a deep merge on nested map fields, which can only ADD/
+        // overwrite keys, never remove ones absent from what's sent - so actually
+        // dropping the NFL rank keys needs a full-document replacement instead.
+        // Start from a full copy of `d` (so every other field/league is preserved
+        // byte-for-byte) and only rewrite the three fields that key by rank.
+        const full = { ...d };
+        ['closes', 'liveP', 'todayHx'].forEach(field => {
+          if (!full[field]) return;
+          const cleaned = {};
+          Object.entries(full[field]).forEach(([rank, v]) => { if (+rank < 3001) cleaned[rank] = v; });
+          full[field] = cleaned;
+        });
+        window._fbSetDoc(window._fbDoc(dbInst, 'config', 'prices'), full, { merge: false }).catch(()=>{});
+        [...nflPlayers].forEach(p => { delete closes[p.rank]; delete priceHx[p.rank]; liveP[p.rank] = p.statPrice; });
+        _saveCloses();
+        try { localStorage.setItem('ax_priceHx', JSON.stringify(priceHx)); } catch(e){}
+        try { localStorage.setItem('ax_liveP_cache', JSON.stringify(liveP)); } catch(e){}
+        renderAll();
       }).catch(()=>{});
     }
 
