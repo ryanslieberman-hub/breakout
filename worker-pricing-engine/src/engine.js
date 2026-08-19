@@ -59,9 +59,11 @@ export function nflStatPrice(p) {
   else if (r === 'TE') raw = (p.rec || 0) * 1 + (p.recy || 0) * 0.1 + (p.rtd || 0) * 6;
   else if (r === 'K') raw = (p.fgm || 0) * 3 + (p.xpm || 0) * 1;
   else raw = (p.tkl || 0) * 1 + (p.sack || 0) * 4 + (p.defint || 0) * 6; // DEF
-  const within = (p.rank || 3001) - 3001;
-  const spread = Math.max(0.35, 1 - within * 0.006);
-  return Math.max(0.01, raw * (MULT[p.tier] || 1) * PRICE_SCALE * spread * NFL_SCALE);
+  // NFL_RAW (index.html) now carries real per-player stat lines, so raw + tier
+  // alone differentiates players correctly - no rank-based spread needed (it
+  // used to patch over every player at a position sharing one placeholder
+  // stat line, but discounted by team-alphabetical roster order, not skill).
+  return Math.max(0.01, raw * (MULT[p.tier] || 1) * PRICE_SCALE * NFL_SCALE);
 }
 
 export function statPriceFor(league, p) {
