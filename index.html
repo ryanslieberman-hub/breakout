@@ -17151,15 +17151,31 @@ async function renderFriendsLeaderboard(){
 // normal large size) for anyone who hasn't claimed a username yet.
 function _ulbNameBlock(u, isYou){
   const youTag = isYou ? '<span style="color:var(--green);font-size:9px;">(you)</span>' : '';
-  // .ulb-name truncates with an ellipsis by default (fine for player/display
-  // names elsewhere), but a username is the thing being looked up here - cut
-  // it short and it reads as a different, wrong handle. Override to wrap
-  // instead of clipping for this one line.
-  const wrapStyle = 'white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word;';
+  // A username is the thing being looked up here, so it can't just get
+  // clipped with an ellipsis like a display name can - but wrapping to a
+  // second line reads as broken layout. ulb-name-fit marks this line for
+  // _fitUlbNames() to shrink the font on, post-render, until it's back to
+  // one line (see call sites in _renderFriendsLbList/_renderGlobalLbRows).
   if (u.username) {
-    return `<div class="ulb-name" style="${wrapStyle}">@${escHtml(u.username)} ${youTag}</div><div class="ulb-sub ulb-realname">${escHtml(u.displayName||'Trader')}</div>`;
+    return `<div class="ulb-name ulb-name-fit">@${escHtml(u.username)} ${youTag}</div><div class="ulb-sub ulb-realname">${escHtml(u.displayName||'Trader')}</div>`;
   }
-  return `<div class="ulb-name" style="${wrapStyle}">${escHtml(u.displayName||'Anonymous')} ${youTag}</div>`;
+  return `<div class="ulb-name ulb-name-fit">${escHtml(u.displayName||'Anonymous')} ${youTag}</div>`;
+}
+
+// Shrinks each .ulb-name-fit element's font-size just enough to stay on one
+// line - CSS alone can't do "fit this text in this box", and wrapping to a
+// second line looks like broken layout on a leaderboard row. Run this after
+// the row HTML lands in the DOM (needs real layout to measure against).
+function _fitUlbNames(container){
+  (container || document).querySelectorAll('.ulb-name-fit').forEach(el => {
+    el.style.fontSize = '';
+    let size = parseFloat(getComputedStyle(el).fontSize);
+    const minSize = 9;
+    while (el.scrollWidth > el.clientWidth && size > minSize) {
+      size -= 0.5;
+      el.style.fontSize = size + 'px';
+    }
+  });
 }
 
 async function _renderFriendsLbList(){
@@ -17191,6 +17207,7 @@ async function _renderFriendsLbList(){
         ${!isYou ? `<span class="comment-delete" style="margin-left:4px;" onclick="removeFriendship('${_friendshipId(currentUser.uid,u.uid)}')">remove</span>` : ''}
       </div>`;
     }).join('');
+    _fitUlbNames(el);
   } catch(e) {
     el.innerHTML = `<div class="g10-loading" style="color:var(--red)">Error: ${e.code || e.message}</div>`;
   }
@@ -17700,6 +17717,7 @@ function _renderGlobalLbRows(){
       ${friendAction}
     </div>`;
   }).join('');
+  _fitUlbNames(el);
 }
 
 // ═══════════════════════════════════════════
