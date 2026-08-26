@@ -1335,7 +1335,14 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
      above 768px, where seeing both at once is the point. */
   .market-layout{flex-direction:column;}
   .lsidebar{width:100% !important; border-right:none; border-bottom:1px solid var(--border); flex:1; min-height:0;}
-  .center{display:none; width:100%; flex:1; min-height:0;}
+  /* overflow-y:auto (not the base rule's hidden) - the hero above is now
+     unlocked to grow (flex-wrap:wrap; max-height:none) for a live box score,
+     and .chart-pane/.trade-bar below it don't shrink past their own minimums
+     (120px chart, trade controls). When hero + tabs + pane + trade bar add up
+     taller than the viewport, overflow:hidden was clipping the trade bar/Buy
+     button off the bottom with no way to reach them - scroll the column
+     instead of losing content. */
+  .center{display:none; width:100%; flex:1; min-height:0; overflow-y:auto;}
   .market-layout.show-detail .lsidebar{display:none;}
   .market-layout.show-detail .center{display:flex;}
 
@@ -1514,12 +1521,12 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 <nav>
   <div class="logo" style="display:flex;align-items:center;gap:8px;"><h1 class="wordmark">Breakout</h1><svg class="brand-mark" viewBox="0 0 26 22" fill="none" aria-hidden="true"><line x1="2" y1="9" x2="24" y2="9" stroke="var(--border2)" stroke-width="1.4" stroke-dasharray="2 2.6"/><path d="M2,19 L6,15 L9,17 L12.5,9 L22,3" stroke="var(--green)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12.5" cy="9" r="1.9" fill="var(--green)"/></svg><button id="league-btn" onclick="openLeagueDrawer()" style="display:inline-flex;align-items:center;gap:4px;"><span id="league-label">NBA</span><span style="display:inline-flex;color:var(--muted)"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></button></div>
   <div class="nav-tabs" role="tablist" aria-label="Views">
-  <button type="button" class="nav-tab active" onclick="goToMarketTop()"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 L10 11 L14 14 L20 6"/><path d="M15 6 L20 6 L20 11"/></svg><span class="tab-label-full">Market</span><span class="tab-label-mobile">Market</span></button>
-  <button type="button" class="nav-tab" id="nav-portfolio-tab" onclick="showView(&#39;portfolio&#39;,this)" style="display:none"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M8 8 V6 a2 2 0 0 1 2-2 h4 a2 2 0 0 1 2 2 V8"/></svg><span class="tab-label-full">Portfolio</span><span class="tab-label-mobile">Portfolio</span></button>
-  <button type="button" class="nav-tab" onclick="showView(&#39;leaderboard&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21 h8"/><path d="M12 17 v4"/><path d="M7 4 h10 v6 a5 5 0 0 1-10 0 Z"/><path d="M7 6 H4 a1 1 0 0 0-1 1 v1 a3 3 0 0 0 3 3"/><path d="M17 6 h3 a1 1 0 0 1 1 1 v1 a3 3 0 0 1-3 3"/></svg><span class="tab-label-full">Leaderboard</span><span class="tab-label-mobile">Leaders</span></button>
-  <button type="button" class="nav-tab" id="nav-schedule-tab" onclick="showView(&#39;schedule&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10 h18"/><path d="M8 3 v4"/><path d="M16 3 v4"/></svg><span class="tab-label-full">Schedule</span><span class="tab-label-mobile">Schedule</span></button>
-  <button type="button" class="nav-tab" onclick="showView(&#39;chat&#39;,this)" id="nav-chat-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg><span class="tab-label-full">Chat</span><span class="tab-label-mobile">Chat</span><span class="chat-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: 4px; vertical-align: middle;"></span></button>
-  <button type="button" class="nav-tab" onclick="showView('profile',this)" id="nav-profile-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span class="tab-label-full">Profile</span><span class="tab-label-mobile">Profile</span></button>
+  <button type="button" class="nav-tab active" data-view="market" onclick="goToMarketTop()"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 L10 11 L14 14 L20 6"/><path d="M15 6 L20 6 L20 11"/></svg><span class="tab-label-full">Market</span><span class="tab-label-mobile">Market</span></button>
+  <button type="button" class="nav-tab" id="nav-portfolio-tab" data-view="portfolio" onclick="showView(&#39;portfolio&#39;,this)" style="display:none"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M8 8 V6 a2 2 0 0 1 2-2 h4 a2 2 0 0 1 2 2 V8"/></svg><span class="tab-label-full">Portfolio</span><span class="tab-label-mobile">Portfolio</span></button>
+  <button type="button" class="nav-tab" data-view="leaderboard" onclick="showView(&#39;leaderboard&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21 h8"/><path d="M12 17 v4"/><path d="M7 4 h10 v6 a5 5 0 0 1-10 0 Z"/><path d="M7 6 H4 a1 1 0 0 0-1 1 v1 a3 3 0 0 0 3 3"/><path d="M17 6 h3 a1 1 0 0 1 1 1 v1 a3 3 0 0 1-3 3"/></svg><span class="tab-label-full">Leaderboard</span><span class="tab-label-mobile">Leaders</span></button>
+  <button type="button" class="nav-tab" id="nav-schedule-tab" data-view="schedule" onclick="showView(&#39;schedule&#39;,this)"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10 h18"/><path d="M8 3 v4"/><path d="M16 3 v4"/></svg><span class="tab-label-full">Schedule</span><span class="tab-label-mobile">Schedule</span></button>
+  <button type="button" class="nav-tab" data-view="chat" onclick="showView(&#39;chat&#39;,this)" id="nav-chat-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg><span class="tab-label-full">Chat</span><span class="tab-label-mobile">Chat</span><span class="chat-dot" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-left: 4px; vertical-align: middle;"></span></button>
+  <button type="button" class="nav-tab" data-view="profile" onclick="showView('profile',this)" id="nav-profile-tab"><svg class="tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg><span class="tab-label-full">Profile</span><span class="tab-label-mobile">Profile</span></button>
   </div>
   <div class="nav-right">
     <button id="nav-claim-btn" class="nav-claim-btn" onclick="claimDailyFree()" style="display:none;" title="Free Coins &amp; Bucks - no purchase necessary">Claim</button>
@@ -8931,8 +8938,16 @@ function autoRepairPrices(reason){
 
 // Restore liveP from localStorage immediately (before async Firebase load)
 // so prices don't flash back to base on every reload
-// Sanity clamp: reject any price more than 50% from statPrice - likely corrupt
-const _priceValid = (p, price) => price > 0 && price >= p.statPrice * 0.50 && price <= p.statPrice * 1.50;
+// Sanity clamp: reject prices far outside a plausible range around statPrice - likely
+// corrupt. Matches ENGINE's own band() (0.55x-1.7x, see baseFor) rather than a tighter
+// ad-hoc band - a stricter band here than the engine itself trusts was scrubbing REAL
+// closes for cheap tier-D/C players whose fundamental (statPrice) naturally drifts a lot
+// as season-long counting stats accumulate (e.g. RBI/HR climbing over weeks moves a
+// $3-4 stock's statPrice by what looks like a huge percentage even though nothing is
+// actually wrong). That wiped a player's entire close/priceHx history down to nothing,
+// flatlining their price and %-badges at 0 - looked exactly like "broken", not "cheap
+// stock having a normal week" (e.g. Alec Bohm, Aug 2026: closes silently scrubbed to 0).
+const _priceValid = (p, price) => price > 0 && price >= p.statPrice * 0.55 && price <= p.statPrice * 1.70;
 try {
   const savedP = JSON.parse(localStorage.getItem('ax_liveP_cache') || 'null');
   if (savedP) {
@@ -13297,6 +13312,83 @@ function setCTab(tab){
     loadComments(selRank);
   }
 }
+
+// ── Swipe between Chart/News/Last 10/Chat ───────────────────────────────
+// Dragging a finger across the tab strip or an open pane steps to the
+// adjacent tab, same order as the strip reads left to right. The chart pane
+// is deliberately left out: its canvas already owns horizontal drag to
+// scrub the price line (see the touchmove listener on #mainChart above), so
+// layering a second horizontal-drag gesture on the exact same surface would
+// fire both at once - scrubbing the chart would also flip you to News mid-
+// drag. Chart is still reachable by swiping the tab strip itself, which
+// never touches the canvas.
+const CTAB_ORDER = ['chart', 'news', 'g10', 'chat'];
+function _ctabSwipeStep(dir){
+  const i = CTAB_ORDER.indexOf(activeCtab);
+  const next = CTAB_ORDER[Math.min(CTAB_ORDER.length - 1, Math.max(0, i + dir))];
+  if (next !== activeCtab) setCTab(next);
+}
+function _wireCtabSwipe(el){
+  if (!el) return;
+  let sx = 0, sy = 0, tracking = false;
+  el.addEventListener('touchstart', e => {
+    // Don't hijack taps on real controls (chat textarea/Post button, news
+    // links, etc.) - only track drags that start on plain panel surface.
+    if (e.target.closest('input,textarea,button,select,a,.g10-row')) { tracking = false; return; }
+    const t = e.touches[0];
+    sx = t.clientX; sy = t.clientY; tracking = true;
+  }, {passive:true});
+  el.addEventListener('touchend', e => {
+    if (!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    // Horizontal and decisive, not an incidental wobble mid vertical-scroll.
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      _ctabSwipeStep(dx < 0 ? 1 : -1);
+    }
+  }, {passive:true});
+}
+document.addEventListener('DOMContentLoaded', () => {
+  ['news-pane', 'g10-pane', 'chat-pane'].forEach(id => _wireCtabSwipe(document.getElementById(id)));
+  _wireCtabSwipe(document.querySelector('.ctabs'));
+});
+
+// ── Scrub between Market/Portfolio/Leaderboard/Schedule/Chat/Profile ───────
+// Press down anywhere on the bottom nav and drag, without lifting your
+// finger, and whichever tab it's currently over activates immediately -
+// the standard iOS tab-bar scrub gesture, not a page-swipe. No release
+// threshold, no distance to clear: crossing into a new tab's hit area
+// switches to it right then, and you can keep dragging back and forth
+// across the whole bar in one continuous touch. Lifting just ends the
+// gesture wherever it already is - there's nothing left to "commit".
+let _navScrubTab = null;
+
+function _wireNavScrub(el){
+  if (!el) return;
+  const pick = (x, y) => {
+    const hit = document.elementFromPoint(x, y)?.closest('.nav-tab');
+    return (hit && getComputedStyle(hit).display !== 'none') ? hit : null;
+  };
+  const go = btn => {
+    if (!btn || btn === _navScrubTab) return;
+    _navScrubTab = btn;
+    if (!btn.classList.contains('active')) {
+      navigator.vibrate?.(4); // no-op where unsupported (iOS Safari) - harmless
+      btn.click();
+    }
+  };
+  el.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    go(pick(t.clientX, t.clientY));
+  }, {passive:true});
+  el.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    go(pick(t.clientX, t.clientY));
+  }, {passive:true});
+  el.addEventListener('touchend', () => { _navScrubTab = null; }, {passive:true});
+}
+document.addEventListener('DOMContentLoaded', () => _wireNavScrub(document.querySelector('.nav-tabs')));
 
 function flashHero(up){
   const el=document.getElementById('hero-block');
