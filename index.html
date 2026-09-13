@@ -6455,6 +6455,33 @@ async function nflTick() {
     moved++;
   });
   try { if (ENGINE.deriveAll) ENGINE.deriveAll(); } catch(e){}
+
+  // Capture intraday ticks for the 1D chart (NFL). Same fix MLB/NBA/Golf already have
+  // (see mlbTick's comment) - without this, a player's price genuinely moves drive by
+  // drive as ENGINE.deriveAll re-derives it from the pace-adjusted stat line each poll,
+  // but nothing recorded those in-between values, so the whole game collapsed into one
+  // straight jump on the chart instead of the real arc.
+  {
+    const _now = Date.now();
+    nflPlayers.forEach(p => {
+      const r = p.rank;
+      const ln = lastNight[r];
+      if (!ln || !ln.live) return;          // only players in a live game right now
+      const np = liveP[r];
+      if (!(np > 0)) return;
+      if (!intraday[r]) intraday[r] = [];
+      const arr = intraday[r];
+      const last = arr.length ? arr[arr.length-1] : null;
+      const mins = last ? (_now - last.t) / 60000 : 999;
+      const delta = last ? Math.abs(np - last.price) / last.price : 1;
+      if (!last || mins > 5 || delta > 0.003) {
+        arr.push({ t: _now, price: np });
+        if (!priceHx[r]) priceHx[r] = [];
+        priceHx[r].push({ day: todayDayNum(), price: np });
+      }
+    });
+  }
+
   if (isFinal) {
     nflPlayers.forEach(p => { if (lineByRank[p.rank]) ENGINE.finalize(p, today); });
   }
