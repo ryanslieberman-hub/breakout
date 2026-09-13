@@ -4355,12 +4355,21 @@ const ENGINE = (() => {
 
   // NFL performance: position-specific fantasy-style scoring vs the player's baseline. With
   // no live stat (off-season / no game), returns 0 → price rests at base, like other leagues.
+  // Pace-adjusted like MLB's per-9-innings rate stats: a raw cumulative fpts total means
+  // something completely different in the 1st quarter than in the 4th (100 pass yards
+  // early is a huge pace, the same 100 yards with the game almost over is a slow night).
+  // gameFrac (0-1, how much of the 60-minute game clock has elapsed - see nflTick) lets us
+  // extrapolate a full-game PACE from the stat line instead of judging the raw total.
   function nflPerf(p, stat){
     if (!stat) return 0;
     // stat carries this game's fantasy points (fpts). Compare to the player's baseline fpts.
     const base = p.fpts || 8;
     const got = stat.fpts != null ? stat.fpts : base;
-    const rel = (got - base) / Math.max(base, 4);   // relative over/under-performance
+    // Floor the fraction so the very start of a game (a handful of plays) doesn't
+    // extrapolate into an absurd pace via division by a near-zero elapsed time.
+    const frac = Math.min(1, Math.max(0.15, stat.gameFrac != null ? stat.gameFrac : 1));
+    const pace = got / frac;
+    const rel = (pace - base) / Math.max(base, 4);   // relative over/under-performance, on pace
     return bound(p, rel);
   }
 
@@ -4428,8 +4437,15 @@ const ENGINE = (() => {
     dates = dates.filter(d => !isOutlier(c[d]));
     if (!dates.length) { const base = baseFor(p); return base>0 ? round1((cur-base)/base*100) : 0; }
     let b;
-    if (range === 0) b = c[dates[0]];
-    else {
+    if (range === 0) {
+      // "All" - since we started tracking this player. If the earliest close IS
+      // the current price (nothing has moved since, e.g. a player's very first
+      // recorded game and no move since), that close isn't a meaningful "before"
+      // anchor - fall back to the pre-history fair value so a real first-game
+      // move still shows up instead of reading as a flat 0%.
+      const earliest = c[dates[0]];
+      b = (Math.abs(earliest - cur) < 0.01 && p.statPrice > 0) ? p.statPrice : earliest;
+    } else {
       const cutoff = localDateStr(range);
       // Anchor to the most recent close ON/BEFORE the cutoff - the actual "price N
       // days ago". Close history is sparse (players don't play every day), so the
@@ -4441,7 +4457,16 @@ const ENGINE = (() => {
       // as a flat 0.0% on this badge. Falling back further in time (never forward to
       // today) keeps the two in agreement.
       const priorOrAt = dates.filter(d => d <= cutoff);
-      b = priorOrAt.length ? c[priorOrAt[priorOrAt.length - 1]] : c[dates[0]];
+      if (priorOrAt.length) {
+        b = c[priorOrAt[priorOrAt.length - 1]];
+      } else {
+        // Our entire close history is more recent than the cutoff (e.g. a player's
+        // first game of the season played within the last `range` days) - there's
+        // no real "price N days ago" to anchor on, and reusing the only close we
+        // have compares the current price to itself whenever nothing has moved
+        // since. Anchor on the pre-history fair value instead.
+        b = p.statPrice > 0 ? p.statPrice : c[dates[0]];
+      }
     }
     return b > 0 ? round1((cur - b) / b * 100) : 0;
   }
@@ -6348,6 +6373,23 @@ function _nflFptsFromRaw(s) {
     + (s.tkl||0)*1 + (s.sack||0)*2 + (s.defint||0)*3 + (s.ffum||0)*2 + (s.deftd||0)*6;
 }
 
+// Fraction (0-1) of the 60-minute NFL game clock elapsed, from an ESPN scoreboard
+// event's status. A final game is 1 (full game played - no pace adjustment needed,
+// the raw total IS the final total). A live game extrapolates from period + the
+// clock remaining in that period so nflPerf can price on PACE, not raw cumulative
+// total - see nflPerf for why (100 yards in Q1 is a torrid pace, the same 100 by Q3
+// is pedestrian). Overtime (period 5) games are treated as essentially complete.
+function _nflGameFrac(status) {
+  if (!status) return 1;
+  if (status.type?.completed || status.type?.state === 'post') return 1;
+  const period = status.period || 1;
+  if (period >= 5) return 1;                    // OT - game is effectively over
+  const clock = (status.displayClock || '15:00').split(':').map(Number);
+  const secsLeftInPeriod = (clock[0]||0) * 60 + (clock[1]||0);
+  const secsElapsed = (period - 1) * 900 + Math.max(0, 900 - secsLeftInPeriod);
+  return Math.min(1, Math.max(0, secsElapsed / 3600));
+}
+
 let _nflNameIndex = null;
 function _buildNflIndex() {
   if (_nflNameIndex) return;
@@ -6370,6 +6412,7 @@ async function nflTick() {
 
   const lineByRank = {};   // rank -> merged raw stat line this game (see _nflRawLine)
   for (const ev of relevant) {
+    const gameFrac = _nflGameFrac(ev.status);
     const sum = await espnFetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${ev.id}`).catch(()=>null);
     const teams = sum?.boxscore?.players || [];
     teams.forEach(tm => {
@@ -6384,6 +6427,7 @@ async function nflTick() {
           if (!p) return; // not on our roster
           const line = lineByRank[p.rank] || (lineByRank[p.rank] = {});
           _nflRawLine(cat.name, cat.labels, a.stats || [], line);
+          line.gameFrac = gameFrac;   // same value each pass - one game per player per tick
         });
       });
     });
@@ -6406,7 +6450,7 @@ async function nflTick() {
   Object.entries(lineByRank).forEach(([rank, line]) => {
     const r = +rank;
     const fpts = _nflFptsFromRaw(line);
-    window._engineStats[r] = { fpts };
+    window._engineStats[r] = { fpts, gameFrac: line.gameFrac };
     lastNight[r] = { played:true, date: today, live: isLive, nfl:true, fpts: Math.round(fpts*10)/10, ...line };
     moved++;
   });
@@ -6420,6 +6464,74 @@ async function nflTick() {
   }
   if (currentLeague === 'NFL') { try { renderAll(); updateMovers(); } catch(e){} }
   console.log(`[nfl] scored ${moved} players from ${relevant.length} game(s)${isFinal ? ' (finalized)' : ' (live)'}`);
+}
+
+// Corrects an NFL "last night" entry left stuck mid-game. nflTick() only ever
+// re-checks TODAY's scoreboard, so if this browser was open while a game was
+// live and got closed/backgrounded before that game went final, the partial
+// snapshot (e.g. a QB's early passing yards) stays cached with live:true
+// forever - the next day's tick no longer looks at that game's date at all.
+// This scans for exactly that (an nfl entry still marked live from a past
+// date) and, if the game has since finished, overwrites it with the real
+// final box score.
+async function nflReconcileStaleLive() {
+  if (typeof espnFetch !== 'function') return;
+  _buildNflIndex();
+  const today = localDateStr(0);
+  const staleDates = new Set();
+  Object.values(lastNight).forEach(ln => {
+    if (ln?.nfl && ln.live && ln.date && ln.date !== today) staleDates.add(ln.date);
+  });
+  if (!staleDates.size) return;
+
+  let moved = 0;
+  for (const dateStr of staleDates) {
+    const dateParam = dateStr.replace(/-/g,'');
+    const sb = await espnFetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${dateParam}`).catch(()=>null);
+    const events = (sb?.events || []).filter(e => e.status?.type?.completed);
+    if (!events.length) continue; // still not final (or fetch failed) - retry on a later load
+
+    const lineByRank = {};
+    for (const ev of events) {
+      const sum = await espnFetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${ev.id}`).catch(()=>null);
+      const teams = sum?.boxscore?.players || [];
+      teams.forEach(tm => {
+        (tm.statistics || []).forEach(cat => {
+          const isOffense = ['passing','rushing','receiving'].includes(cat.name);
+          const isDefense = ['defensive','interceptions'].includes(cat.name);
+          if (!isOffense && !isDefense) return;
+          (cat.athletes || []).forEach(a => {
+            const nm = a.athlete?.displayName;
+            if (!nm) return;
+            const p = _nflNameIndex[_normName(nm)];
+            if (!p) return;
+            const line = lineByRank[p.rank] || (lineByRank[p.rank] = {});
+            _nflRawLine(cat.name, cat.labels, a.stats || [], line);
+          });
+        });
+      });
+    }
+
+    window._engineStats = window._engineStats || {};
+    Object.entries(lineByRank).forEach(([rank, line]) => {
+      const r = +rank;
+      if (!(lastNight[r]?.live && lastNight[r]?.date === dateStr)) return; // only touch the stale ones
+      const fpts = _nflFptsFromRaw(line);
+      window._engineStats[r] = { fpts };
+      lastNight[r] = { played:true, date: dateStr, live:false, nfl:true, fpts: Math.round(fpts*10)/10, ...line };
+      moved++;
+    });
+    if (Object.keys(lineByRank).length) {
+      nflPlayers.forEach(p => { if (lineByRank[p.rank]) ENGINE.finalize(p, dateStr); });
+    }
+  }
+  if (moved > 0) {
+    try { ENGINE.deriveAll(); } catch(e){}
+    _saveCloses(); _saveLastNight();
+    saveLocalPortfolio(); syncPricesToFirestore();
+    if (currentLeague === 'NFL') { try { renderAll(); updateMovers(); } catch(e){} }
+    console.log(`[nfl] reconciled ${moved} stale live entrie(s)`);
+  }
 }
 
 // ── GOLF - LIVE DATA FETCHING ───────────────────────────────────────────────
@@ -7076,6 +7188,7 @@ async function fetchLiveStats(isFinal=false) {
   try { await fetchGolfLiveStats(isFinal); } catch(e) { console.warn('Golf fetch:', e.message); }
   // Always fetch NFL too (no-op off-season; scores players when games exist)
   try { await nflTick(); } catch(e) { console.warn('NFL fetch:', e.message); }
+  try { await nflReconcileStaleLive(); } catch(e) { console.warn('NFL reconcile:', e.message); }
   try {
     for (let ago = 0; ago <= 2; ago++) {
       const d = new Date(); d.setDate(d.getDate() - ago);
@@ -7858,6 +7971,46 @@ function updateHero(){
         document.getElementById('ln-lbl-stl').textContent = 'BB';
         document.getElementById('ln-lbl-blk').textContent = 'K';
       }
+    } else if (ln.nfl) {
+      // ── NFL HERO STATS ──────────────────────────────────────────────────
+      // Role-aware, same "different columns per role" split as the g10 log
+      // (renderG10 above). Falls through to here for anyone matched by
+      // nflTick()'s box-score scan, which stamps `nfl:true` on the entry.
+      ['ln-row-fg','ln-row-3p','ln-row-min','ln-row-pm','ln-row-tov'].forEach(id => {
+        const el = document.getElementById(id); if(el) el.style.display = 'none';
+      });
+      const set = (id, val, cls, lbl) => {
+        const v = document.getElementById(id); if (v) { v.textContent = val; v.className = 'ln-v ' + cls; }
+        const l = document.getElementById('ln-lbl-' + id.slice(3)); if (l) l.textContent = lbl;
+      };
+      const role = p.role;
+      if (role === 'QB') {
+        set('ln-pts', Math.round(ln.py||0), (ln.py||0) >= 250 ? 'great' : (ln.py||0) >= 175 ? 'good' : 'bad', 'PASS YD');
+        set('ln-reb', (ln.ptd||0).toFixed(0), (ln.ptd||0) >= 2 ? 'great' : (ln.ptd||0) >= 1 ? 'good' : 'bad', 'PASS TD');
+        set('ln-ast', (ln.ints||0).toFixed(0), (ln.ints||0) === 0 ? 'great' : (ln.ints||0) === 1 ? 'good' : 'bad', 'INT');
+        set('ln-stl', Math.round(ln.ry||0), (ln.ry||0) >= 20 ? 'great' : 'good', 'RUSH YD');
+        set('ln-blk', (ln.rtd||0).toFixed(0), (ln.rtd||0) > 0 ? 'great' : 'good', 'RUSH TD');
+      } else if (role === 'RB') {
+        set('ln-pts', Math.round(ln.ry||0), (ln.ry||0) >= 80 ? 'great' : (ln.ry||0) >= 40 ? 'good' : 'bad', 'RUSH YD');
+        const td = (ln.rtd||0) + (ln.rectd||0);
+        set('ln-reb', td.toFixed(0), td > 0 ? 'great' : 'bad', 'TD');
+        set('ln-ast', (ln.rec||0).toFixed(0), (ln.rec||0) >= 3 ? 'great' : 'good', 'REC');
+        set('ln-stl', Math.round(ln.recy||0), (ln.recy||0) >= 20 ? 'great' : 'good', 'REC YD');
+        set('ln-blk', (ln.car||0).toFixed(0), 'good', 'CAR');
+      } else if (role === 'WR' || role === 'TE') {
+        set('ln-pts', Math.round(ln.recy||0), (ln.recy||0) >= 80 ? 'great' : (ln.recy||0) >= 40 ? 'good' : 'bad', 'REC YD');
+        set('ln-reb', (ln.rec||0).toFixed(0), (ln.rec||0) >= 5 ? 'great' : (ln.rec||0) >= 2 ? 'good' : 'bad', 'REC');
+        set('ln-ast', (ln.tgt||0).toFixed(0), 'good', 'TGT');
+        set('ln-stl', (ln.rectd||0).toFixed(0), (ln.rectd||0) > 0 ? 'great' : 'bad', 'TD');
+        set('ln-blk', '—', 'good', '');
+      } else {
+        // DEF
+        set('ln-pts', (ln.tkl||0).toFixed(0), (ln.tkl||0) >= 8 ? 'great' : (ln.tkl||0) >= 4 ? 'good' : 'bad', 'TKL');
+        set('ln-reb', (ln.sack||0).toFixed(1), (ln.sack||0) > 0 ? 'great' : 'bad', 'SACK');
+        set('ln-ast', (ln.defint||0).toFixed(0), (ln.defint||0) > 0 ? 'great' : 'bad', 'INT');
+        set('ln-stl', (ln.ffum||0).toFixed(0), (ln.ffum||0) > 0 ? 'great' : 'bad', 'FF');
+        set('ln-blk', (ln.deftd||0).toFixed(0), (ln.deftd||0) > 0 ? 'great' : 'bad', 'TD');
+      }
     } else {
       // ── NBA HERO STATS (default) ──────────────────────────────────────────
       // Reset labels back to NBA
@@ -7962,6 +8115,13 @@ function updateHero(){
       document.getElementById('ln-game').textContent = `${ln.pts}K ${(ln.min||0)}IP ${ln.reb}ER · ${dateLabel}`;
     } else if (ln.mlbRole === 'H') {
       document.getElementById('ln-game').textContent = `${ln.pts}HR ${ln.reb}RBI ${ln.ast}H · ${dateLabel}`;
+    } else if (ln.nfl) {
+      const role = p.role;
+      const line = role === 'QB' ? `${Math.round(ln.py||0)} pass yd, ${(ln.ptd||0).toFixed(0)} TD, ${(ln.ints||0).toFixed(0)} INT`
+        : role === 'RB' ? `${Math.round(ln.ry||0)} rush yd, ${((ln.rtd||0)+(ln.rectd||0)).toFixed(0)} TD, ${(ln.rec||0).toFixed(0)} rec`
+        : (role === 'WR' || role === 'TE') ? `${(ln.rec||0).toFixed(0)} rec, ${Math.round(ln.recy||0)} yd, ${(ln.rectd||0).toFixed(0)} TD`
+        : `${(ln.tkl||0).toFixed(0)} tkl, ${(ln.sack||0).toFixed(1)} sack, ${(ln.defint||0).toFixed(0)} INT`;
+      document.getElementById('ln-game').textContent = `${line} · ${dateLabel}`;
     } else {
       document.getElementById('ln-game').textContent = `${ln.pts}pts ${ln.reb}reb ${ln.ast}ast · ${dateLabel}`;
     }
@@ -8587,6 +8747,7 @@ async function loadPricesFromFirestore() {
 function updateMovers(){
   const leaguePlayers = currentLeague === 'MLB' ? mlbPlayers
                       : currentLeague === 'GOLF' ? golfPlayers
+                      : currentLeague === 'NFL' ? nflPlayers
                       : nbaPlayers;
   let sorted = [];
 
@@ -8840,6 +9001,7 @@ function drawMain(hoverX){
   const _chartPct = getTodayPct(selRank);
   const _chartAnchor = _chartPct !== 0 ? liveP[selRank] / (1 + _chartPct / 100) : 0;
   const _nowDay = (Date.now() - EPOCH) / 86400000;
+  const _selPlayer = players.find(x => x.rank === selRank);
 
   if (chartRange === 1) {
     const ydDay = dateToDayNum(new Date(localDateStr(1) + 'T23:59:00'));
@@ -8861,16 +9023,26 @@ function drawMain(hoverX){
     const cutoffDay = dateToDayNum(new Date(localDateStr(chartRange) + 'T00:00:00'));
     const todayStr = localDateStr();
     const c = closes[selRank] || {};
+    const allCloseDates = Object.keys(c).filter(ds => c[ds] > 0 && ds < todayStr).sort();
     // Only use closes from dates before today and where price differs from current liveP
-    const closePts = Object.keys(c).sort()
-      .filter(ds => c[ds] > 0 && ds < todayStr && Math.abs(c[ds] - liveP[selRank]) > 0.01)
+    const closePts = allCloseDates
+      .filter(ds => Math.abs(c[ds] - liveP[selRank]) > 0.01)
       .map(ds => ({ day: dateToDayNum(new Date(ds + 'T12:00:00')), price: c[ds] }))
       .filter(h => h.day >= cutoffDay);
     if (closePts.length) {
       hx = [{ day: cutoffDay, price: closePts[0].price }, ...closePts.slice(1), { day: _nowDay, price: liveP[selRank] }];
     } else {
-      hx = _chartAnchor > 0
-        ? [{ day: cutoffDay, price: _chartAnchor }, { day: _nowDay, price: liveP[selRank] }]
+      // No close differs from today's live price (e.g. exactly one recorded close and
+      // the price hasn't moved since - true for a player with just one game played this
+      // season). That close IS the current price, so it can't anchor a real move -
+      // fall back to the pre-history fair value instead (same anchor ENGINE.pct uses
+      // for this exact case), so the line actually shows the real move instead of
+      // drawing flat while the % badge above it reports a gain.
+      const earliestClose = allCloseDates.length ? c[allCloseDates[0]] : 0;
+      const statAnchor = _selPlayer?.statPrice > 0 ? _selPlayer.statPrice : 0;
+      const anchorPrice = statAnchor > 0 ? statAnchor : (earliestClose > 0 ? earliestClose : _chartAnchor);
+      hx = anchorPrice > 0
+        ? [{ day: cutoffDay, price: anchorPrice }, { day: _nowDay, price: liveP[selRank] }]
         : [{ day: _nowDay, price: liveP[selRank] }];
     }
     hx = hx.filter((h, i) => i === 0 || Math.abs(h.day - hx[i-1].day) > 0.01);
@@ -8878,14 +9050,18 @@ function drawMain(hoverX){
     const seasonStart = dateToDayNum(new Date('2026-03-26T12:00:00'));
     const todayStr = localDateStr();
     const c = closes[selRank] || {};
-    const closePts = Object.keys(c).sort()
-      .filter(ds => c[ds] > 0 && ds < todayStr && Math.abs(c[ds] - liveP[selRank]) > 0.01)
+    const allCloseDates = Object.keys(c).filter(ds => c[ds] > 0 && ds < todayStr).sort();
+    const closePts = allCloseDates
+      .filter(ds => Math.abs(c[ds] - liveP[selRank]) > 0.01)
       .map(ds => ({ day: dateToDayNum(new Date(ds + 'T12:00:00')), price: c[ds] }));
     if (closePts.length) {
       hx = [{ day: seasonStart, price: closePts[0].price }, ...closePts.slice(1), { day: _nowDay, price: liveP[selRank] }];
     } else {
-      hx = _chartAnchor > 0
-        ? [{ day: seasonStart, price: _chartAnchor }, { day: _nowDay, price: liveP[selRank] }]
+      const earliestClose = allCloseDates.length ? c[allCloseDates[0]] : 0;
+      const statAnchor = _selPlayer?.statPrice > 0 ? _selPlayer.statPrice : 0;
+      const anchorPrice = statAnchor > 0 ? statAnchor : (earliestClose > 0 ? earliestClose : _chartAnchor);
+      hx = anchorPrice > 0
+        ? [{ day: seasonStart, price: anchorPrice }, { day: _nowDay, price: liveP[selRank] }]
         : [{ day: _nowDay, price: liveP[selRank] }];
     }
     hx = hx.filter((h, i) => i === 0 || Math.abs(h.day - hx[i-1].day) > 0.01);
@@ -11352,39 +11528,16 @@ async function _backgroundSync() {
       }).catch(()=>{});
     }
 
-    // One-time: wipe NFL's stored close history in Firestore. The NFL_RAW rewrite
-    // (real per-player stats + tiers instead of one shared placeholder line, and
-    // no more rank-based spread) changed almost every NFL player's fundamental
-    // value, so history recorded under the old formula is fair-value-invalid now
-    // even though it looked fine when it was written - autoRepairPrices() filters
-    // it back out of priceHx/closes on every load already, but leaving it in the
-    // shared doc means every device pays that filtering cost forever. Just remove it.
-    if (!localStorage.getItem('ax_nfl_reprice_v1')) {
-      localStorage.setItem('ax_nfl_reprice_v1', '1');
-      window._fbGetDoc(window._fbDoc(dbInst, 'config', 'prices')).then(snap => {
-        if (!snap.exists()) return;
-        const d = snap.data();
-        // merge:true does a deep merge on nested map fields, which can only ADD/
-        // overwrite keys, never remove ones absent from what's sent - so actually
-        // dropping the NFL rank keys needs a full-document replacement instead.
-        // Start from a full copy of `d` (so every other field/league is preserved
-        // byte-for-byte) and only rewrite the three fields that key by rank.
-        const full = { ...d };
-        ['closes', 'liveP', 'todayHx'].forEach(field => {
-          if (!full[field]) return;
-          const cleaned = {};
-          Object.entries(full[field]).forEach(([rank, v]) => { if (+rank < 3001) cleaned[rank] = v; });
-          full[field] = cleaned;
-        });
-        window._fbSetDoc(window._fbDoc(dbInst, 'config', 'prices'), full, { merge: false }).catch(()=>{});
-        [...nflPlayers].forEach(p => { delete closes[p.rank]; delete priceHx[p.rank]; liveP[p.rank] = p.statPrice; });
-        _saveCloses();
-        try { localStorage.setItem('ax_priceHx', JSON.stringify(priceHx)); } catch(e){}
-        try { localStorage.setItem('ax_liveP_cache', JSON.stringify(liveP)); } catch(e){}
-        renderAll();
-      }).catch(()=>{});
-    }
-
+    // NOTE: a one-time NFL close-history wipe used to live here (guarded by an
+    // `ax_nfl_reprice_v1` localStorage flag), meant to run once right after the
+    // NFL_RAW rewrite invalidated old-formula history. Because the guard was
+    // per-BROWSER rather than per-deployment, it refired - and did a full
+    // `merge:false` replace of shared config/prices, deleting every NFL rank's
+    // closes/liveP/todayHx - on every device/incognito window/cleared-storage
+    // session that had never set the flag, indefinitely. That included wiping
+    // legitimate current-season history backfilled via
+    // worker-pricing-engine/scripts/backfill-nfl-closes.mjs. Removed for good;
+    // do not reintroduce a client-gated one-time Firestore wipe like this.
   }
 
   // 2. Load injuries + run tracker in parallel - neither blocks the other
@@ -14834,7 +14987,7 @@ async function loadLast10(rank) {
   el.innerHTML = '<div class="g10-loading">Scanning recent games…</div>';
   const p = players.find(x => x.rank === rank);
   const pNameLower = p.name.toLowerCase();
-  const isGolfPlayer = rank >= 2001;
+  const isGolfPlayer = rank >= 2001 && rank < 3001;
   const isMLBPlayer = rank >= 1001 && rank < 2001;
 
   if (isGolfPlayer) {
