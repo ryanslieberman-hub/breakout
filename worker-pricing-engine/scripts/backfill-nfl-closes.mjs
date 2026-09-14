@@ -112,31 +112,43 @@ async function getPricesDoc(token) {
 // sibling ranks and the other leagues' history are untouched (same effect the
 // client's setDoc(..., {merge:true}) has). Numeric segments must be
 // backtick-quoted in a Firestore field path.
+//
+// Chunked into groups of ranks rather than one PATCH for everything - a full
+// Sunday slate is 180+ ranks, and one request listing every rank's fieldPath
+// in the URL (2 per rank) runs long enough that Google's front-end rejects it
+// outright as a malformed request (a generic 400 page, not a Firestore JSON
+// error) before it ever reaches Firestore. A single game day (the only case
+// this script had run for before) never had enough ranks to hit that.
+const PATCH_CHUNK_SIZE = 25;
 async function patchCloses(token, closesByRank, livePByRank) {
   const ranks = Object.keys(closesByRank);
-  const fieldPaths = [];
-  const closesFields = {};
-  const livePFields = {};
-  for (const r of ranks) {
-    closesFields[r] = toFsValue(closesByRank[r]);
-    livePFields[r] = toFsValue(livePByRank[r]);
-    fieldPaths.push('closes.`' + r + '`', 'liveP.`' + r + '`');
+  for (let i = 0; i < ranks.length; i += PATCH_CHUNK_SIZE) {
+    const chunk = ranks.slice(i, i + PATCH_CHUNK_SIZE);
+    const fieldPaths = [];
+    const closesFields = {};
+    const livePFields = {};
+    for (const r of chunk) {
+      closesFields[r] = toFsValue(closesByRank[r]);
+      livePFields[r] = toFsValue(livePByRank[r]);
+      fieldPaths.push('closes.`' + r + '`', 'liveP.`' + r + '`');
+    }
+    const body = {
+      fields: {
+        closes: { mapValue: { fields: closesFields } },
+        liveP: { mapValue: { fields: livePFields } },
+      },
+    };
+    const qs = fieldPaths
+      .map((p) => `updateMask.fieldPaths=${encodeURIComponent(p)}`)
+      .join('&');
+    const res = await fetch(`${DOCS}/config/prices?${qs}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`patch failed (ranks ${chunk[0]}..${chunk[chunk.length - 1]}): ${await res.text()}`);
+    console.log(`  patched ${chunk.length} ranks (${i + chunk.length}/${ranks.length})`);
   }
-  const body = {
-    fields: {
-      closes: { mapValue: { fields: closesFields } },
-      liveP: { mapValue: { fields: livePFields } },
-    },
-  };
-  const qs = fieldPaths
-    .map((p) => `updateMask.fieldPaths=${encodeURIComponent(p)}`)
-    .join('&');
-  const res = await fetch(`${DOCS}/config/prices?${qs}`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`patch failed: ${await res.text()}`);
 }
 
 // ── ESPN ─────────────────────────────────────────────────────────────────

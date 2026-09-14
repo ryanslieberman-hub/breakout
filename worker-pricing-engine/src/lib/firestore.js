@@ -212,6 +212,52 @@ export async function firestoreSetNestedField(env, path, dottedFieldPath, value)
   return fromFirestoreFields((await res.json()).fields);
 }
 
+// Sets one or more deeply-nested leaf fields on ONE doc, without disturbing
+// sibling keys anywhere else in the same nested maps - e.g. writing
+// closes.`3411`.`2026-09-14` leaves every other rank's and every other
+// date's entry under `closes` untouched. `entries` is
+// [{ segments: ['closes', '3411', '2026-09-14'], value: 172.52 }, ...];
+// entries sharing a path prefix (e.g. two ranks both under `closes`) are
+// merged into one nested body rather than clobbering each other.
+//
+// Chunked into batches rather than one PATCH for every entry - listing every
+// entry's fieldPath in the URL (one query param each) runs long enough with
+// 100+ entries (a Sunday afternoon slate can finalize that many players in
+// one 15-min tick) that Google's front-end rejects the request outright as
+// malformed (a generic HTML 400 page, not a Firestore error) before it ever
+// reaches Firestore. Confirmed by the same failure in the NFL backfill
+// script's one-shot PATCH.
+const DEEP_FIELD_CHUNK_SIZE = 40;
+export async function firestoreSetDeepFields(env, path, entries) {
+  if (!entries.length) return;
+  const token = await getAccessToken(env);
+  for (let i = 0; i < entries.length; i += DEEP_FIELD_CHUNK_SIZE) {
+    const chunk = entries.slice(i, i + DEEP_FIELD_CHUNK_SIZE);
+    const rootFields = {};
+    const fieldPaths = [];
+    for (const { segments, value } of chunk) {
+      let cursor = rootFields;
+      for (let j = 0; j < segments.length; j++) {
+        const seg = segments[j];
+        if (j === segments.length - 1) {
+          cursor[seg] = toFirestoreValue(value);
+        } else {
+          if (!cursor[seg]) cursor[seg] = { mapValue: { fields: {} } };
+          cursor = cursor[seg].mapValue.fields;
+        }
+      }
+      fieldPaths.push(segments.map(s => '`' + s + '`').join('.'));
+    }
+    const qs = fieldPaths.map(p => `updateMask.fieldPaths=${encodeURIComponent(p)}`).join('&');
+    const res = await fetch(`${baseUrl(env.FIREBASE_PROJECT_ID)}/${path}?${qs}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: rootFields }),
+    });
+    if (!res.ok) throw new Error(`Firestore deep-field patch failed (${path}): ${await res.text()}`);
+  }
+}
+
 export async function firestoreQuery(env, collectionId, filters = []) {
   const token = await getAccessToken(env);
   const structuredQuery = {

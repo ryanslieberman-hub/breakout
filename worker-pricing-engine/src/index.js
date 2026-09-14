@@ -14,6 +14,7 @@ import * as golf from './golf.js';
 import * as nfl from './nfl.js';
 import {
   firestoreBatchGetDocs, firestoreBatchWriteDocs, firestoreListCollection, firestorePatchDoc,
+  firestoreSetDeepFields,
 } from './lib/firestore.js';
 import { notifyAllTokens, notifyUid } from './lib/notify.js';
 import { verifyFirebaseIdToken, bearerToken } from './lib/auth.js';
@@ -250,6 +251,7 @@ async function tickMlb(env, today) {
 
   const updates = [];
   const movers = [];
+  const configWrites = []; // mirrors finalized closes into config/prices - see tickNfl for why
   const now = Date.now();
   let finalized = 0;
   for (const { player, stat } of toProcess) {
@@ -263,7 +265,21 @@ async function tickMlb(env, today) {
       avg: st.avg, hr: st.hr, rbi: st.rbi, ops: st.ops, era: st.era, kper9: st.kper9, ipp: st.ipp,
     };
     if (isPitcher && stat.ip >= 1) fields.pitcherLastStart = today;
-    if (stat.final) { fields.closes = { ...st.closes, [today]: finalize(value, today, st.closes) }; finalized++; }
+    if (stat.final) {
+      const closeVal = finalize(value, today, st.closes);
+      fields.closes = { ...st.closes, [today]: closeVal };
+      finalized++;
+      // Same gap as NFL (see tickNfl's comment): config/prices, the doc the
+      // CLIENT reads for chart history, only gets a game's close written into
+      // it if a browser happened to be open live-ticking when the game ended.
+      // This cron runs every 15 min with no browser involved, so mirror the
+      // close straight in - inconsistent MLB chart/price history was games
+      // finishing with nobody's browser open to record them.
+      const clamped = Math.round(
+        Math.min(st.statPrice * 1.68, Math.max(st.statPrice * 0.56, closeVal)) * 100
+      ) / 100;
+      configWrites.push({ segments: ['closes', String(player.rank), today], value: clamped });
+    }
     const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: today, now });
     Object.assign(fields, moveFields);
     movers.push(...events);
@@ -271,6 +287,13 @@ async function tickMlb(env, today) {
   }
 
   await firestoreBatchWriteDocs(env, updates);
+  if (configWrites.length) {
+    try {
+      await firestoreSetDeepFields(env, 'config/prices', configWrites);
+    } catch (e) {
+      console.error('config/prices MLB close mirror failed:', e.message);
+    }
+  }
   const notified = await announceMovers(env, movers);
   return { league: 'mlb', games: gamePks.length, processed: toProcess.length, finalized, movers: movers.length, notified };
 }
@@ -382,6 +405,7 @@ async function tickNfl(env, today) {
   const states = await loadStatesBatch(env, 'nfl', toProcess);
   const updates = [];
   const movers = [];
+  const configWrites = []; // mirrors finalized closes into config/prices - see below
   const now = Date.now();
   let finalized = 0;
   for (const player of toProcess) {
@@ -391,7 +415,24 @@ async function tickNfl(env, today) {
     const perf = nflPerf(p, { fpts });
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
     const fields = { base: newBaseRecord, tier: st.tier, statPrice: st.statPrice, fpts: st.fpts };
-    if (isFinal) { fields.closes = { ...st.closes, [today]: finalize(value, today, st.closes) }; finalized++; }
+    if (isFinal) {
+      const closeVal = finalize(value, today, st.closes);
+      fields.closes = { ...st.closes, [today]: closeVal };
+      finalized++;
+      // Also mirror straight into config/prices - the doc the CLIENT reads. NFL
+      // history used to be recorded ONLY by a browser that happened to be open
+      // with the app on screen at the exact moment a game went final (see
+      // scripts/backfill-nfl-closes.mjs's header for the one-shot manual fix
+      // this needed twice already). This cron already runs every 15 min with no
+      // browser involved - writing the close here directly closes that gap for
+      // good instead of leaving it as a manual catch-up step after game day.
+      // Stay inside the client's _priceValid clamp (statPrice * [0.55, 1.70])
+      // so autoRepairPrices() never scrubs this write back out client-side.
+      const clamped = Math.round(
+        Math.min(p.statPrice * 1.68, Math.max(p.statPrice * 0.56, closeVal)) * 100
+      ) / 100;
+      configWrites.push({ segments: ['closes', String(player.rank), today], value: clamped });
+    }
     const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: today, now });
     Object.assign(fields, moveFields);
     movers.push(...events);
@@ -399,6 +440,17 @@ async function tickNfl(env, today) {
   }
 
   await firestoreBatchWriteDocs(env, updates);
+  if (configWrites.length) {
+    try {
+      await firestoreSetDeepFields(env, 'config/prices', configWrites);
+    } catch (e) {
+      // Don't let a config/prices hiccup sink the tick - priceEngine/* (the
+      // source of truth this function's own state reads from) already wrote
+      // successfully above; this mirror can retry next tick since `finalize`
+      // is idempotent for an already-closed date.
+      console.error('config/prices NFL close mirror failed:', e.message);
+    }
+  }
   const notified = await announceMovers(env, movers);
   return { league: 'nfl', games: relevant.length, processed: toProcess.length, finalized, movers: movers.length, notified };
 }
@@ -423,17 +475,28 @@ export async function runGameDayTick(env) {
 // gets priced off their carried-forward `base`, same as the live app.
 // Idempotent per day - `lastDailySummary.date` guards against a re-run
 // (retry, manual trigger) double-sending the same day's push.
+//
+// Reads portfolios/{uid}/wallets/gold - the Coins wallet, the only portfolio
+// the app has shown since the coins-only launch (index.html's
+// activePortfolioId defaults to 'gold'; 'regular' is dormant). This used to
+// read the top-level portfolios/{uid} doc instead - the old $100k Practice
+// portfolio's shape, which the client stopped using but which still defaults
+// to cash:100000 - so every user got a nightly "Your portfolio: 100,000.00"
+// push about a portfolio that isn't even reachable in the app anymore,
+// while their actual Coins balance never got summarized at all.
 export async function runPortfolioSummary(env) {
   const today = easternDateStr(0);
-  const [allPortfolios, users] = await Promise.all([
-    firestoreListCollection(env, 'portfolios'),
-    firestoreListCollection(env, 'users'),
-  ]);
-  // portfolios/{uid} docs get created (default $100k, no holdings) the moment
-  // someone so much as opens the app pre-signup, and outlive that visit even
-  // if they never actually create an account - only summarize real accounts.
-  const realUids = new Set(users.map(u => u.id));
-  const portfolios = allPortfolios.filter(p => realUids.has(p.id));
+  const users = await firestoreListCollection(env, 'users');
+  if (!users.length) return { date: today, portfolios: 0, updated: 0 };
+
+  const walletPath = uid => `portfolios/${uid}/wallets/gold`;
+  const walletDocs = await firestoreBatchGetDocs(env, users.map(u => walletPath(u.id)));
+  // Only users with an actual saved wallet doc - a brand-new wallet starts at
+  // $0 and is never persisted until real activity (see saveCloudPortfolio's
+  // "don't save default state" guard), so no doc = nothing to summarize.
+  const portfolios = users
+    .map(u => ({ id: u.id, ...walletDocs[walletPath(u.id)] }))
+    .filter(p => walletDocs[walletPath(p.id)]);
   if (!portfolios.length) return { date: today, portfolios: 0, updated: 0 };
 
   const ranks = new Set();
@@ -471,7 +534,7 @@ export async function runPortfolioSummary(env) {
       }
 
       await notifyUid(env, uid, { title: 'Your portfolio', body }, { kind: 'portfolio_summary' });
-      await firestorePatchDoc(env, `portfolios/${uid}`, { lastDailySummary: { date: today, value } });
+      await firestorePatchDoc(env, walletPath(uid), { lastDailySummary: { date: today, value } });
       updated++;
     } catch (e) {
       // One bad portfolio (bad data, a transient Firestore error) shouldn't
