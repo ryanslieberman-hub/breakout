@@ -8509,7 +8509,7 @@ function startPricesListener() {
   }
 }
 function syncPricesToFirestore() {
-  if (!db || !window._fbSetDoc || !window._fbDoc) return;
+  if (!db || !window._fbSetDoc || !window._fbUpdateDoc || !window._fbDoc) return;
   clearTimeout(_priceSyncTimeout);
   _priceSyncTimeout = setTimeout(() => {
     try {
@@ -8541,28 +8541,56 @@ function syncPricesToFirestore() {
         if (priceApplied[p.rank]) priceAppliedSnap[r] = priceApplied[p.rank];
       });
 
-      // Write prices doc - use merge:true so historical closes accumulate across syncs
-      window._fbSetDoc(window._fbDoc(db, 'config', 'prices'), {
-        liveP: livePSnap,
-        todayHx: todayPts,
-        intraday: intradaySnap,
-        closes: closesSnap,
+      // Write each rank as its own dotted field PATH (updateDoc), not a nested
+      // object under one key (setDoc/merge:true). Firestore's merge:true only
+      // protects fields you DIDN'T include in the write - a nested map field
+      // you DID include (e.g. `closes: closesSnap`) is replaced WHOLESALE, not
+      // deep-merged. Every device only has ITS OWN partial view of `closes` in
+      // memory (it never independently computes every other player's history,
+      // especially anything backfilled or written server-side by
+      // worker-pricing-engine), so this was silently overwriting the entire
+      // shared closes/liveP map with just one device's incomplete snapshot on
+      // every single sync - including wiping real NFL closes days after this
+      // exact worker correctly wrote them (confirmed live: every NFL rank's
+      // closes flattened back to statPrice, plus a phantom pre-season date,
+      // right after an ordinary client tick synced). Addressing each rank as
+      // `closes.<rank>` merges just that leaf and leaves every sibling rank -
+      // written by this device, another device, or the server - untouched.
+      const dotted = (prefix, snap) => {
+        const out = {};
+        for (const [k, v] of Object.entries(snap)) out[`${prefix}.${k}`] = v;
+        return out;
+      };
+      const pricesUpdate = {
+        ...dotted('liveP', livePSnap),
+        ...dotted('todayHx', todayPts),
+        ...dotted('intraday', intradaySnap),
+        ...dotted('closes', closesSnap),
         isGameLive: isGameLive,
         date: todayStr,
         savedAt: Date.now(),
-      }, { merge: true }).catch(e => {});
+      };
+      window._fbUpdateDoc(window._fbDoc(db, 'config', 'prices'), pricesUpdate).catch(e => {
+        // updateDoc requires the doc to already exist (unlike setDoc) - fall back
+        // once for the (very unlikely, e.g. brand-new project) case it doesn't.
+        window._fbSetDoc(window._fbDoc(db, 'config', 'prices'), {
+          liveP: livePSnap, todayHx: todayPts, intraday: intradaySnap, closes: closesSnap,
+          isGameLive: isGameLive, date: todayStr, savedAt: Date.now(),
+        }, { merge: true }).catch(() => {});
+      });
 
-      // Write priceApplied to SEPARATE doc with merge:true - never wiped, only grows
+      // Write priceApplied to SEPARATE doc - never wiped, only grows. Same
+      // per-rank field-path fix as above (was `dates: priceAppliedSnap`).
       // This is the double-apply guard - must survive across days and device reloads
       if (Object.keys(priceAppliedSnap).length > 0) {
-        window._fbSetDoc(window._fbDoc(db, 'config', 'priceApplied'),
-          { dates: priceAppliedSnap, updatedAt: Date.now() },
-          { merge: true }
+        window._fbUpdateDoc(window._fbDoc(db, 'config', 'priceApplied'),
+          { ...dotted('dates', priceAppliedSnap), updatedAt: Date.now() }
         ).catch(e => {});
       }
 
-      // Write lastNight box scores with merge:true - accumulates from all devices
-      // so any device that was online during the game shares box scores with all others
+      // Write lastNight box scores - accumulates from all devices so any device
+      // that was online during the game shares box scores with all others. Same
+      // per-rank field-path fix as above (was `data: lastNightSnap`).
       const lastNightSnap = {};
       const lnCutoff = localDateStr(3);
       Object.entries(lastNight).forEach(([rank, ln]) => {
@@ -8573,22 +8601,21 @@ function syncPricesToFirestore() {
         lastNightSnap[rank] = ln;
       });
       if (Object.keys(lastNightSnap).length > 0) {
-        window._fbSetDoc(window._fbDoc(db, 'config', 'lastNight'),
-          { data: lastNightSnap, updatedAt: Date.now() },
-          { merge: true }
+        window._fbUpdateDoc(window._fbDoc(db, 'config', 'lastNight'),
+          { ...dotted('data', lastNightSnap), updatedAt: Date.now() }
         ).catch(e => {});
       }
 
-      // Write captured golf headshot IDs with merge:true, same reasoning as
-      // lastNight above - this used to be PURELY local (ax_golf_ids), with no
-      // cloud backup at all, so a cleared/reinstalled device lost every golf
-      // headshot until it happened to be online during a live tournament to
-      // recapture them itself. IDs never change once learned, so a plain
-      // accumulating merge is safe - no per-entry cutoff needed like lastNight.
+      // Write captured golf headshot IDs, same reasoning as lastNight above -
+      // this used to be PURELY local (ax_golf_ids), with no cloud backup at
+      // all, so a cleared/reinstalled device lost every golf headshot until it
+      // happened to be online during a live tournament to recapture them
+      // itself. IDs never change once learned, so a plain accumulating merge
+      // is safe - no per-entry cutoff needed like lastNight. Same per-rank
+      // field-path fix as above (was `data: window._golfEspnIds`).
       if (window._golfEspnIds && Object.keys(window._golfEspnIds).length > 0) {
-        window._fbSetDoc(window._fbDoc(db, 'config', 'golfIds'),
-          { data: window._golfEspnIds, updatedAt: Date.now() },
-          { merge: true }
+        window._fbUpdateDoc(window._fbDoc(db, 'config', 'golfIds'),
+          { ...dotted('data', window._golfEspnIds), updatedAt: Date.now() }
         ).catch(e => {});
       }
 
