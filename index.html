@@ -131,6 +131,13 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .nbtn.viral:hover{background:rgba(245,68,95,.1);}
 .day-lbl{font-family:var(--font-mono);font-size:9px;color:var(--muted);display:none;}
 
+/* ── CLAIM BANNER (mobile-only mirror of the nav claim button/countdown -
+   see the HTML comment above #claim-banner for why this exists) ── */
+.claim-banner{display:none;align-items:center;justify-content:center;gap:6px;height:28px;flex-shrink:0;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.3px;border-bottom:1px solid var(--border);}
+.claim-banner.claim-available{background:rgba(18,212,126,.14);color:var(--green);cursor:pointer;animation:navClaimPulse 1.6s ease-in-out infinite;}
+.claim-banner.claim-cooldown{background:rgba(242,184,67,.08);color:var(--gold);opacity:.85;}
+@media (min-width:769px){ .claim-banner{display:none!important;} }
+
 /* ── MOVERS BAR ── */
 .movers-bar{height:32px;flex-shrink:0;display:flex;align-items:center;gap:0;border-bottom:1px solid var(--border);background:var(--dim);overflow:hidden;padding:0 20px;}
 .movers-label{font-family:var(--font-mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-right:16px;flex-shrink:0;}
@@ -1544,6 +1551,11 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
       </button></div>
   </div>
 </nav>
+
+<!-- CLAIM TIMER (mobile only - .nav-right, which holds the nav claim button, is
+     hidden below the 768px breakpoint since Portfolio/Profile became their own
+     bottom tabs; the countdown otherwise only existed on the Profile tab) -->
+<div id="claim-banner" class="claim-banner" style="display:none;" onclick="if(_claimEligible) claimDailyFree();"></div>
 
 <!-- MOVERS BAR -->
 <div class="movers-bar">
@@ -11897,6 +11909,8 @@ async function handleAuthChange(user) {
     _claimNextEligibleAt = null;
     const btn = document.getElementById('nav-claim-btn');
     if (btn) btn.style.display = 'none';
+    const banner = document.getElementById('claim-banner');
+    if (banner) banner.style.display = 'none';
   }
 }
 
@@ -14030,6 +14044,7 @@ let _claimEligible = false, _claimNextEligibleAt = null;
 function renderClaimUI() {
   const btn = document.getElementById('nav-claim-btn');
   const card = document.getElementById('profile-claim-card');
+  const banner = document.getElementById('claim-banner');
   if (btn) {
     btn.style.display = '';
     if (_claimEligible) {
@@ -14045,6 +14060,21 @@ function renderClaimUI() {
       btn.textContent = '⏱ ' + clock;
       btn.className = 'nav-claim-btn claim-cooldown';
       btn.title = 'Next free claim in ' + clock;
+    }
+  }
+  // Mobile claim banner - the nav button above is hidden below 768px (.nav-right
+  // as a whole was dropped once Portfolio/Profile got their own bottom tabs), so
+  // without this the countdown only existed on the Profile tab - easy to never
+  // see if that's not a tab someone happens to visit.
+  if (banner) {
+    banner.style.display = 'flex';
+    if (_claimEligible) {
+      banner.textContent = '🪙 Free Coins ready - tap to claim';
+      banner.className = 'claim-banner claim-available';
+    } else {
+      const clock = fmtCountdownClock(_claimNextEligibleAt - Date.now());
+      banner.textContent = '⏱ Next free Coins in ' + clock;
+      banner.className = 'claim-banner claim-cooldown';
     }
   }
   // Profile tab card - the actual "put it somewhere I can find it" fix. Same
@@ -14065,10 +14095,12 @@ function renderClaimUI() {
 }
 
 async function refreshClaimBadge() {
-  if (!document.getElementById('nav-claim-btn') && !document.getElementById('profile-claim-card')) return;
+  if (!document.getElementById('nav-claim-btn') && !document.getElementById('profile-claim-card') && !document.getElementById('claim-banner')) return;
   if (!currentUser) {
     const btn = document.getElementById('nav-claim-btn');
     if (btn) btn.style.display = 'none';
+    const banner = document.getElementById('claim-banner');
+    if (banner) banner.style.display = 'none';
     return;
   }
   try {
