@@ -4469,11 +4469,20 @@ const ENGINE = (() => {
         b = c[priorOrAt[priorOrAt.length - 1]];
       } else {
         // Our entire close history is more recent than the cutoff (e.g. a player's
-        // first game of the season played within the last `range` days) - there's
-        // no real "price N days ago" to anchor on, and reusing the only close we
-        // have compares the current price to itself whenever nothing has moved
-        // since. Anchor on the pre-history fair value instead.
-        b = p.statPrice > 0 ? p.statPrice : c[dates[0]];
+        // first game of the season played within the last `range` days, or - very
+        // common for MLB, whose close history has been rebuilt more than once, see
+        // the outlier-guard comment above - the history simply doesn't reach back
+        // that far yet). Anchoring on statPrice here used to compare "price now"
+        // against a STATIC preseason baseline under the "14D"/"30D" label - a
+        // number with no relationship to 14 or 30 days ago, which could (and did:
+        // a player with 5 days of real history read 7D/All as a real -9.4% but
+        // 14D/30D as +0.9% off statPrice - opposite signs on the same player)
+        // contradict the shorter, real-data ranges. Anchor on the oldest close we
+        // actually have instead, same fallback "All" (range===0) already uses
+        // above, so a range longer than our history honestly collapses toward the
+        // All number instead of silently swapping in an unrelated one.
+        const earliest = c[dates[0]];
+        b = (Math.abs(earliest - cur) < 0.01 && p.statPrice > 0) ? p.statPrice : earliest;
       }
     }
     return b > 0 ? round1((cur - b) / b * 100) : 0;
