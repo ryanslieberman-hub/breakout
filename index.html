@@ -3642,6 +3642,10 @@ async function openPortfolioDrawer(){
       <div class="portfolio-option active">
         <div class="po-icon">${coinIcon(22)}</div>
         <div class="po-info"><div class="po-name">Coins</div><div class="po-sub">Sign in to claim free Coins</div></div>
+      </div>
+      <div class="portfolio-option" style="opacity:.45;cursor:default;">
+        <div class="po-icon" style="font-size:22px;">💵</div>
+        <div class="po-info"><div class="po-name">Cash</div><div class="po-sub">Coming soon</div></div>
       </div>`;
     return;
   }
@@ -3664,7 +3668,13 @@ async function openPortfolioDrawer(){
     <div class="portfolio-option ${activePortfolioId===r.id?'active':''}" onclick="switchPortfolioContext('${r.id}').then(ok=>{ if(ok) closePortfolioDrawer(); })">
       <div class="po-icon">${r.icon}</div>
       <div class="po-info"><div class="po-name">${escHtml(r.name)}</div><div class="po-sub">${escHtml(r.sub)}</div></div>
-    </div>`).join('');
+    </div>`).join('')
+    // Preview row for the eventual real-money portfolio - same "Coming Soon"
+    // treatment as NHL in the league drawer (disabled, no onclick, dimmed).
+    + `<div class="portfolio-option" style="opacity:.45;cursor:default;">
+      <div class="po-icon" style="font-size:22px;">💵</div>
+      <div class="po-info"><div class="po-name">Cash</div><div class="po-sub">Coming soon</div></div>
+    </div>`;
 }
 
 function closePortfolioDrawer(){
@@ -14028,7 +14038,11 @@ function renderClaimUI() {
       btn.title = 'Free Coins ready - tap to claim';
     } else {
       const clock = fmtCountdownClock(_claimNextEligibleAt - Date.now());
-      btn.textContent = clock;
+      // Bare digits here used to read as a stray, unlabeled number floating in the
+      // nav - a "⏱" prefix is enough to make it unambiguously a countdown at a
+      // glance without needing the full width "Next claim:" would cost in this
+      // already-tight nav bar.
+      btn.textContent = '⏱ ' + clock;
       btn.className = 'nav-claim-btn claim-cooldown';
       btn.title = 'Next free claim in ' + clock;
     }
