@@ -7677,6 +7677,18 @@ function renderAll(){renderList();updateHero();drawMain();updateNav();updateRang
   // Same for Profile - it shows live Cash/Total/P&L now that they're not in nav
   const prv = document.getElementById('view-profile');
   if(prv && prv.style.display === 'flex') renderProfileView();
+  // Same for Schedule - loadSchedule() computes each player's % from `closes`/
+  // `lastNight` at the moment it's called, but those are only populated later by
+  // _backgroundSync()'s Firestore fetch, well after boot's first renderAll(). If
+  // someone opens Schedule before that fetch finishes (completely normal - it's
+  // often the very first thing someone checks), every player renders with NO %
+  // badge at all (loadSchedule only shows one above a 0.1 threshold) and nothing
+  // ever refreshed it - the badges stayed permanently blank even once real data
+  // arrived, since renderAll() had no hook for this view like it does for
+  // Portfolio/Profile above. Re-run it here so a later renderAll() (background
+  // sync completing, a price tick, etc.) catches an open Schedule tab up.
+  const schv = document.getElementById('view-schedule');
+  if(schv && schv.style.display !== 'none') loadSchedule();
 }
 
 function updateNav(){
