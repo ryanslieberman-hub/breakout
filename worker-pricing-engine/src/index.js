@@ -231,32 +231,45 @@ export async function runNbaDailyRefresh(env) {
   return { league: 'nba', updated: updates.length, totalPlayers: nbaRaw.length };
 }
 
-// Caps a close being mirrored into config/prices (the CLIENT-visible doc) so it
-// never jumps further than the ordinary ±15%/day cap relative to what's ALREADY
-// there for that rank - not just the wide statPrice band used below. This
-// worker's own priceEngine/* state (`st.closes`, read from a completely
-// separate document) is where `finalize()` above already applied that same cap,
-// but priceEngine/* and config/prices are two independently-computed price
-// histories (see reference_breakout_pricing_split memory) that can drift apart
-// over weeks of ticks with slightly different inputs/timing. Mirroring a value
-// that's perfectly valid against the WORKER's own history straight into
-// config/prices ignores how far config/prices's own history already sits from
-// it, teleporting the client-visible price/chart by however much the two
-// tracks have silently diverged (confirmed live 2026-09-15: several MLB
-// players' config/prices close jumped 15-25% day-over-day even though their
-// underlying box score was unremarkable, because the worker's own parallel
-// history had quietly drifted ~20% away from the client's). Re-anchoring the
-// mirror to config/prices's own most recent prior close keeps the two tracks
-// converging gradually instead of snapping to whichever one last wrote.
-function clampMirrorClose(rank, closeVal, statPrice, today, clientClosesByRank) {
+// Derives the close to mirror into config/prices (the CLIENT-visible doc) by
+// re-applying tonight's REAL performance move to config/prices's OWN prior
+// close, rather than importing the worker's own absolute `closeVal`.
+//
+// priceEngine/* (this worker's state, `st.closes`) and config/prices (what
+// the client actually charts) are two independently-computed price histories
+// (see reference_breakout_pricing_split memory) that drift apart over weeks
+// of ticks with slightly different inputs/timing - confirmed live 2026-09-15,
+// two ways:
+//   1. A ±15%-of-worker's-own-prior-close cap on the mirrored value still let
+//      several MLB players' config/prices close jump 15-25% in one day on an
+//      unremarkable box score, because the worker's own base had quietly
+//      drifted ~20% from the client's.
+//   2. Smaller drift is WORSE, not better, if only the absolute value is
+//      clamped: Ben Rice went 2-for-3 with 2 RBI, 0 K (a good, real +5.1% game
+//      by this engine's own math) - but the worker's internal base for him
+//      had drifted to $426.77 while config/prices already showed $476.50, so
+//      mirroring the worker's own correctly-derived-from-ITS-base value
+//      ($449.00) read as a -5.8% DROP on the client, well under any
+//      percentage-jump cap and so invisible to one. The move itself was never
+//      wrong; only the base it got applied to was.
+//
+// Re-deriving `clientPriorClose * (1 + perf)` keeps the percentage move
+// correct regardless of how far the two absolute tracks have diverged, and
+// lets them converge over time instead of one silently overwriting the
+// other's drift onto the client.
+function mirrorClose(rank, perf, workerCloseVal, statPrice, today, clientClosesByRank) {
   const clientCloses = (clientClosesByRank && clientClosesByRank[String(rank)]) || {};
   const priorDates = Object.keys(clientCloses)
     .filter(d => d < today && clientCloses[d] > 0)
     .sort();
-  let val = closeVal;
+  let val;
   if (priorDates.length) {
-    const prevClientClose = clientCloses[priorDates[priorDates.length - 1]];
-    val = Math.min(prevClientClose * 1.15, Math.max(prevClientClose * 0.85, val));
+    const clientPrior = clientCloses[priorDates[priorDates.length - 1]];
+    val = clientPrior * (1 + (perf || 0));
+    val = Math.min(clientPrior * 1.15, Math.max(clientPrior * 0.85, val));
+  } else {
+    // No client history yet for this rank - nothing to re-derive against.
+    val = workerCloseVal;
   }
   return Math.round(Math.min(statPrice * 1.68, Math.max(statPrice * 0.56, val)) * 100) / 100;
 }
@@ -306,8 +319,8 @@ async function tickMlb(env, today) {
       // This cron runs every 15 min with no browser involved, so mirror the
       // close straight in - inconsistent MLB chart/price history was games
       // finishing with nobody's browser open to record them.
-      const clamped = clampMirrorClose(player.rank, closeVal, st.statPrice, today, clientCloses);
-      configWrites.push({ segments: ['closes', String(player.rank), today], value: clamped });
+      const mirrored = mirrorClose(player.rank, perf, closeVal, st.statPrice, today, clientCloses);
+      configWrites.push({ segments: ['closes', String(player.rank), today], value: mirrored });
     }
     const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: today, now });
     Object.assign(fields, moveFields);
@@ -458,10 +471,11 @@ async function tickNfl(env, today) {
       // good instead of leaving it as a manual catch-up step after game day.
       // Stay inside the client's _priceValid clamp (statPrice * [0.55, 1.70])
       // so autoRepairPrices() never scrubs this write back out client-side.
-      // Also re-anchored to config/prices's own prior close, not just the wide
-      // statPrice band - see clampMirrorClose's comment above tickMlb.
-      const clamped = clampMirrorClose(player.rank, closeVal, p.statPrice, today, clientCloses);
-      configWrites.push({ segments: ['closes', String(player.rank), today], value: clamped });
+      // Also re-derived from config/prices's own prior close using tonight's
+      // real perf, not the worker's own absolute value - see mirrorClose's
+      // comment above tickMlb.
+      const mirrored = mirrorClose(player.rank, perf, closeVal, p.statPrice, today, clientCloses);
+      configWrites.push({ segments: ['closes', String(player.rank), today], value: mirrored });
     }
     const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: today, now });
     Object.assign(fields, moveFields);
@@ -557,13 +571,15 @@ export async function runPortfolioSummary(env) {
 
       const last = portfolio.lastDailySummary;
       const amount = fmtCoins(value);
-      let body = amount;
+      let body = `Now ${amount} Coins.`;
       if (last && last.value > 0) {
-        const pct = ((value - last.value) / last.value) * 100;
-        body = `${amount} (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% today)`;
+        const delta = value - last.value;
+        const pct = (delta / last.value) * 100;
+        const verb = delta >= 0 ? 'gained' : 'lost';
+        body = `Your portfolio ${verb} ${fmtCoins(Math.abs(delta))} Coins (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%) — now ${amount} Coins.`;
       }
 
-      await notifyUid(env, uid, { title: 'Your portfolio', body }, { kind: 'portfolio_summary' });
+      await notifyUid(env, uid, { title: 'Your daily recap', body }, { kind: 'portfolio_summary' });
       await firestorePatchDoc(env, walletPath(uid), { lastDailySummary: { date: today, value } });
       updated++;
     } catch (e) {
