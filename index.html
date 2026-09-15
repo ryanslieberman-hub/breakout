@@ -1683,7 +1683,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="chart-top">
           <span class="chart-lbl">Price History</span>
           <div class="rbtns" id="range-btns">
-            <div class="rb" onclick="setRange(1,this)" data-range="1">1D<span class="rb-pct" id="rb-pct-1">—</span></div>
+            <div class="rb" onclick="setRange(1,this)" data-range="1">24H<span class="rb-pct" id="rb-pct-1">—</span></div>
             <div class="rb active" onclick="setRange(7,this)" data-range="7">7D<span class="rb-pct down" id="rb-pct-7">-1.4%</span></div>
             <div class="rb" onclick="setRange(14,this)" data-range="14">14D<span class="rb-pct down" id="rb-pct-14">-1.4%</span></div>
             <div class="rb" onclick="setRange(30,this)" data-range="30">30D<span class="rb-pct down" id="rb-pct-30">-1.4%</span></div>
@@ -4207,6 +4207,86 @@ function _saveLastNight() {
 }
 const lastNight = _loadLastNight();
 
+// ── Second-game-within-24h tracking ─────────────────────────────────────────
+// lastNight only ever holds ONE entry per rank - the most recent game. A
+// second game within 24 hours of the first (an MLB day-night doubleheader,
+// or any game that ends late one night with another starting the next
+// afternoon/evening) used to just silently replace the first entry, so the
+// hero panel could only ever show whichever game finalized most recently.
+// lastNightPrev keeps the game that just got displaced, IF it's still within
+// the last 24h, so the hero panel can combine both (see _mergeRecentGames).
+function _loadLastNightPrev() {
+  try {
+    const obj = JSON.parse(localStorage.getItem('athletex_lastNightPrev') || '{}');
+    const cutoff = Date.now() - 26 * 3600 * 1000; // slight buffer over the 24h the merge itself checks
+    const result = {};
+    for (const [rank, val] of Object.entries(obj)) {
+      if (val && val.ts && val.ts >= cutoff) result[rank] = val;
+    }
+    return result;
+  } catch(e) { return {}; }
+}
+function _saveLastNightPrev() {
+  try { localStorage.setItem('athletex_lastNightPrev', JSON.stringify(lastNightPrev)); } catch(e) {}
+}
+const lastNightPrev = _loadLastNightPrev();
+
+// Every lastNight[rank] = {...} write in this file goes through here instead
+// of assigning directly. A finalized game's entry (played && live===false) is
+// never touched again by the normal live-tick flow for that SAME game - so if
+// a write arrives after that, it can only be because a genuinely different
+// game has started (same calendar date or not - a doubleheader's second game
+// often shares the first's date string, so comparing dates alone would miss
+// it). Stash the outgoing finalized entry as lastNightPrev before overwriting,
+// timestamped at whenever IT was originally written (real wall-clock time,
+// not a guess), so the hero panel can later check whether it's still within
+// the last 24h and combine both games' stats.
+function _setLastNight(rank, entry) {
+  const old = lastNight[rank];
+  if (old && old.played && old.live === false) {
+    const oldTs = old.ts || (old.date ? Date.parse(old.date + 'T20:00:00') : 0);
+    if (oldTs) {
+      lastNightPrev[rank] = { ...old, ts: oldTs };
+      _saveLastNightPrev();
+    }
+  }
+  entry.ts = Date.now();
+  lastNight[rank] = entry;
+}
+
+// Combines `recent` with `prev` (from lastNightPrev) into one box score when
+// prev is still within the last 24h - every numeric counting stat is summed;
+// non-numeric fields (played/live/date/league tags) always come from the
+// more recent game. Recomputes the MLB "H/AB" and "K"/"IP" display fields
+// from the summed underlying numbers instead of leaving a stale single-game
+// split. NBA's fg/fg3 shooting splits are left as the more recent game's
+// only - they're stored as pre-formatted "M/A" strings, not separately
+// tracked numerators, so they can't be safely summed here.
+function _mergeRecentGames(recent, prev) {
+  if (!prev || !prev.ts || Date.now() - prev.ts > 24 * 3600 * 1000) return recent;
+  if (!recent || !recent.played) return recent;
+  // Golf's numeric fields don't sum safely - golfTotal is already a running
+  // tournament cumulative (adding two rounds' totals would double-count), and
+  // a combined toPar across rounds isn't how the card presents golf anyway.
+  // Multiple rounds in 24h is also a rare weather-makeup edge case, not the
+  // doubleheader-style scenario this feature targets.
+  if (recent.golf) return recent;
+  const merged = { ...recent };
+  for (const [k, v] of Object.entries(prev)) {
+    if (k === 'ts') continue;
+    if (typeof v === 'number' && typeof recent[k] === 'number') merged[k] = recent[k] + v;
+  }
+  if (recent.mlbRole === 'SP' || recent.mlbRole === 'RP') {
+    merged.fg = `${merged.min || 0} IP`;
+    merged.fg3 = `${merged.pts || 0} K`;
+  } else if (recent.mlbRole) {
+    merged.fg = `${merged.ast || 0}/${merged.min || 0}`;
+    merged.fg3 = `${merged.pts || 0} HR`;
+  }
+  merged._multiGame = true;
+  return merged;
+}
+
 // ===== INSERTED: UNIFIED PRICING ENGINE =====
 // ═══════════════════════════════════════════════════════════════════════════
 //  UNIFIED PRICING ENGINE  (single authority for NBA, MLB, Golf)
@@ -4509,7 +4589,28 @@ const ENGINE = (() => {
     dayOpen[p.rank] = { day: Math.floor(todayDayNum()), price: base };
     if (pools[p.rank]) { pools[p.rank].y = pools[p.rank].x * val; syncPool(pools[p.rank]); }
     reanchorChallengePools(p.rank, val);
+    _logPricePoint(p.rank, val);
     return val;
+  }
+
+  // Rolling price-history log, throttled the same way the old MLB-only intraday
+  // capture was (5+ min elapsed OR a real move) so a flat, non-playing player
+  // doesn't spam an entry on every tick. Feeds the true rolling 24H %/chart -
+  // see get24hPct/buildRolling24hSeries below. Pruned to the last 30h (a
+  // little past the 24h window itself) so the array can't grow unbounded.
+  function _logPricePoint(rank, val) {
+    if (!(val > 0) || typeof intraday === 'undefined') return;
+    if (!intraday[rank]) intraday[rank] = [];
+    const arr = intraday[rank];
+    const now = Date.now();
+    const last = arr.length ? arr[arr.length - 1] : null;
+    const mins = last ? (now - last.t) / 60000 : 999;
+    const delta = last ? Math.abs(val - last.price) / last.price : 1;
+    if (!last || mins > 5 || delta > 0.003) {
+      arr.push({ t: now, price: val });
+      const cutoff = now - 30 * 3600 * 1000;
+      while (arr.length && arr[0].t < cutoff) arr.shift();
+    }
   }
 
   // Lock today's price as today's close (called when a game finalizes).
@@ -4530,6 +4631,13 @@ const ENGINE = (() => {
     }
     closes[p.rank][dateStr] = val;
     liveP[p.rank] = val; // keep live price consistent with the capped close
+    // Unconditional (bypasses _logPricePoint's throttle) - finalize is a rare,
+    // meaningful event and its capped value can differ from whatever price()
+    // last logged, so the rolling 24h log needs this exact point on record.
+    if (!intraday[p.rank]) intraday[p.rank] = [];
+    intraday[p.rank].push({ t: Date.now(), price: val });
+    { const _cutoff = Date.now() - 30 * 3600 * 1000;
+      while (intraday[p.rank].length && intraday[p.rank][0].t < _cutoff) intraday[p.rank].shift(); }
     // Clear the stat once its game is settled. Otherwise last night's line stays in
     // _engineStats and re-prices the player every derive on following days - leaving a
     // hitter who played last night floating above his close instead of at base today.
@@ -5155,18 +5263,18 @@ function _statToEngineShape(st){
 function writeMLBStatLineOfficial(p, st, dateStr, isLive){
   const isP = p.role === 'SP' || p.role === 'RP';
   if (isP){
-    lastNight[p.rank] = {
+    _setLastNight(p.rank, {
       played:true, date:dateStr, live:!!isLive, mlbRole:p.role,
       pts: st.kp||0, reb: st.er||0, ast: 0, min: st.ip||0, tov: 0,
       bb: st.bb||0, stl: st.bb||0, fg: `${st.ip||0} IP`, fg3: `${st.kp||0} K`, h: st.h||0, blk: st.hr||0
-    };
+    });
   } else {
     const h = st.h||0, ab = st.ab||0, hr = st.hr||0;
-    lastNight[p.rank] = {
+    _setLastNight(p.rank, {
       played:true, date:dateStr, live:!!isLive, mlbRole:p.role,
       pts: hr, reb: st.rbi||0, ast: h, min: ab, tov: st.k||0,
       bb: st.bb||0, stl: st.bb||0, fg: `${h}/${ab}`, fg3: `${hr} HR`, h: h
-    };
+    });
   }
 }
 
@@ -5814,20 +5922,20 @@ function applyPitcherAnticipation() {
 function writeMLBStatLine(p, stat, dateStr, isLive){
   const isP = p.role === 'SP' || p.role === 'RP';
   if (isP){
-    lastNight[p.rank] = {
+    _setLastNight(p.rank, {
       played:true, date:dateStr, live:!!isLive, mlbRole:p.role,
       pts: stat.kp||0, reb: stat.er||0, ast: 0,
       min: stat.ip||0, tov: 0, bb: stat.bb||0, stl: stat.bb||0,
       fg: `${stat.ip||0} IP`, fg3: `${stat.kp||0} K`, h: stat.h||0
-    };
+    });
   } else {
     const h = stat.h||0, ab = stat.ab||0, hr = stat.hr||0;
-    lastNight[p.rank] = {
+    _setLastNight(p.rank, {
       played:true, date:dateStr, live:!!isLive, mlbRole:p.role,
       pts: hr, reb: stat.rbi||0, ast: h, min: ab, tov: stat.k||0,
       bb: stat.bb||0, stl: stat.bb||0,
       fg: `${h}/${ab}`, fg3: `${hr} HR`, h: h
-    };
+    });
   }
 }
 
@@ -6383,9 +6491,9 @@ function applyRealStats(allStats, gameDate, playingTeamIds, isLatestDate=true, i
     const teamId = TEAM_ESPN_ID[p.team] || TEAM_ESPN_ID[p.team?.split(' ').slice(-1)[0]];
     if (playingTeamIds?.size > 0 && teamId && !playingTeamIds.has(teamId)) return;
     map[p.rank] = stat;
-    lastNight[p.rank] = {played:true, date:gameDate, live:false,
+    _setLastNight(p.rank, {played:true, date:gameDate, live:false,
       pts:stat.pts||0, reb:stat.reb||0, ast:stat.ast||0,
-      stl:stat.stl||0, blk:stat.blk||0, tov:stat.tov||0, min:stat.min||0};
+      stl:stat.stl||0, blk:stat.blk||0, tov:stat.tov||0, min:stat.min||0});
     moved++;
   });
   window._engineStats = map;
@@ -6407,9 +6515,9 @@ function applyLiveStats(allStats, playingTeamIds) {
     if (!p) return;
     const teamId = TEAM_ESPN_ID[p.team] || TEAM_ESPN_ID[p.team?.split(' ').slice(-1)[0]];
     if (playingTeamIds?.size > 0 && teamId && !playingTeamIds.has(teamId)) return;
-    lastNight[p.rank] = {played:true, date:today, live:true,
+    _setLastNight(p.rank, {played:true, date:today, live:true,
       pts:stat.pts||0, reb:stat.reb||0, ast:stat.ast||0,
-      stl:stat.stl||0, blk:stat.blk||0, tov:stat.tov||0, min:stat.min||0};
+      stl:stat.stl||0, blk:stat.blk||0, tov:stat.tov||0, min:stat.min||0});
   });
   _saveLastNight();
   renderAll(); updateMovers();
@@ -6603,7 +6711,7 @@ async function nflTick() {
     const r = +rank;
     const fpts = _nflFptsFromRaw(line);
     window._engineStats[r] = { fpts, gameFrac: line.gameFrac };
-    lastNight[r] = { played:true, date: today, live: isLive, nfl:true, fpts: Math.round(fpts*10)/10, ...line };
+    _setLastNight(r, { played:true, date: today, live: isLive, nfl:true, fpts: Math.round(fpts*10)/10, ...line });
     moved++;
   });
   try { if (ENGINE.deriveAll) ENGINE.deriveAll(); } catch(e){}
@@ -6697,7 +6805,7 @@ async function nflReconcileStaleLive() {
       if (!(lastNight[r]?.live && lastNight[r]?.date === dateStr)) return; // only touch the stale ones
       const fpts = _nflFptsFromRaw(line);
       window._engineStats[r] = { fpts };
-      lastNight[r] = { played:true, date: dateStr, live:false, nfl:true, fpts: Math.round(fpts*10)/10, ...line };
+      _setLastNight(r, { played:true, date: dateStr, live:false, nfl:true, fpts: Math.round(fpts*10)/10, ...line });
       moved++;
     });
     if (Object.keys(lineByRank).length) {
@@ -7284,12 +7392,12 @@ async function fetchGolfLiveStats(isFinal=false) {
       try { localStorage.setItem('ax_golf_cumhx', JSON.stringify(window._golfCumHx)); } catch(e){}
       try { if (typeof syncGolfHistoryToFirestore === 'function') syncGolfHistoryToFirestore(); } catch(e){}
 
-      lastNight[p.rank] = {
+      _setLastNight(p.rank, {
         played: true, date: roundDate, live: !!rec.evLive, golf: true, toPar: tp,
         golfPos: rec.posName || null,        // tournament position e.g. "T4"
         golfTotal: cum,                      // total score to par for the event
         golfThru: rec.thru,                  // holes played this round
-      };
+      });
       // Persist standings so the card shows position/total even before a re-fetch.
       try {
         window._golfStandings = window._golfStandings || {};
@@ -8039,7 +8147,7 @@ function updateHero(){
   if(sellAllBtn) sellAllBtn.style.display = ownShares > 0 ? '' : 'none';
 
   // Last night box score
-  const ln = lastNight[selRank];
+  let ln = lastNight[selRank];
   const lnWrap = document.getElementById('last-night-wrap');
   const lnDnp  = document.getElementById('last-night-dnp');
 
@@ -8068,6 +8176,10 @@ function updateHero(){
   } else {
     lnDnp.style.display  = 'none';
     lnWrap.style.display = 'block';
+
+    // Combine with the displaced prior game if it's still within the last
+    // 24h (e.g. an MLB day-night doubleheader) - see _mergeRecentGames.
+    ln = _mergeRecentGames(ln, lastNightPrev[selRank]);
 
     if (ln.golf) {
       // ── GOLF HERO STATS ───────────────────────────────────────────────────
@@ -8298,10 +8410,10 @@ function updateHero(){
       }
       // Not playing now → fall through and show their most recent result.
     }
-    const dateLabel = isLive ? 'Live' : !ln.date ? '' : ln.date === today ? 'Tonight'
+    const dateLabel = (isLive ? 'Live' : !ln.date ? '' : ln.date === today ? 'Tonight'
       : ln.date === yesterday ? 'Last Night'
       : ln.date === twoDays ? '2 Nights Ago'
-      : ln.date;
+      : ln.date) + (ln._multiGame ? ' (2 games)' : '');
     const golfDateLabel = isLive ? 'In Progress' : ln.date === today ? 'Today' : ln.date === yesterday ? 'Yesterday' : ln.date;
     const headerLabel = ln.golf ? 'Latest Round'
       : isLive ? 'Tonight' : ln.date === today ? 'Tonight' : ln.date === yesterday ? 'Last Night' : 'Game Log';
@@ -8426,6 +8538,39 @@ function getTodayPct(rank){
   }
   return prev > 0 ? Math.round((cur - prev) / prev * 1000) / 10 : 0;
 }
+
+// True rolling 24-hour % - used specifically for the "24H" range on a
+// player's detail page (the range buttons, the hero %-change when that range
+// is selected, and the chart line itself - see the chartRange===1 branch).
+// Deliberately kept separate from getTodayPct above (which stays calendar-day
+// based - list rows and the movers ticker's fallback path depend on its
+// exact existing behavior and aren't part of what "make 1D a real 24h
+// window" was asked for).
+//
+// Anchors on ENGINE's rolling price log (`intraday`, populated by every
+// price()/finalize() call - see _logPricePoint) so a game that finished at
+// 11pm and another that starts at 6pm the next day both land inside the same
+// 24h window and their combined price move shows correctly, instead of the
+// old calendar-day reset silently splitting them into two separate "days".
+// Falls back to the calendar-day number when no rolling log exists yet
+// (e.g. immediately after a fresh page load, before any tick has run).
+function get24hPct(rank){
+  const cur = liveP[rank];
+  if (!(cur > 0)) return getTodayPct(rank);
+  const cutoff = Date.now() - 24 * 3600 * 1000;
+  const arr = (intraday[rank] || []).slice().sort((a, b) => a.t - b.t);
+  if (!arr.length) return getTodayPct(rank);
+  const priorPts = arr.filter(pt => pt.t <= cutoff);
+  // A point at/before the cutoff is the real "price 24h ago". If our log
+  // doesn't reach back that far yet, collapse to the oldest point we DO have
+  // (same "anchor on what we actually have" pattern ENGINE.pct uses for
+  // sparse 7/14/30D history) rather than falling all the way back to the
+  // calendar-day number, which would hide real rolling movement.
+  const basePrice = priorPts.length ? priorPts[priorPts.length - 1].price : arr[0].price;
+  if (!(basePrice > 0)) return getTodayPct(rank);
+  return Math.round((cur - basePrice) / basePrice * 1000) / 10;
+}
+
 function _getTodayPct_statBased(rank){
   const cur = liveP[rank];
   if (!cur) return 0;
@@ -9267,21 +9412,44 @@ function drawMain(hoverX){
   const _selPlayer = players.find(x => x.rank === selRank);
 
   if (chartRange === 1) {
-    const ydDay = dateToDayNum(new Date(localDateStr(1) + 'T23:59:00'));
-    const yesterdayEvening = dateToDayNum(new Date(localDateStr(1) + 'T17:00:00'));
-    const livePt = { day: _nowDay, price: liveP[selRank] };
-    let todayPts = todayTicks.length > 0
-      ? todayTicks
-      : allPts.filter(h => h.day >= yesterdayEvening);
-    if (!todayPts.length || Math.abs(todayPts[todayPts.length-1].price - liveP[selRank]) > 0.001) {
-      todayPts = [...todayPts, livePt];
+    // True rolling 24h window, built from ENGINE's rolling price log
+    // (`intraday`, see _logPricePoint) instead of "since local midnight" - a
+    // game that ended at 11pm and another that starts at 6pm the next day
+    // both land in the same window here. Matches get24hPct exactly (both
+    // anchor on the log entry at/before now-24h, or the oldest one available
+    // if the log doesn't reach back that far).
+    const cutoffMs = Date.now() - 24 * 3600 * 1000;
+    const rollingArr = (intraday[selRank] || []).slice().sort((a, b) => a.t - b.t);
+    const toDay = t => (t - EPOCH) / 86400000;
+    const priorPts = rollingArr.filter(pt => pt.t <= cutoffMs);
+    const withinPts = rollingArr.filter(pt => pt.t > cutoffMs);
+    const anchor24h = priorPts.length ? priorPts[priorPts.length - 1].price
+                     : withinPts.length ? withinPts[0].price
+                     : 0;
+    if (anchor24h > 0) {
+      hx = [
+        { day: toDay(cutoffMs), price: anchor24h },
+        ...withinPts.map(pt => ({ day: toDay(pt.t), price: pt.price })),
+        { day: _nowDay, price: liveP[selRank] },
+      ];
+    } else {
+      // No rolling log yet (e.g. right after a fresh page load, before any
+      // tick has run) - fall back to the old "since yesterday evening"
+      // heuristic so the chart still draws something meaningful.
+      const ydDay = dateToDayNum(new Date(localDateStr(1) + 'T23:59:00'));
+      const yesterdayEvening = dateToDayNum(new Date(localDateStr(1) + 'T17:00:00'));
+      const livePt = { day: _nowDay, price: liveP[selRank] };
+      let todayPts = todayTicks.length > 0
+        ? todayTicks
+        : allPts.filter(h => h.day >= yesterdayEvening);
+      if (!todayPts.length || Math.abs(todayPts[todayPts.length-1].price - liveP[selRank]) > 0.001) {
+        todayPts = [...todayPts, livePt];
+      }
+      const anchor1d = _dayOpenBase(selRank) || _chartAnchor;
+      hx = anchor1d > 0
+        ? [{ day: ydDay, price: anchor1d }, ...todayPts]
+        : todayPts;
     }
-    // Use the SAME opening baseline the % badge uses, so the chart's implied move
-    // matches getTodayPct exactly (both include trade-driven price movement).
-    const anchor1d = _dayOpenBase(selRank) || _chartAnchor;
-    hx = anchor1d > 0
-      ? [{ day: ydDay, price: anchor1d }, ...todayPts]
-      : todayPts;
   } else if (chartRange > 1) {
     const cutoffDay = dateToDayNum(new Date(localDateStr(chartRange) + 'T00:00:00'));
     const todayStr = localDateStr();
@@ -9878,6 +10046,7 @@ function setRange(r,el){
 // range buttons so they always agree with each other and with the chart's path.
 // range: 1=1D, 7=7D, 14=14D, 30=30D, 0=All.
 function _rangePct(rank, range){
+  if (range === 1) return get24hPct(rank); // true rolling 24h, not calendar-day
   return ENGINE.pct(rank, range);
 }
 
@@ -11254,11 +11423,11 @@ function applyLiveStats(allStats, playingTeamIds, gameDate) {
     if (!stat) return;
     if (stat.min > 0) {
       map[p.rank] = stat; // engine reads { pts, reb, ast, stl, blk, tov, min }
-      lastNight[p.rank] = {
+      _setLastNight(p.rank, {
         pts:stat.pts, reb:stat.reb, ast:stat.ast, stl:stat.stl||0, blk:stat.blk||0, tov:stat.tov||0,
         min:stat.min, fg:`${stat.fgm}/${stat.fga}`, fg3:`${stat.fg3m}/${stat.fg3a}`,
         pm:stat.pm>0?`+${stat.pm}`:`${stat.pm}`, played:true, live:true, date:liveDate,
-      };
+      });
       anyLive = true;
     }
   });
@@ -11350,8 +11519,16 @@ async function smartTracker() {
     // NOTE: intentionally NOT clearing priceApplied here.
     // Keeping yesterday's dates prevents double-apply when users open fresh in the morning.
     // applyRealStats guards against re-applying any date <= priceApplied[rank].
-    // Clear intraday - new day, fresh ticks
-    Object.keys(intraday).forEach(k => { intraday[k] = []; });
+    // intraday now backs a genuine rolling 24h price log (see ENGINE's
+    // _logPricePoint) - it must survive the midnight boundary instead of being
+    // wiped here, or a game that finished late one night would vanish from
+    // the 24H view the moment the calendar day rolled over. Prune by age
+    // instead (each push already does this too; this is just a backstop for
+    // ranks that haven't ticked recently enough to self-prune).
+    const _pruneCutoff = Date.now() - 30 * 3600 * 1000;
+    Object.keys(intraday).forEach(k => {
+      intraday[k] = (intraday[k] || []).filter(pt => pt.t >= _pruneCutoff);
+    });
 
     await loadInjuries();
     await fetchLiveStats();
