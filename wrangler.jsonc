@@ -18,5 +18,18 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "."
-  }
+  },
+  // Adding "routes" makes Wrangler default workers_dev to false - explicitly
+  // keep the old square-block-4d1b.ryanslieberman.workers.dev URL alive
+  // alongside the new custom domain below. worker-payments' Stripe redirect
+  // URLs and handoff.md both still point at it.
+  "workers_dev": true,
+  // Custom domain, registered via Cloudflare Registrar (2026-09-15) so it's
+  // already a zone on this account - no nameserver migration needed.
+  // custom_domain:true provisions the SSL cert and route automatically on
+  // deploy. The bare workers.dev URL keeps working alongside this.
+  "routes": [
+    { "pattern": "breakoutmarket.com", "custom_domain": true },
+    { "pattern": "www.breakoutmarket.com", "custom_domain": true }
+  ]
 }
