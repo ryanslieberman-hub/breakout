@@ -9288,12 +9288,24 @@ function drawMain(hoverX){
     const c = closes[selRank] || {};
     const allCloseDates = Object.keys(c).filter(ds => c[ds] > 0 && ds < todayStr).sort();
     // Only use closes from dates before today and where price differs from current liveP
-    const closePts = allCloseDates
-      .filter(ds => Math.abs(c[ds] - liveP[selRank]) > 0.01)
+    const differingDates = allCloseDates.filter(ds => Math.abs(c[ds] - liveP[selRank]) > 0.01);
+    const closePts = differingDates
       .map(ds => ({ day: dateToDayNum(new Date(ds + 'T12:00:00')), price: c[ds] }))
       .filter(h => h.day >= cutoffDay);
     if (closePts.length) {
       hx = [{ day: cutoffDay, price: closePts[0].price }, ...closePts.slice(1), { day: _nowDay, price: liveP[selRank] }];
+    } else if (differingDates.length) {
+      // A real prior close exists and differs from the live price, but it's
+      // OLDER than this exact N-day window (sparse history - true for anyone
+      // who hasn't played every single day). Anchor on the OLDEST one we have
+      // instead of falling through to the preseason statPrice below - matches
+      // ENGINE.pct's own fallback for this identical case (see its comment),
+      // so the chart's implied move agrees with the %-badge above it. Confirmed
+      // live 2026-09-15: Chase Burns had exactly one prior close (9/7, just
+      // outside the 7D cutoff of 9/8) - the chart jumped all the way back to
+      // his preseason statPrice and showed 7D +4.9%, while the badge correctly
+      // used that 9/7 close and showed -0.4%.
+      hx = [{ day: cutoffDay, price: c[differingDates[0]] }, { day: _nowDay, price: liveP[selRank] }];
     } else {
       // No close differs from today's live price (e.g. exactly one recorded close and
       // the price hasn't moved since - true for a player with just one game played this
