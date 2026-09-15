@@ -14,7 +14,7 @@ import * as golf from './golf.js';
 import * as nfl from './nfl.js';
 import {
   firestoreBatchGetDocs, firestoreBatchWriteDocs, firestoreListCollection, firestorePatchDoc,
-  firestoreSetDeepFields,
+  firestoreSetDeepFields, firestoreGetDoc,
 } from './lib/firestore.js';
 import { notifyAllTokens, notifyUid } from './lib/notify.js';
 import { verifyFirebaseIdToken, bearerToken } from './lib/auth.js';
@@ -231,6 +231,36 @@ export async function runNbaDailyRefresh(env) {
   return { league: 'nba', updated: updates.length, totalPlayers: nbaRaw.length };
 }
 
+// Caps a close being mirrored into config/prices (the CLIENT-visible doc) so it
+// never jumps further than the ordinary ±15%/day cap relative to what's ALREADY
+// there for that rank - not just the wide statPrice band used below. This
+// worker's own priceEngine/* state (`st.closes`, read from a completely
+// separate document) is where `finalize()` above already applied that same cap,
+// but priceEngine/* and config/prices are two independently-computed price
+// histories (see reference_breakout_pricing_split memory) that can drift apart
+// over weeks of ticks with slightly different inputs/timing. Mirroring a value
+// that's perfectly valid against the WORKER's own history straight into
+// config/prices ignores how far config/prices's own history already sits from
+// it, teleporting the client-visible price/chart by however much the two
+// tracks have silently diverged (confirmed live 2026-09-15: several MLB
+// players' config/prices close jumped 15-25% day-over-day even though their
+// underlying box score was unremarkable, because the worker's own parallel
+// history had quietly drifted ~20% away from the client's). Re-anchoring the
+// mirror to config/prices's own most recent prior close keeps the two tracks
+// converging gradually instead of snapping to whichever one last wrote.
+function clampMirrorClose(rank, closeVal, statPrice, today, clientClosesByRank) {
+  const clientCloses = (clientClosesByRank && clientClosesByRank[String(rank)]) || {};
+  const priorDates = Object.keys(clientCloses)
+    .filter(d => d < today && clientCloses[d] > 0)
+    .sort();
+  let val = closeVal;
+  if (priorDates.length) {
+    const prevClientClose = clientCloses[priorDates[priorDates.length - 1]];
+    val = Math.min(prevClientClose * 1.15, Math.max(prevClientClose * 0.85, val));
+  }
+  return Math.round(Math.min(statPrice * 1.68, Math.max(statPrice * 0.56, val)) * 100) / 100;
+}
+
 // ── MLB ──
 async function tickMlb(env, today) {
   const schedule = await mlb.fetchSchedule(today);
@@ -248,6 +278,7 @@ async function tickMlb(env, today) {
   if (!toProcess.length) return { league: 'mlb', games: gamePks.length, processed: 0, finalized: 0 };
 
   const states = await loadStatesBatch(env, 'mlb', toProcess.map(t => t.player));
+  const clientCloses = (await firestoreGetDoc(env, 'config/prices').catch(() => null))?.closes || {};
 
   const updates = [];
   const movers = [];
@@ -275,9 +306,7 @@ async function tickMlb(env, today) {
       // This cron runs every 15 min with no browser involved, so mirror the
       // close straight in - inconsistent MLB chart/price history was games
       // finishing with nobody's browser open to record them.
-      const clamped = Math.round(
-        Math.min(st.statPrice * 1.68, Math.max(st.statPrice * 0.56, closeVal)) * 100
-      ) / 100;
+      const clamped = clampMirrorClose(player.rank, closeVal, st.statPrice, today, clientCloses);
       configWrites.push({ segments: ['closes', String(player.rank), today], value: clamped });
     }
     const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: today, now });
@@ -403,6 +432,7 @@ async function tickNfl(env, today) {
   if (!toProcess.length) return { league: 'nfl', games: relevant.length, processed: 0, finalized: 0 };
 
   const states = await loadStatesBatch(env, 'nfl', toProcess);
+  const clientCloses = (await firestoreGetDoc(env, 'config/prices').catch(() => null))?.closes || {};
   const updates = [];
   const movers = [];
   const configWrites = []; // mirrors finalized closes into config/prices - see below
@@ -428,9 +458,9 @@ async function tickNfl(env, today) {
       // good instead of leaving it as a manual catch-up step after game day.
       // Stay inside the client's _priceValid clamp (statPrice * [0.55, 1.70])
       // so autoRepairPrices() never scrubs this write back out client-side.
-      const clamped = Math.round(
-        Math.min(p.statPrice * 1.68, Math.max(p.statPrice * 0.56, closeVal)) * 100
-      ) / 100;
+      // Also re-anchored to config/prices's own prior close, not just the wide
+      // statPrice band - see clampMirrorClose's comment above tickMlb.
+      const clamped = clampMirrorClose(player.rank, closeVal, p.statPrice, today, clientCloses);
       configWrites.push({ segments: ['closes', String(player.rank), today], value: clamped });
     }
     const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: today, now });

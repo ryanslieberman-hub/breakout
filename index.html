@@ -1604,6 +1604,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
           <div class="tf" id="pf-3" onclick="setPos(getPosLabels()[2],this)">SF</div>
           <div class="tf" id="pf-4" onclick="setPos(getPosLabels()[3],this)">PF</div>
           <div class="tf" id="pf-5" onclick="setPos(getPosLabels()[4],this)">C</div>
+          <div class="tf" id="pf-6" onclick="setPos(getPosLabels()[5],this)" style="display:none;"></div>
         </div>
       </div>
       <div class="plist" id="plist"></div>
@@ -3284,6 +3285,27 @@ const NFL_RAW = [
   {rank:3691, name:'Ryan Flournoy', team:'Dallas Cowboys', pos:'WR', role:'WR', tier:'C', fpts:7, rec:3.5, recy:45, rtd:0.3, tgt:5.5},
   {rank:3692, name:"Tre' Harris", team:'Los Angeles Chargers', pos:'WR', role:'WR', tier:'C', fpts:7, rec:3.5, recy:45, rtd:0.3, tgt:5.5},
   {rank:3693, name:'Gunnar Helm', team:'Tennessee Titans', pos:'TE', role:'TE', tier:'B', fpts:8, rec:4, recy:42, rtd:0.3, tgt:6},
+  // ── Kickers (2026-09-15) ──
+  {rank:3700, name:'Brandon Aubrey', team:'Dallas Cowboys', pos:'K', role:'K', tier:'S', fpts:9.5, fgm:1.9, xpm:2.6},
+  {rank:3701, name:'Harrison Butker', team:'Kansas City Chiefs', pos:'K', role:'K', tier:'A', fpts:8.8, fgm:1.7, xpm:2.5},
+  {rank:3702, name:'Chris Boswell', team:'Pittsburgh Steelers', pos:'K', role:'K', tier:'A', fpts:8.6, fgm:1.7, xpm:2.2},
+  {rank:3703, name:'Evan McPherson', team:'Cincinnati Bengals', pos:'K', role:'K', tier:'A', fpts:8.5, fgm:1.7, xpm:2.1},
+  {rank:3704, name:'Jake Bates', team:'Detroit Lions', pos:'K', role:'K', tier:'B', fpts:8.3, fgm:1.6, xpm:2.4},
+  {rank:3705, name:'Cameron Dicker', team:'Los Angeles Chargers', pos:'K', role:'K', tier:'B', fpts:8.2, fgm:1.6, xpm:2.2},
+  {rank:3706, name:'Jason Sanders', team:'Miami Dolphins', pos:'K', role:'K', tier:'B', fpts:8.0, fgm:1.6, xpm:2.0},
+  {rank:3707, name:'Younghoe Koo', team:'Atlanta Falcons', pos:'K', role:'K', tier:'B', fpts:7.9, fgm:1.5, xpm:2.1},
+  {rank:3708, name:'Wil Lutz', team:'Denver Broncos', pos:'K', role:'K', tier:'B', fpts:7.8, fgm:1.5, xpm:2.0},
+  {rank:3709, name:'Tyler Bass', team:'Buffalo Bills', pos:'K', role:'K', tier:'B', fpts:7.9, fgm:1.4, xpm:2.4},
+  {rank:3710, name:'Jake Elliott', team:'Philadelphia Eagles', pos:'K', role:'K', tier:'B', fpts:7.7, fgm:1.5, xpm:2.0},
+  {rank:3711, name:'Joshua Karty', team:'Los Angeles Rams', pos:'K', role:'K', tier:'B', fpts:7.6, fgm:1.5, xpm:1.9},
+  {rank:3712, name:'Matt Gay', team:'Washington Commanders', pos:'K', role:'K', tier:'B', fpts:7.6, fgm:1.4, xpm:2.1},
+  {rank:3713, name:"Ka'imi Fairbairn", team:'Houston Texans', pos:'K', role:'K', tier:'C', fpts:7.3, fgm:1.4, xpm:1.9},
+  {rank:3714, name:'Chase McLaughlin', team:'Tampa Bay Buccaneers', pos:'K', role:'K', tier:'C', fpts:7.4, fgm:1.4, xpm:2.0},
+  {rank:3715, name:'Cairo Santos', team:'Chicago Bears', pos:'K', role:'K', tier:'C', fpts:7.2, fgm:1.3, xpm:2.0},
+  {rank:3716, name:'Jason Myers', team:'Seattle Seahawks', pos:'K', role:'K', tier:'C', fpts:7.3, fgm:1.4, xpm:1.9},
+  {rank:3717, name:'Greg Zuerlein', team:'New York Jets', pos:'K', role:'K', tier:'C', fpts:7.0, fgm:1.3, xpm:1.8},
+  {rank:3718, name:'Dustin Hopkins', team:'Cleveland Browns', pos:'K', role:'K', tier:'C', fpts:6.9, fgm:1.3, xpm:1.7},
+  {rank:3719, name:'Brandon McManus', team:'Green Bay Packers', pos:'K', role:'K', tier:'C', fpts:7.1, fgm:1.3, xpm:1.9},
 ];
 // ── NFL PRICING ──────────────────────────────────────────────────────────────
 // Position-specific fantasy-style scoring. Each position's baseline stat line seeds a
@@ -6405,6 +6427,22 @@ function _nflRawLine(cat, labels, stats, into) {
     into.defint = (into.defint||0) + (cat === 'interceptions' ? get(['INT']) : 0);
     into.ffum = (into.ffum||0) + get(['FF']);
     into.deftd = (into.deftd||0) + get(['TD']);
+  } else if (cat === 'fumbles') {
+    // Offensive fumbles lost - the counterpart to defensive FF above. ESPN's
+    // fumbles category is [FUM, LOST, REC]; only LOST costs fantasy value (a
+    // fumble you recover yourself didn't change possession).
+    const idx = (labels||[]).findIndex(l => (l||'').toUpperCase() === 'LOST');
+    into.fuml = (into.fuml||0) + (idx >= 0 ? parseFloat((stats[idx]||'0').toString().replace(/[^0-9.\-]/g,'')) || 0 : 0);
+  } else if (cat === 'kicking') {
+    const frac = (name) => {
+      const idx = (labels||[]).findIndex(l => (l||'').toUpperCase() === name);
+      const raw = idx >= 0 ? (stats[idx]||'0/0').toString() : '0/0';
+      const [m, a] = raw.split('/').map(n => parseInt(n) || 0);
+      return { m: m||0, a: a||(m||0) };
+    };
+    const fg = frac('FG'), xp = frac('XP');
+    into.fgm = (into.fgm||0) + fg.m; into.fga = (into.fga||0) + fg.a;
+    into.xpm = (into.xpm||0) + xp.m; into.xpa = (into.xpa||0) + xp.a;
   }
   return into;
 }
@@ -6414,7 +6452,9 @@ function _nflFptsFromRaw(s) {
   return (s.py||0)*0.04 + (s.ptd||0)*4 - (s.ints||0)*2
     + (s.ry||0)*0.1 + (s.rtd||0)*6
     + (s.rec||0)*0.5 + (s.recy||0)*0.1 + (s.rectd||0)*6
-    + (s.tkl||0)*1 + (s.sack||0)*2 + (s.defint||0)*3 + (s.ffum||0)*2 + (s.deftd||0)*6;
+    - (s.fuml||0)*2
+    + (s.tkl||0)*1 + (s.sack||0)*2 + (s.defint||0)*3 + (s.ffum||0)*2 + (s.deftd||0)*6
+    + (s.fgm||0)*3 + (s.xpm||0)*1;
 }
 
 // Fraction (0-1) of the 60-minute NFL game clock elapsed, from an ESPN scoreboard
@@ -8085,6 +8125,13 @@ function updateHero(){
         set('ln-reb', (ln.rec||0).toFixed(0), (ln.rec||0) >= 5 ? 'great' : (ln.rec||0) >= 2 ? 'good' : 'bad', 'REC');
         set('ln-ast', (ln.tgt||0).toFixed(0), 'good', 'TGT');
         set('ln-stl', (ln.rectd||0).toFixed(0), (ln.rectd||0) > 0 ? 'great' : 'bad', 'TD');
+        set('ln-blk', (ln.fuml||0).toFixed(0), (ln.fuml||0) > 0 ? 'bad' : 'great', 'FUM');
+      } else if (role === 'K') {
+        set('ln-pts', `${(ln.fgm||0).toFixed(0)}/${(ln.fga||0).toFixed(0)}`, (ln.fgm||0) >= 3 ? 'great' : (ln.fgm||0) >= 1 ? 'good' : 'bad', 'FG');
+        set('ln-reb', `${(ln.xpm||0).toFixed(0)}/${(ln.xpa||0).toFixed(0)}`, 'good', 'XP');
+        const kpts = (ln.fgm||0)*3 + (ln.xpm||0);
+        set('ln-ast', kpts.toFixed(0), kpts >= 10 ? 'great' : kpts >= 6 ? 'good' : 'bad', 'PTS');
+        set('ln-stl', '—', 'good', '');
         set('ln-blk', '—', 'good', '');
       } else {
         // DEF
@@ -8948,9 +8995,23 @@ function updateMovers(){
       // reliable source for "last night's guys" - it's exactly the data the hero
       // shows - and works even when closes history is too sparse to diff.
       const cutoff = localDateStr(2); // within the last couple days
+      // Restrict to the single most-recent slate date, not just "within the last
+      // couple days". Without this, a modest MNF slate (small stat swings) got
+      // completely drowned out by a BIGGER slate from the PRIOR night once both
+      // pools were merged and sorted purely by |pct| - "Last Night" silently
+      // showed Sunday's biggest movers instead of Monday's, because none of
+      // Monday's real (but smaller) moves cracked the combined top 10. Confirmed
+      // live 2026-09-15: every NFL mover shown was from Sunday's slate although
+      // Monday Night Football had already finished with real, recorded data.
+      let mostRecentLnDate = null;
+      leaguePlayers.forEach(p => {
+        const ln = lastNight[p.rank];
+        if (ln && ln.played && ln.date && (!mostRecentLnDate || ln.date > mostRecentLnDate)) mostRecentLnDate = ln.date;
+      });
       out = leaguePlayers.map(p => {
         const ln = lastNight[p.rank];
         if (!ln || !ln.played || !ln.date || ln.date < cutoff) return null;
+        if (mostRecentLnDate && ln.date !== mostRecentLnDate) return null;
         const pct = getTodayPct(p.rank);
         if (!pct) return null;
         // Cross-check against the ACTUAL close movement. A phantom mover (stale golf round
@@ -9770,13 +9831,13 @@ function setTier(t,el){
 function getPosLabels() {
   if (currentLeague === 'MLB') return ['SP','RP','H','OF','C'];
   if (currentLeague === 'GOLF') return ['PRO','','','',''];
-  if (currentLeague === 'NFL') return ['QB','RB','WR','TE','DEF'];
+  if (currentLeague === 'NFL') return ['QB','RB','WR','TE','DEF','K'];
   return ['PG','SG','SF','PF','C'];
 }
 
 function updatePosFilters() {
   const labels = getPosLabels();
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 1; i <= 6; i++) {
     const el = document.getElementById(`pf-${i}`);
     if (el) {
       const lab = labels[i-1];
@@ -15469,13 +15530,14 @@ function renderG10(rank, games) {
         <td style="text-align:right;color:${(g.ptd||0)>0?'var(--green)':'inherit'}">${(g.ptd||0).toFixed(0)}</td>
         <td style="text-align:right;color:${(g.ints||0)>0?'var(--red)':'var(--muted)'}">${(g.ints||0).toFixed(0)}</td>
         <td style="text-align:right;color:var(--muted)">${Math.round(g.ry||0)}</td>
+        <td style="text-align:right;color:${(g.fuml||0)>0?'var(--red)':'var(--muted)'}">${(g.fuml||0).toFixed(0)}</td>
       </tr>`).join('');
       el.innerHTML = `
         <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Pass yards last ${games.length} games</div>
         <div class="g10-sparkline">${sparkHTML}</div>
         <table class="g10-table">
           <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
-          <th>PASS YD</th><th>TD</th><th>INT</th><th>RUSH YD</th></tr></thead>
+          <th>PASS YD</th><th>TD</th><th>INT</th><th>RUSH YD</th><th>FUM</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
       return;
@@ -15491,6 +15553,7 @@ function renderG10(rank, games) {
         <td style="text-align:right;color:${td>0?'var(--green)':'inherit'}">${td.toFixed(0)}</td>
         <td style="text-align:right;color:var(--muted)">${(g.rec||0).toFixed(0)}</td>
         <td style="text-align:right;color:var(--muted)">${Math.round(g.recy||0)}</td>
+        <td style="text-align:right;color:${(g.fuml||0)>0?'var(--red)':'var(--muted)'}">${(g.fuml||0).toFixed(0)}</td>
       </tr>`;
       }).join('');
       el.innerHTML = `
@@ -15498,7 +15561,7 @@ function renderG10(rank, games) {
         <div class="g10-sparkline">${sparkHTML}</div>
         <table class="g10-table">
           <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
-          <th>CAR</th><th>RUSH YD</th><th>TD</th><th>REC</th><th>REC YD</th></tr></thead>
+          <th>CAR</th><th>RUSH YD</th><th>TD</th><th>REC</th><th>REC YD</th><th>FUM</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
       return;
@@ -15511,13 +15574,32 @@ function renderG10(rank, games) {
         <td style="text-align:right;color:var(--muted)">${(g.tgt||0).toFixed(0)}</td>
         <td style="text-align:right">${Math.round(g.recy||0)}</td>
         <td style="text-align:right;color:${(g.rectd||0)>0?'var(--green)':'inherit'}">${(g.rectd||0).toFixed(0)}</td>
+        <td style="text-align:right;color:${(g.fuml||0)>0?'var(--red)':'var(--muted)'}">${(g.fuml||0).toFixed(0)}</td>
       </tr>`).join('');
       el.innerHTML = `
         <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Receiving yards last ${games.length} games</div>
         <div class="g10-sparkline">${sparkHTML}</div>
         <table class="g10-table">
           <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
-          <th>REC</th><th>TGT</th><th>REC YD</th><th>TD</th></tr></thead>
+          <th>REC</th><th>TGT</th><th>REC YD</th><th>TD</th><th>FUM</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      return;
+    }
+    if (p.role === 'K') {
+      const sparkHTML = bars(games.map(g => (g.fgm||0)*3 + (g.xpm||0)), p.fgm ? p.fgm*3 + (p.xpm||2) : 9);
+      const rows = games.map(g => `<tr>
+        <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
+        <td style="text-align:right;color:${(g.fgm||0)>0?'var(--green)':'inherit'}">${(g.fgm||0).toFixed(0)}/${(g.fga||0).toFixed(0)}</td>
+        <td style="text-align:right;color:var(--muted)">${(g.xpm||0).toFixed(0)}/${(g.xpa||0).toFixed(0)}</td>
+        <td style="text-align:right">${((g.fgm||0)*3 + (g.xpm||0)).toFixed(0)}</td>
+      </tr>`).join('');
+      el.innerHTML = `
+        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Kicking points last ${games.length} games</div>
+        <div class="g10-sparkline">${sparkHTML}</div>
+        <table class="g10-table">
+          <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
+          <th>FG</th><th>XP</th><th>PTS</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
       return;
@@ -15529,13 +15611,14 @@ function renderG10(rank, games) {
       <td style="text-align:right">${(g.tkl||0).toFixed(0)}</td>
       <td style="text-align:right;color:${(g.sack||0)>0?'var(--green)':'inherit'}">${(g.sack||0).toFixed(1)}</td>
       <td style="text-align:right;color:${(g.defint||0)>0?'var(--green)':'var(--muted)'}">${(g.defint||0).toFixed(0)}</td>
+      <td style="text-align:right;color:${(g.ffum||0)>0?'var(--green)':'var(--muted)'}">${(g.ffum||0).toFixed(0)}</td>
     </tr>`).join('');
     el.innerHTML = `
       <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Tackles last ${games.length} games</div>
       <div class="g10-sparkline">${sparkHTML}</div>
       <table class="g10-table">
         <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
-        <th>TKL</th><th>SACK</th><th>INT</th></tr></thead>
+        <th>TKL</th><th>SACK</th><th>INT</th><th>FF</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
     return;

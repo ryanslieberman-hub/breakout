@@ -47,6 +47,28 @@ function defPoints(cat, labels, stats) {
   return tackles * 1 + sacks * 2 + tfl * 0.5 + pd * 1 + ints * 3 + ffum * 2 + td * 6;
 }
 
+// Kicker scoring - ESPN's kicking category is [FG, XP, PTS] with FG/XP as
+// "made/attempted" strings (e.g. "2/3"); only the made count matters for
+// fantasy value. Same weights as the client's _nflFptsFromRaw.
+function kickPoints(labels, stats) {
+  if (!labels || !stats) return 0;
+  const made = name => {
+    const idx = labels.findIndex(l => (l || '').toUpperCase() === name);
+    const raw = idx >= 0 ? (stats[idx] || '0/0').toString() : '0/0';
+    return parseInt(raw.split('/')[0]) || 0;
+  };
+  return made('FG') * 3 + made('XP') * 1;
+}
+
+// Offensive fumbles lost - the counterpart to defensive FF above. ESPN's
+// fumbles category is [FUM, LOST, REC]; only a lost fumble costs value.
+function fumblePoints(labels, stats) {
+  if (!labels || !stats) return 0;
+  const idx = labels.findIndex(l => (l || '').toUpperCase() === 'LOST');
+  const lost = idx >= 0 ? parseFloat((stats[idx] || '0').toString().replace(/[^0-9.\-]/g, '')) || 0 : 0;
+  return -lost * 2;
+}
+
 // Returns { normalizedName -> totalFantasyPointsThisGame } from an ESPN
 // summary response, summed across all offense/defense stat categories.
 export function extractNflFantasyPoints(summary) {
@@ -56,12 +78,18 @@ export function extractNflFantasyPoints(summary) {
     for (const cat of tm.statistics || []) {
       const isOffense = ['passing', 'rushing', 'receiving'].includes(cat.name);
       const isDefense = ['defensive', 'interceptions'].includes(cat.name);
-      if (!isOffense && !isDefense) continue;
+      const isKicking = cat.name === 'kicking';
+      const isFumbles = cat.name === 'fumbles';
+      if (!isOffense && !isDefense && !isKicking && !isFumbles) continue;
       for (const a of cat.athletes || []) {
         const nm = a.athlete?.displayName;
         if (!nm) continue;
         const pts = isDefense
           ? defPoints(cat.name, cat.labels, a.stats || [])
+          : isKicking
+          ? kickPoints(cat.labels, a.stats || [])
+          : isFumbles
+          ? fumblePoints(cat.labels, a.stats || [])
           : fantasyPoints(cat.name, a.stats || []);
         const key = normalizeName(nm);
         out[key] = (out[key] || 0) + pts;
