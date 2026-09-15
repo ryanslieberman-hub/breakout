@@ -215,6 +215,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .prow-up{box-shadow:inset 0 0 0 1px rgba(18,212,126,.35);}
 .prow-down{box-shadow:inset 0 0 0 1px rgba(245,68,95,.35);}
 .inj-badge{display:inline-block;background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:6px;margin-left:5px;vertical-align:middle;letter-spacing:.5px;}
+.q-badge{display:inline-block;background:#f2b843;color:#1a1200;font-size:9px;font-weight:700;padding:1px 5px;border-radius:6px;margin-left:5px;vertical-align:middle;letter-spacing:.5px;}
 .watch-btn{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 4px;opacity:.4;transition:opacity .15s;line-height:1;flex-shrink:0;}
 .watch-btn.watching{opacity:1;}
 .watch-btn:hover{opacity:.8;}
@@ -1273,6 +1274,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .ln-l{font-size:var(--fs-micro);}
 .ln-v{font-variant-numeric:tabular-nums;}
 .inj-badge{font-size:var(--fs-micro);}
+.q-badge{font-size:var(--fs-micro);}
 .lo-icon{font-size:var(--fs-micro);}
 .modal-label{font-size:var(--fs-micro);}
 .modal-hint{font-size:var(--fs-micro);}
@@ -3977,110 +3979,176 @@ const TEAM_ESPN_ID = {
 };
 
 
-// ─── Daily ESPN stats refresh ───────────────────────────────────────────────
-// Fetches current season PPG/RPG/APG for every NBA player from ESPN once per day.
-// This keeps stats accurate without any manual updates.
+// ─── Injury tracking (all leagues) ──────────────────────────────────────────
+// Fetches each league's ESPN injury report and marks players OUT/QUESTIONABLE
+// so the "OUT" badge (list row + hero panel, both league-agnostic) stays
+// accurate. Originally NBA-only - this used to fall back to matching an
+// injured player's name against the module-level `players` array, which is
+// mutable and holds whatever league is CURRENTLY on screen (see its own
+// comment: "the active list - mutable, swapped on league change"). Fetching
+// NBA's injury feed while a device had NFL/MLB selected matched NBA names
+// against the wrong league's roster, which could both wrongly mark an
+// NFL/MLB player OUT and never mark real NFL/MLB injuries at all - NFL had NO
+// injury feed of its own, so a real Week 1 injury (e.g. A.J. Brown) never
+// showed anything, while a coincidental name match on a live NFL game night
+// (e.g. Kenneth Walker III, playing and producing real stats) could still
+// read OUT. Each league below now matches ONLY against its own roster.
+async function _fetchLeagueInjuries(espnUrl, idMap, leaguePlayers) {
+  const data = await espnFetch(espnUrl);
+  let count = 0;
+  const names = [];
+  const teamList = data.injuries || data.teams || [];
+  teamList.forEach(team => {
+    const injuries = team.injuries || team.athletes || [];
+    injuries.forEach(inj => {
+      const athlete = inj.athlete || inj;
+      const status  = (inj.status || inj.type || athlete.status || '').toLowerCase();
+      // `athlete.id` isn't present in every ESPN sport's injuries response shape
+      // (confirmed missing for NFL) - `inj.id` is NOT a fallback for it, it's the
+      // injury-REPORT entry's own id, a completely different number that happens
+      // to always exist and so silently "matched" whenever an unrelated NFL_IDS
+      // rank coincidentally equalled it. The real athlete id is reliably embedded
+      // in one of `athlete.links[].href` as `/id/<id>/<slug>` - pull it from there
+      // instead when `athlete.id` itself is missing.
+      let espnId = athlete.id != null ? String(athlete.id) : '';
+      if (!espnId && Array.isArray(athlete.links)) {
+        for (const link of athlete.links) {
+          const m = /\/id\/(\d+)\//.exec(link?.href || '');
+          if (m) { espnId = m[1]; break; }
+        }
+      }
+      const name    = (athlete.displayName || athlete.fullName || '').toLowerCase();
+
+      const isOut = status.includes('out') || status.includes('injured reserve')
+                 || status.includes('ir') || status === 'out';
+      const isQtm = !isOut && (status.includes('day') || status.includes('questionable') || status.includes('doubtful'));
+      if (!isOut && !isQtm) return;
+
+      const addToSet = (rank) => {
+        if (isOut) { INJURED.add(rank); count++; names.push(name); }
+        else { QUESTIONABLE.add(rank); }
+      };
+
+      // Match by ESPN ID first
+      if (espnId && idMap) {
+        const rankById = Object.keys(idMap).find(r => String(idMap[r]) === espnId);
+        if (rankById) { addToSet(parseInt(rankById)); return; }
+      }
+      // Fallback: match by name, scoped to THIS league's roster only. An EXACT
+      // full-name match always wins first - a common-surname substring match
+      // (e.g. "brown") can otherwise beat the real player to Array.find's
+      // first-hit if that player happens to sit earlier in the roster array,
+      // which is ordered by team/position, not alphabetically (confirmed live:
+      // "a.j. brown" matched "Chase Brown" instead of "A.J. Brown" this way,
+      // because Chase Brown's rank happens to come first in NFL_RAW). Only
+      // fall back to the loose substring match when no exact name exists.
+      if (name) {
+        const p = leaguePlayers.find(p2 => p2.name.toLowerCase() === name)
+               || leaguePlayers.find(p2 => name.includes(p2.name.toLowerCase().split(' ').pop()));
+        if (p) { addToSet(p.rank); }
+      }
+    });
+  });
+  return { count, names };
+}
+
 async function loadInjuries() {
+  INJURED.clear();
+  QUESTIONABLE.clear();
+  // Re-add all permanent season-ending injuries before any feed overwrites
+  PERMANENT_INJURED.forEach(r => INJURED.add(r));
+  let totalCount = 0;
+  const allNames = [];
+
+  // Each league's fetch is independent - one feed being down (or ESPN
+  // reshaping a response) shouldn't blank out the other leagues' injuries.
   try {
-    // ESPN injuries endpoint - returns per-team injury reports
-    const data = await espnFetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries');
-    INJURED.clear();
-    QUESTIONABLE.clear();
-    // Re-add all permanent season-ending injuries before ESPN feed overwrites
-    PERMANENT_INJURED.forEach(r => INJURED.add(r));
-    let count = 0;
-    const injuredNames = [];
+    const { count, names } = await _fetchLeagueInjuries(
+      'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries', ESPN_IDS, nbaPlayers);
+    totalCount += count; allNames.push(...names);
+  } catch(e) { console.log('NBA injury feed unavailable'); }
 
-    // ESPN structure varies - handle both known formats
-    const teamList = data.injuries || data.teams || [];
-    teamList.forEach(team => {
-      const injuries = team.injuries || team.athletes || [];
-      injuries.forEach(inj => {
-        // Get athlete info - may be nested differently
-        const athlete = inj.athlete || inj;
-        const status  = (inj.status || inj.type || athlete.status || '').toLowerCase();
-        const espnId  = String(athlete.id || inj.id || '');
-        const name    = (athlete.displayName || athlete.fullName || '').toLowerCase();
+  try {
+    const { count, names } = await _fetchLeagueInjuries(
+      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries', NFL_IDS, nflPlayers);
+    totalCount += count; allNames.push(...names);
+  } catch(e) { console.log('NFL injury feed unavailable'); }
 
-        const isOut = status.includes('out') || status.includes('injured reserve')
-                   || status.includes('ir') || status === 'out';
-        const isQtm = !isOut && (status.includes('day') || status.includes('questionable') || status.includes('doubtful'));
-        if(!isOut && !isQtm) return;
-
-        const addToSet = (rank) => {
-          if(isOut) { INJURED.add(rank); count++; injuredNames.push(name); }
-          else { QUESTIONABLE.add(rank); }
-        };
-
-        // Match by ESPN ID first
-        if(espnId) {
-          const rankById = Object.keys(ESPN_IDS).find(r => String(ESPN_IDS[r]) === espnId);
-          if(rankById) { addToSet(parseInt(rankById)); return; }
-        }
-        // Fallback: match by full name
-        if(name) {
-          const p = players.find(p2 => p2.name.toLowerCase() === name ||
-                                       name.includes(p2.name.toLowerCase().split(' ').pop()));
-          if(p) { addToSet(p.rank); }
-        }
-      });
+  // MLB already tracks IL status daily via the official 40-man roster feed
+  // (mlbFetchInjuries → window._mlbInjuryStatus, used for price decay) - reuse
+  // that instead of a second ESPN call. Any D10/D15/D60 code is OUT.
+  try {
+    mlbPlayers.forEach(p => {
+      if (INJURED.has(p.rank)) return; // permanent list takes priority
+      const inj = window._mlbInjuryStatus && window._mlbInjuryStatus[p.rank];
+      if (inj && inj.code) { INJURED.add(p.rank); totalCount++; allNames.push(p.name); }
     });
+  } catch(e) { console.log('MLB injury sync unavailable'); }
 
-    // Override: anyone who has played stats from today or yesterday can't be OUT
-    // Use local date strings to avoid UTC offset issues (e.g. EST games appearing as wrong date)
-    const _mkLocal = (offsetDays=0) => {
-      const d = new Date(); d.setDate(d.getDate() - offsetDays);
-      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-    };
-    const todayStrI = _mkLocal(0);
-    const ydStrI    = _mkLocal(1);
-    const twoDayStrI = _mkLocal(2);
-    // Remove from INJURED if: lastNight shows played recently, playerLastApplied has today/yesterday,
-    // OR lastStatSnap has live minutes > 0 (player is actively in a game right now)
-    [...INJURED].forEach(rank => {
-      const ln = lastNight[rank];
-      const snap = lastStatSnap[rank];
-      const hasLiveStats = snap && (snap.min || 0) > 0;
-      const playedRecently = (ln && ln.played && (ln.date === todayStrI || ln.date === ydStrI || ln.date === twoDayStrI))
-                          || playerLastApplied[rank] === todayStrI
-                          || playerLastApplied[rank] === ydStrI
-                          || hasLiveStats;
-      if (playedRecently) {
-        INJURED.delete(rank);
-        QUESTIONABLE.delete(rank);
-      }
-    });
+  // Override: anyone who has played stats from today or yesterday can't be OUT
+  // Use local date strings to avoid UTC offset issues (e.g. EST games appearing as wrong date)
+  const _mkLocal = (offsetDays=0) => {
+    const d = new Date(); d.setDate(d.getDate() - offsetDays);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  };
+  const todayStrI = _mkLocal(0);
+  const ydStrI    = _mkLocal(1);
+  const twoDayStrI = _mkLocal(2);
+  // Remove from INJURED if: lastNight shows played recently, priceApplied has today/yesterday,
+  // OR lastStatSnap has live minutes > 0 (player is actively in a game right now)
+  //
+  // BUG FIXED 2026-09-15: this block (and the one below) referenced a
+  // `playerLastApplied` variable that has never existed anywhere in this file
+  // - every call to loadInjuries() threw a ReferenceError right here, silently
+  // swallowed by this function's own try/catch, before ever reaching this
+  // override or the renderAll() at the end. That means NO ONE who was ever
+  // marked INJURED could be auto-cleared by playing a real game - the ONLY
+  // other clear path was applyLiveStats's inline delete, which is NBA-only
+  // and only fires while a live game is being actively polled. This is almost
+  // certainly why a real, current game (e.g. Kenneth Walker III playing and
+  // producing real box-score stats) could still show OUT: whatever added him
+  // to INJURED was never getting cleared, regardless of the reason. The real,
+  // already-existing per-rank "last date a stat was applied" map is
+  // `priceApplied` (declared further down) - using that instead of the
+  // nonexistent variable is what actually lets this override run.
+  [...INJURED].forEach(rank => {
+    const ln = lastNight[rank];
+    const snap = lastStatSnap[rank];
+    const hasLiveStats = snap && (snap.min || 0) > 0;
+    const playedRecently = (ln && ln.played && (ln.date === todayStrI || ln.date === ydStrI || ln.date === twoDayStrI))
+                        || priceApplied[rank] === todayStrI
+                        || priceApplied[rank] === ydStrI
+                        || hasLiveStats;
+    if (playedRecently) {
+      INJURED.delete(rank);
+      QUESTIONABLE.delete(rank);
+    }
+  });
 
-    console.log(`%cInjuries: ${count} out`, 'color:#ff9800', injuredNames.join(', ') || 'none matched');
+  console.log(`%cInjuries: ${totalCount} out`, 'color:#ff9800', allNames.join(', ') || 'none matched');
 
-    // For newly-injured players, clear their playerLastApplied so the next
-    // fetchLiveStats can re-evaluate and zero out any stat that snuck through.
-    // Also clear their lastNight entry if it has a 'played' stat from today
-    // that was applied before the injury was known.
-    const todayStr = localDateStr();
-    const ydDate = new Date(); ydDate.setDate(ydDate.getDate()-1);
-    const ydStr = localDateStr(1);
-    INJURED.forEach(rank => {
-      const ln = lastNight[rank];
-      // Never wipe lastNight for a player who has played:true - they played, period.
-      // Only wipe playerLastApplied / lastNight for players with no played record at all.
-      if (ln && ln.played) {
-        // They played - pull them out of INJURED regardless of date
-        INJURED.delete(rank);
-        return;
-      }
-      if (playerLastApplied[rank] === todayStr || playerLastApplied[rank] === ydStr) {
-        delete playerLastApplied[rank];
-        _savePlayerLastApplied(playerLastApplied);
-      }
-    });
+  // For newly-injured players, clear their priceApplied so the next
+  // fetchLiveStats can re-evaluate and zero out any stat that snuck through.
+  // Also clear their lastNight entry if it has a 'played' stat from today
+  // that was applied before the injury was known.
+  const todayStr = localDateStr();
+  const ydStr = localDateStr(1);
+  INJURED.forEach(rank => {
+    const ln = lastNight[rank];
+    // Never wipe lastNight for a player who has played:true - they played, period.
+    // Only wipe priceApplied / lastNight for players with no played record at all.
+    if (ln && ln.played) {
+      // They played - pull them out of INJURED regardless of date
+      INJURED.delete(rank);
+      return;
+    }
+    if (priceApplied[rank] === todayStr || priceApplied[rank] === ydStr) {
+      delete priceApplied[rank];
+    }
+  });
 
-    // Immediately update the player card if the selected player's status changed
-    if (typeof renderAll === 'function') renderAll();
-
-  } catch(e) {
-    console.log('Injury feed unavailable - using hardcoded list');
-  }
+  // Immediately update the player card if the selected player's status changed
+  if (typeof renderAll === 'function') renderAll();
 }
 // lastNight persisted to localStorage so box scores survive page reloads and multi-date loops
 function _resetStaleDnpStreaks() {
@@ -7781,6 +7849,7 @@ function renderList(){
     const pct=getTodayPct(p.rank);
     const owned=holdings[p.rank]?.shares>0;
     const isInj = INJURED.has(p.rank);
+    const isQtm = !isInj && QUESTIONABLE.has(p.rank);
     const isStarred = watchlist.has(p.rank);
     const isHot = pct >= 3;
     const isCold = pct <= -3;
@@ -7813,7 +7882,7 @@ function renderList(){
       ${owned?'<div class="owned-dot"></div>':''}
       ${avatarHtml}
       <div class="pinfo">
-        <div class="pname">${p.name}${isInj?' <span class="inj-badge">OUT</span>':''}${isHot?' <span style="display:inline-flex;align-items:center;gap:2px;font-size:8px;color:var(--green);letter-spacing:0">'+breakoutMark('up')+'HOT</span>':''}${isCold?' <span style="display:inline-flex;align-items:center;gap:2px;font-size:8px;color:var(--blue);letter-spacing:0">'+breakoutMark('down')+'COLD</span>':''}</div>
+        <div class="pname">${p.name}${isInj?' <span class="inj-badge">OUT</span>':''}${isQtm?' <span class="q-badge">Q</span>':''}${isHot?' <span style="display:inline-flex;align-items:center;gap:2px;font-size:8px;color:var(--green);letter-spacing:0">'+breakoutMark('up')+'HOT</span>':''}${isCold?' <span style="display:inline-flex;align-items:center;gap:2px;font-size:8px;color:var(--blue);letter-spacing:0">'+breakoutMark('down')+'COLD</span>':''}</div>
         <div class="psub">${p.team} · <span style="color:var(--blue)">${p.pos}</span> · T${p.tier}${owned?' · <span style="color:var(--green)">'+fmt(ownVal)+'</span>':''}</div>
       </div>
       <div class="pright">
@@ -7877,7 +7946,8 @@ function updateHero(){
   }
   document.getElementById('hname').textContent=p.name;
   const heroInj = INJURED.has(p.rank);
-  document.getElementById('hsub').innerHTML=`${p.team} · ${p.pos} · TIER ${p.tier}${heroInj?' <span class="inj-badge">OUT</span>':''}`;
+  const heroQtm = !heroInj && QUESTIONABLE.has(p.rank);
+  document.getElementById('hsub').innerHTML=`${p.team} · ${p.pos} · TIER ${p.tier}${heroInj?' <span class="inj-badge">OUT</span>':heroQtm?' <span class="q-badge">Q</span>':''}`;
 
   // Season stat labels: NBA = PPG/RPG/APG, MLB pitchers = ERA/K9/IP, MLB hitters = AVG/HR/RBI
   const ppgEl = document.getElementById('h-ppg');
