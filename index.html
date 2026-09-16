@@ -4190,6 +4190,9 @@ function _loadLastNight() {
         }
       }
     }
+    // Self-heal entries whose .ts implies they're much more recent than
+    // their own .date - see _healLastNightTs's comment.
+    Object.values(result).forEach(_healLastNightTs);
     return result;
   } catch(e) { return {}; }
 }
@@ -4264,17 +4267,42 @@ function _isNewGame(old, entry) {
 // being re-confirmed, keep the ORIGINAL timestamp instead of bumping it to
 // now - otherwise a redundant re-fetch would keep making an old game look
 // artificially recent.
+// Approximates a real timestamp for an entry that predates the `.ts` field
+// (loaded from an old cache) - anchors on its own date rather than "now",
+// which would misrepresent an old game as having just happened.
+function _approxTs(entry) {
+  return entry?.date ? Date.parse(entry.date + 'T20:00:00') : 0;
+}
+
+// Shared self-heal, used both on local load and on Firestore restore: fixes
+// a .ts that implies an entry is much more recent than its own .date says -
+// see _setLastNight's comment for how this got written in the first place.
+function _healLastNightTs(val) {
+  if (!val || typeof val.ts !== 'number' || !val.date) return val;
+  const approx = _approxTs(val);
+  if (approx && val.ts - approx > 24 * 3600 * 1000) val.ts = approx;
+  return val;
+}
+
 function _setLastNight(rank, entry) {
   const old = lastNight[rank];
   if (old && old.played && old.live === false && _isNewGame(old, entry)) {
-    const oldTs = old.ts || (old.date ? Date.parse(old.date + 'T20:00:00') : 0);
+    const oldTs = old.ts || _approxTs(old);
     if (oldTs) {
       lastNightPrev[rank] = { ...old, ts: oldTs };
       _saveLastNightPrev();
     }
     entry.ts = Date.now();
   } else {
-    entry.ts = old?.ts || Date.now();
+    // Same game being re-confirmed (or no prior entry at all) - a MISSING
+    // old.ts means `old` predates this field (an existing cached entry, not
+    // a freshly-started game), so approximate from ITS OWN date instead of
+    // defaulting to Date.now(): confirmed live, Tarik Skubal's real game was
+    // 2026-09-14, but a routine re-confirmation fetch after this feature
+    // shipped had no old.ts to preserve and stamped "now" instead, making a
+    // 2-day-old game look like it just happened 13 hours ago - which then
+    // suppressed the "> 24h ago, show the date" label entirely.
+    entry.ts = old?.ts || _approxTs(old) || _approxTs(entry) || Date.now();
   }
   lastNight[rank] = entry;
 }
@@ -8454,36 +8482,36 @@ function updateHero(){
       }
       // Not playing now → fall through and show their most recent result.
     }
-    // Two merged games can straddle a calendar-day boundary (e.g. one game
-    // "Today", the other "Last Night") - annotating whichever date label won
-    // with "(2 games)" reads as if both happened on that one day. State the
-    // actual window instead.
-    const dateLabel = ln._multiGame ? 'Last 24 Hrs' : (isLive ? 'Live' : !ln.date ? '' : ln.date === today ? 'Today'
-      : ln.date === yesterday ? 'Last Night'
-      : ln.date === twoDays ? '2 Nights Ago'
-      : ln.date);
-    const golfDateLabel = isLive ? 'In Progress' : ln.date === today ? 'Today' : ln.date === yesterday ? 'Yesterday' : ln.date;
-    const headerLabel = ln.golf ? 'Latest Round'
-      : isLive ? 'Today' : ln.date === today ? 'Today' : ln.date === yesterday ? 'Last Night' : 'Game Log';
+    // No recency word at all (Today/Last Night/Live/Last 24 Hrs) when the
+    // game is within the last 24 hours - only show something when it's
+    // genuinely older, and then show the real date, not a relative guess.
+    // Prefer the precise timestamp (ln.ts, set by _setLastNight) when
+    // available; fall back to the today/yesterday calendar check for older
+    // cached entries that predate it.
+    const _within24h = isLive || (typeof ln.ts === 'number'
+      ? (Date.now() - ln.ts < 24 * 3600 * 1000)
+      : (ln.date === today || ln.date === yesterday));
+    const dateSuffix = _within24h ? '' : (ln.date ? ` · ${ln.date}` : '');
+    const headerLabel = ln.golf ? 'Latest Round' : 'Game Log';
     const lnHeader = document.getElementById('ln-header');
     if (lnHeader) lnHeader.textContent = headerLabel;
     if (ln.golf) {
       const tp = ln.toPar == null ? null : Math.round(ln.toPar);
       const tpStr = tp == null ? '—' : tp === 0 ? 'E' : tp > 0 ? `+${tp}` : `${tp}`;
-      document.getElementById('ln-game').textContent = `${tpStr} to par · ${golfDateLabel}`;
+      document.getElementById('ln-game').textContent = `${tpStr} to par${dateSuffix}`;
     } else if (ln.mlbRole === 'SP' || ln.mlbRole === 'RP') {
-      document.getElementById('ln-game').textContent = `${ln.pts}K ${(ln.min||0)}IP ${ln.reb}ER · ${dateLabel}`;
+      document.getElementById('ln-game').textContent = `${ln.pts}K ${(ln.min||0)}IP ${ln.reb}ER${dateSuffix}`;
     } else if (ln.mlbRole === 'H') {
-      document.getElementById('ln-game').textContent = `${ln.pts}HR ${ln.reb}RBI ${ln.ast}H · ${dateLabel}`;
+      document.getElementById('ln-game').textContent = `${ln.pts}HR ${ln.reb}RBI ${ln.ast}H${dateSuffix}`;
     } else if (ln.nfl) {
       const role = p.role;
       const line = role === 'QB' ? `${Math.round(ln.py||0)} pass yd, ${(ln.ptd||0).toFixed(0)} TD, ${(ln.ints||0).toFixed(0)} INT`
         : role === 'RB' ? `${Math.round(ln.ry||0)} rush yd, ${((ln.rtd||0)+(ln.rectd||0)).toFixed(0)} TD, ${(ln.rec||0).toFixed(0)} rec`
         : (role === 'WR' || role === 'TE') ? `${(ln.rec||0).toFixed(0)} rec, ${Math.round(ln.recy||0)} yd, ${(ln.rectd||0).toFixed(0)} TD`
         : `${(ln.tkl||0).toFixed(0)} tkl, ${(ln.sack||0).toFixed(1)} sack, ${(ln.defint||0).toFixed(0)} INT`;
-      document.getElementById('ln-game').textContent = `${line} · ${dateLabel}`;
+      document.getElementById('ln-game').textContent = `${line}${dateSuffix}`;
     } else {
-      document.getElementById('ln-game').textContent = `${ln.pts}pts ${ln.reb}reb ${ln.ast}ast · ${dateLabel}`;
+      document.getElementById('ln-game').textContent = `${ln.pts}pts ${ln.reb}reb ${ln.ast}ast${dateSuffix}`;
     }
     // Dim if older than yesterday - never dim a live in-progress entry
     const isStale = ln.date && ln.date < yesterday && !ln.live;
@@ -9164,7 +9192,7 @@ async function loadPricesFromFirestore() {
         if (val.mlbRole !== undefined && (val.fg === undefined || val.h === undefined)) return;
         // Only fill in if local lastNight is missing or older for this player
         if (!lastNight[r] || !lastNight[r].date || val.date > lastNight[r].date) {
-          lastNight[r] = val;
+          lastNight[r] = _healLastNightTs(val);
         }
       });
       _saveLastNight();
