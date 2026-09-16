@@ -8482,16 +8482,19 @@ function updateHero(){
       }
       // Not playing now → fall through and show their most recent result.
     }
-    // No recency word at all (Today/Last Night/Live/Last 24 Hrs) when the
-    // game is within the last 24 hours - only show something when it's
-    // genuinely older, and then show the real date, not a relative guess.
-    // Prefer the precise timestamp (ln.ts, set by _setLastNight) when
-    // available; fall back to the today/yesterday calendar check for older
-    // cached entries that predate it.
+    // No recency word at all (Today/Last Night/Live) for a single game
+    // within the last 24 hours - only show something when it's genuinely
+    // older, and then show the real date, not a relative guess. The one
+    // exception is a merged 2-game box score (_multiGame) - with no
+    // indicator at all, a suddenly-doubled stat line reads as one huge game
+    // instead of two combined ones, so that case keeps a plain "Last 24
+    // Hrs" note. Prefer the precise timestamp (ln.ts, set by _setLastNight)
+    // when available; fall back to the today/yesterday calendar check for
+    // older cached entries that predate it.
     const _within24h = isLive || (typeof ln.ts === 'number'
       ? (Date.now() - ln.ts < 24 * 3600 * 1000)
       : (ln.date === today || ln.date === yesterday));
-    const dateSuffix = _within24h ? '' : (ln.date ? ` · ${ln.date}` : '');
+    const dateSuffix = ln._multiGame ? ' · Last 24 Hrs' : (_within24h ? '' : (ln.date ? ` · ${ln.date}` : ''));
     const headerLabel = ln.golf ? 'Latest Round' : 'Game Log';
     const lnHeader = document.getElementById('ln-header');
     if (lnHeader) lnHeader.textContent = headerLabel;
