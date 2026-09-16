@@ -4589,7 +4589,20 @@ const ENGINE = (() => {
     dayOpen[p.rank] = { day: Math.floor(todayDayNum()), price: base };
     if (pools[p.rank]) { pools[p.rank].y = pools[p.rank].x * val; syncPool(pools[p.rank]); }
     reanchorChallengePools(p.rank, val);
-    _logPricePoint(p.rank, val);
+    // Only log when a REAL stat drove this price - not every idle recompute.
+    // price(p, null) runs for every non-playing player on every single
+    // deriveAll() tick (page load, background sync, any Firestore resync),
+    // and `val` can legitimately shift on one of those calls for reasons that
+    // have nothing to do with a game - most notably a corrected `closes`
+    // value arriving from Firestore (e.g. the mirror-drift repair run earlier
+    // today). Logging THOSE unconditionally poisoned the rolling 24h log with
+    // a permanent step-change that looked exactly like a real move: confirmed
+    // live on production, Gavin Williams' log held flat ~$25 for a full day,
+    // then jumped straight to $28.16 with zero games played and stayed flat
+    // there - a data correction, not a game. Only a live/finalized `stat`
+    // means an actual game event just happened; finalize() below still logs
+    // unconditionally since IT only ever fires once per real game.
+    if (stat) _logPricePoint(p.rank, val);
     return val;
   }
 
