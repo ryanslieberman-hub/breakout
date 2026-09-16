@@ -8454,10 +8454,14 @@ function updateHero(){
       }
       // Not playing now → fall through and show their most recent result.
     }
-    const dateLabel = (isLive ? 'Live' : !ln.date ? '' : ln.date === today ? 'Tonight'
+    // Two merged games can straddle a calendar-day boundary (e.g. one game
+    // "Tonight", the other "Last Night") - "Tonight (2 games)" reads as if
+    // both happened tonight, which is confusing. State the actual window
+    // instead of picking one game's date label and annotating it.
+    const dateLabel = ln._multiGame ? 'Last 24 Hrs' : (isLive ? 'Live' : !ln.date ? '' : ln.date === today ? 'Tonight'
       : ln.date === yesterday ? 'Last Night'
       : ln.date === twoDays ? '2 Nights Ago'
-      : ln.date) + (ln._multiGame ? ' (2 games)' : '');
+      : ln.date);
     const golfDateLabel = isLive ? 'In Progress' : ln.date === today ? 'Today' : ln.date === yesterday ? 'Yesterday' : ln.date;
     const headerLabel = ln.golf ? 'Latest Round'
       : isLive ? 'Tonight' : ln.date === today ? 'Tonight' : ln.date === yesterday ? 'Last Night' : 'Game Log';
