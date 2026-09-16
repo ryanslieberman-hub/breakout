@@ -4231,26 +4231,51 @@ function _saveLastNightPrev() {
 }
 const lastNightPrev = _loadLastNightPrev();
 
+// True only when `entry` represents a GENUINELY different game from `old` -
+// not the same game's final box score being re-written by a redundant fetch
+// or a second writer function. A finalized game's stat line, once locked in,
+// legitimately gets re-confirmed by later ticks (reconciliation passes,
+// multiple writer functions covering overlapping paths) - assuming any write
+// after finalize must mean "a new game started" was wrong: confirmed live,
+// Jacob Misiorowski's identical 5-IP/7-K line got written twice 19 seconds
+// apart, which _setLastNight previously treated as a doubleheader and summed
+// into a phantom 10 IP / 14 K. A different calendar date is always a
+// different game (doubleheaders share a date, but crossing midnight can't be
+// the same game); otherwise only genuinely different counting stats mean a
+// second game actually happened.
+function _isNewGame(old, entry) {
+  if (old.date !== entry.date) return true;
+  const skip = new Set(['ts', 'live', 'played', 'date']);
+  const keys = new Set([...Object.keys(old), ...Object.keys(entry)]);
+  for (const k of keys) {
+    if (skip.has(k)) continue;
+    if (old[k] !== entry[k]) return true;
+  }
+  return false;
+}
+
 // Every lastNight[rank] = {...} write in this file goes through here instead
-// of assigning directly. A finalized game's entry (played && live===false) is
-// never touched again by the normal live-tick flow for that SAME game - so if
-// a write arrives after that, it can only be because a genuinely different
-// game has started (same calendar date or not - a doubleheader's second game
-// often shares the first's date string, so comparing dates alone would miss
-// it). Stash the outgoing finalized entry as lastNightPrev before overwriting,
-// timestamped at whenever IT was originally written (real wall-clock time,
-// not a guess), so the hero panel can later check whether it's still within
-// the last 24h and combine both games' stats.
+// of assigning directly. When `entry` is a genuinely new game (see
+// _isNewGame) that arrives while the previous one is still finalized
+// (played && live===false), stash the outgoing entry as lastNightPrev before
+// overwriting, timestamped at whenever IT was originally written (real
+// wall-clock time, not a guess), so the hero panel can combine both games'
+// stats if the first is still within the last 24h. When it's the SAME game
+// being re-confirmed, keep the ORIGINAL timestamp instead of bumping it to
+// now - otherwise a redundant re-fetch would keep making an old game look
+// artificially recent.
 function _setLastNight(rank, entry) {
   const old = lastNight[rank];
-  if (old && old.played && old.live === false) {
+  if (old && old.played && old.live === false && _isNewGame(old, entry)) {
     const oldTs = old.ts || (old.date ? Date.parse(old.date + 'T20:00:00') : 0);
     if (oldTs) {
       lastNightPrev[rank] = { ...old, ts: oldTs };
       _saveLastNightPrev();
     }
+    entry.ts = Date.now();
+  } else {
+    entry.ts = old?.ts || Date.now();
   }
-  entry.ts = Date.now();
   lastNight[rank] = entry;
 }
 
@@ -4265,6 +4290,12 @@ function _setLastNight(rank, entry) {
 function _mergeRecentGames(recent, prev) {
   if (!prev || !prev.ts || Date.now() - prev.ts > 24 * 3600 * 1000) return recent;
   if (!recent || !recent.played) return recent;
+  // Defense in depth: _setLastNight should never let lastNightPrev hold the
+  // SAME game as the current one, but if it somehow did, summing would
+  // double every stat (this is exactly how Misiorowski briefly showed 10 IP
+  // instead of 5 - see _isNewGame's comment). Refuse to merge two identical
+  // lines no matter how they got here.
+  if (!_isNewGame(prev, recent)) return recent;
   // Golf's numeric fields don't sum safely - golfTotal is already a running
   // tournament cumulative (adding two rounds' totals would double-count), and
   // a combined toPar across rounds isn't how the card presents golf anyway.
@@ -8565,23 +8596,39 @@ function getTodayPct(rank){
 // 11pm and another that starts at 6pm the next day both land inside the same
 // 24h window and their combined price move shows correctly, instead of the
 // old calendar-day reset silently splitting them into two separate "days".
-// Falls back to the calendar-day number when no rolling log exists yet
-// (e.g. immediately after a fresh page load, before any tick has run).
+//
+// Falls back to getTodayPct ONLY when the player's most recent game was
+// genuinely today or yesterday - NOT unconditionally. getTodayPct's own
+// sparse-history fallback anchors on whatever it can find, up to 2 days back
+// and, with only a single close on record, all the way back to the
+// PRESEASON stat price - a real, correct number for what IT'S meant to show
+// (the list rows' calendar-day badge), but wrong for "24H": confirmed live
+// 2026-09-16, Gavin Williams' only game was 2 days ago (9/14) with a single
+// close, so getTodayPct compared his current price to his preseason
+// statPrice and called it +15.8% - a "since preseason" number wearing a
+// "24H" label, not a real 24-hour move. If there's no rolling log AND no
+// recent game, the honest 24H answer is flat 0%, not a borrowed stale number.
 function get24hPct(rank){
   const cur = liveP[rank];
-  if (!(cur > 0)) return getTodayPct(rank);
+  if (!(cur > 0)) return 0;
   const cutoff = Date.now() - 24 * 3600 * 1000;
   const arr = (intraday[rank] || []).slice().sort((a, b) => a.t - b.t);
-  if (!arr.length) return getTodayPct(rank);
-  const priorPts = arr.filter(pt => pt.t <= cutoff);
-  // A point at/before the cutoff is the real "price 24h ago". If our log
-  // doesn't reach back that far yet, collapse to the oldest point we DO have
-  // (same "anchor on what we actually have" pattern ENGINE.pct uses for
-  // sparse 7/14/30D history) rather than falling all the way back to the
-  // calendar-day number, which would hide real rolling movement.
-  const basePrice = priorPts.length ? priorPts[priorPts.length - 1].price : arr[0].price;
-  if (!(basePrice > 0)) return getTodayPct(rank);
-  return Math.round((cur - basePrice) / basePrice * 1000) / 10;
+  if (arr.length) {
+    const priorPts = arr.filter(pt => pt.t <= cutoff);
+    // A point at/before the cutoff is the real "price 24h ago". If our log
+    // doesn't reach back that far yet, collapse to the oldest point we DO
+    // have (same "anchor on what we actually have" pattern ENGINE.pct uses
+    // for sparse 7/14/30D history) rather than falling all the way back to
+    // a stale calendar-day number, which would hide real rolling movement.
+    const basePrice = priorPts.length ? priorPts[priorPts.length - 1].price : arr[0].price;
+    if (basePrice > 0) return Math.round((cur - basePrice) / basePrice * 1000) / 10;
+  }
+  const ln = lastNight[rank];
+  const todayStr = localDateStr(), ydStr = localDateStr(1);
+  if (ln && ln.played && ln.date && (ln.date === todayStr || ln.date === ydStr)) {
+    return getTodayPct(rank);
+  }
+  return 0;
 }
 
 function _getTodayPct_statBased(rank){
@@ -9187,6 +9234,14 @@ function updateMovers(){
         const daysSinceSlate = Math.round((Date.now() - Date.parse(slateDate + 'T12:00:00')) / 86400000);
         if (daysSinceSlate > 2) return [];   // no active tournament → no movers
       }
+      // NFL: same idea as golf above, tighter window - a slate more than a day
+      // stale isn't "last night" anymore, it's a leftover from the prior game
+      // day (Thu/Sun/Mon cadence leaves real 2+ day gaps that are normal, not
+      // an active slate to keep showing).
+      if (currentLeague === 'NFL') {
+        const daysSinceSlate = Math.round((Date.now() - Date.parse(slateDate + 'T12:00:00')) / 86400000);
+        if (daysSinceSlate > 1) return [];
+      }
       out = leaguePlayers.map(p => {
         const c = closes[p.rank] || {};
         if (!(c[slateDate] > 0)) return null;               // didn't play on the slate date
@@ -9222,7 +9277,15 @@ function updateMovers(){
       // Last resort: derive from lastNight box scores directly. This is the most
       // reliable source for "last night's guys" - it's exactly the data the hero
       // shows - and works even when closes history is too sparse to diff.
-      const cutoff = localDateStr(2); // within the last couple days
+      //
+      // NFL specifically gets a tighter 1-day cutoff, not the shared 2-day one -
+      // NFL's weekly cadence (Thu/Sun/Mon) means a real gap of 2 full days
+      // between slates is completely normal, not an off-day blip like it is for
+      // MLB/NBA. Confirmed live 2026-09-16: Wednesday, no NFL games Tuesday
+      // night, but the ticker still showed Monday Night Football's players
+      // labeled "Last Night" because MNF (2 nights ago) was still inside the
+      // 2-day cutoff. "Last Night" should mean last night.
+      const cutoff = currentLeague === 'NFL' ? localDateStr(1) : localDateStr(2);
       // Restrict to the single most-recent slate date, not just "within the last
       // couple days". Without this, a modest MNF slate (small stat swings) got
       // completely drowned out by a BIGGER slate from the PRIOR night once both
