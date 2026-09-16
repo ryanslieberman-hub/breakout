@@ -9521,7 +9521,20 @@ function drawMain(hoverX){
       if (!todayPts.length || Math.abs(todayPts[todayPts.length-1].price - liveP[selRank]) > 0.001) {
         todayPts = [...todayPts, livePt];
       }
-      const anchor1d = _dayOpenBase(selRank) || _chartAnchor;
+      // _dayOpenBase is today's calendar-day open - the right anchor ONLY when
+      // the player has actually played TODAY. When their last game was
+      // yesterday (the getTodayPct/get24hPct sparse-history fallback case),
+      // _dayOpenBase equals the current live price (nothing has moved since
+      // this morning) and would draw a flat line while the badge above it
+      // correctly shows yesterday's real move. Confirmed live 2026-09-16:
+      // Juan Soto's badge read +3.0% (his game was yesterday) but the chart
+      // was dead flat because _dayOpenBase (his unchanged today-open) won out
+      // over _chartAnchor (the anchor that actually implies +3.0%). Match
+      // getTodayPct's own "hasGameToday" branch exactly instead of always
+      // preferring _dayOpenBase.
+      const _lnToday = lastNight[selRank];
+      const _hasGameToday = _lnToday && _lnToday.played && _lnToday.date === localDateStr();
+      const anchor1d = (_hasGameToday && _dayOpenBase(selRank)) || _chartAnchor;
       hx = anchor1d > 0
         ? [{ day: ydDay, price: anchor1d }, ...todayPts]
         : todayPts;
