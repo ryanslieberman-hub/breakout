@@ -8648,14 +8648,20 @@ function get24hPct(rank){
   if (!(cur > 0)) return 0;
   const cutoff = Date.now() - 24 * 3600 * 1000;
   const arr = (intraday[rank] || []).slice().sort((a, b) => a.t - b.t);
-  if (arr.length) {
-    const priorPts = arr.filter(pt => pt.t <= cutoff);
-    // A point at/before the cutoff is the real "price 24h ago". If our log
-    // doesn't reach back that far yet, collapse to the oldest point we DO
-    // have (same "anchor on what we actually have" pattern ENGINE.pct uses
-    // for sparse 7/14/30D history) rather than falling all the way back to
-    // a stale calendar-day number, which would hide real rolling movement.
-    const basePrice = priorPts.length ? priorPts[priorPts.length - 1].price : arr[0].price;
+  const priorPts = arr.filter(pt => pt.t <= cutoff);
+  // Only trust the log when it actually HAS a point at/before the 24h
+  // cutoff - that's the real "price 24h ago". A log that doesn't reach back
+  // that far yet (freshly wiped, or a player only just started being
+  // tracked tonight) has NO evidence of what the price was 24h ago; its
+  // own oldest point can already reflect today's move, so treating it as
+  // the "before" price silently erases a real move instead of measuring
+  // it. Confirmed live 2026-09-16: Riley Greene's log only had points from
+  // AFTER his first-inning hit (all logged post-move, log wiped hours
+  // earlier that same day) - anchoring on the oldest of those read a real
+  // +3.3% live game as a flat 0%. Fall through to the calendar-day number
+  // in that case instead, same as having no log at all.
+  if (priorPts.length) {
+    const basePrice = priorPts[priorPts.length - 1].price;
     if (basePrice > 0) return Math.round((cur - basePrice) / basePrice * 1000) / 10;
   }
   const ln = lastNight[rank];
@@ -9526,17 +9532,22 @@ function drawMain(hoverX){
     // True rolling 24h window, built from ENGINE's rolling price log
     // (`intraday`, see _logPricePoint) instead of "since local midnight" - a
     // game that ended at 11pm and another that starts at 6pm the next day
-    // both land in the same window here. Matches get24hPct exactly (both
-    // anchor on the log entry at/before now-24h, or the oldest one available
-    // if the log doesn't reach back that far).
+    // both land in the same window here. Matches get24hPct exactly - ONLY
+    // trusts a log entry actually at/before the 24h cutoff as the anchor. A
+    // log that doesn't reach back that far (freshly wiped, or a player just
+    // started being tracked tonight) has no evidence of the price 24h ago;
+    // its own oldest point can already reflect today's move, so treating it
+    // as "before" would draw a flat line for a real move. Confirmed live
+    // 2026-09-16: Riley Greene's log only had points from AFTER his
+    // first-inning hit - anchoring on the oldest of those would have drawn
+    // flat for a real +3.3% game. Falls through to the else branch below
+    // (which correctly uses _dayOpenBase for an actual today-game) instead.
     const cutoffMs = Date.now() - 24 * 3600 * 1000;
     const rollingArr = (intraday[selRank] || []).slice().sort((a, b) => a.t - b.t);
     const toDay = t => (t - EPOCH) / 86400000;
     const priorPts = rollingArr.filter(pt => pt.t <= cutoffMs);
     const withinPts = rollingArr.filter(pt => pt.t > cutoffMs);
-    const anchor24h = priorPts.length ? priorPts[priorPts.length - 1].price
-                     : withinPts.length ? withinPts[0].price
-                     : 0;
+    const anchor24h = priorPts.length ? priorPts[priorPts.length - 1].price : 0;
     if (anchor24h > 0) {
       hx = [
         { day: toDay(cutoffMs), price: anchor24h },
