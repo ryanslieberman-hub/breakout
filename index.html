@@ -9622,7 +9622,19 @@ function drawMain(hoverX){
       const _lnToday = lastNight[selRank];
       const _hasGameToday = _lnToday && _lnToday.played && _lnToday.date === localDateStr();
       const anchor1d = (_hasGameToday && _dayOpenBase(selRank)) || _chartAnchor;
-      hx = anchor1d > 0
+      todayPts.sort((a, b) => a.day - b.day);
+      // Only prepend the synthetic yesterday-23:59 anchor if it actually
+      // precedes the real data. `intraday` now persists across midnight for
+      // the rolling-24h feature (see chartRange===1 above), so todayPts can
+      // already reach back into yesterday evening - prepending the anchor
+      // ahead of real ticks that are chronologically earlier planted a fake
+      // price (the %-badge's implied anchor, never an actual traded price)
+      // in the middle of the real line, drawing a dip/spike that never
+      // happened. Confirmed live 2026-09-17: Alex Bregman's chart showed a
+      // sharp fake drop to 35.54 right after his real 11:01pm close of
+      // 38.78, because the anchor (35.54) sorted in between that tick and
+      // "now" instead of before all of today's ticks like it was meant to.
+      hx = (anchor1d > 0 && (!todayPts.length || ydDay < todayPts[0].day))
         ? [{ day: ydDay, price: anchor1d }, ...todayPts]
         : todayPts;
     }
@@ -9685,6 +9697,20 @@ function drawMain(hoverX){
     }
     hx = hx.filter((h, i) => i === 0 || Math.abs(h.day - hx[i-1].day) > 0.01);
   }
+
+  // Every branch above assembles hx by concatenating anchor points with real
+  // tick arrays, but doesn't guarantee the result is chronological - e.g. the
+  // 24H fallback's yesterday-23:59 anchor can land AFTER real ticks from
+  // earlier that same evening once `intraday` started holding pre-midnight
+  // history for the rolling-24h feature (see chartRange===1 above). px()
+  // below assumes hx[0] is the earliest point and hx[last] the latest; an
+  // out-of-order point gets a wrong/negative x and the line zigzags off the
+  // frame instead of drawing a normal chart. Confirmed live 2026-09-17 on
+  // Alex Bregman's 24H chart - most of his real price climb was plotted off
+  // the left edge because the anchor point's day (yesterday 11:59pm) came
+  // before several of his actual evening ticks (as early as 7:30pm) in
+  // array order, even though those ticks are chronologically earlier.
+  hx.sort((a, b) => a.day - b.day);
 
   // ── NEED AT LEAST 2 POINTS ────────────────────────────────────────────────
   if (hx.length < 2) {
