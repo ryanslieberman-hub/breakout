@@ -8705,7 +8705,18 @@ function get24hPct(rank){
   // that's a different question than "how has the price moved in 24h".
   if (arr.length) {
     const basePrice = arr[0].price;
-    if (basePrice > 0) return Math.round((cur - basePrice) / basePrice * 1000) / 10;
+    // basePrice === cur means every point the log has is a duplicate of
+    // today's already-priced-in move, not evidence the player was flat -
+    // same "wiped mid-move" situation as an empty log (see Riley Greene
+    // above), just with leftover duplicate ticks instead of zero ticks.
+    // Confirmed live 2026-09-17: Jordan Romano's log held 3 fresh points,
+    // all logged ~70 min AFTER his 1IP/2K scoreless outing had already
+    // moved his price, so arr[0].price already equalled the live price -
+    // this read a real stat-worthy outing as a flat 0% instead of falling
+    // through to the stat-based number below.
+    if (basePrice > 0 && basePrice !== cur) {
+      return Math.round((cur - basePrice) / basePrice * 1000) / 10;
+    }
   }
   const ln = lastNight[rank];
   const todayStr = localDateStr(), ydStr = localDateStr(1);
