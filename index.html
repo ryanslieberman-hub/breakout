@@ -9600,9 +9600,14 @@ function drawMain(hoverX){
       let todayPts = todayTicks.length > 0
         ? todayTicks
         : allPts.filter(h => h.day >= yesterdayEvening);
-      if (!todayPts.length || Math.abs(todayPts[todayPts.length-1].price - liveP[selRank]) > 0.001) {
-        todayPts = [...todayPts, livePt];
-      }
+      // Always extend to "now", even when the price hasn't moved since the
+      // last tick - otherwise the chart's rightmost point (and its tooltip/
+      // x-axis time label) stays frozen at that stale tick's timestamp
+      // instead of reflecting the real current time. Confirmed live
+      // 2026-09-17: Alex Bregman's price was flat since last night's game
+      // ended at 11:01pm - the chart's "now" dot showed "11:01pm" all
+      // morning even though it was actually 10:44am.
+      todayPts = [...todayPts, livePt];
       // _dayOpenBase is today's calendar-day open - the right anchor ONLY when
       // the player has actually played TODAY. When their last game was
       // yesterday (the getTodayPct/get24hPct sparse-history fallback case),
