@@ -5152,6 +5152,32 @@ async function mlbFetchInjuries(){
   return next;
 }
 
+// One-time-per-load self-heal for the phantom-game-line bug above: an IL player
+// whose lastNight entry already claims played:true for a recent date (written
+// before this guard existed, or by a device that hasn't picked up the fix yet)
+// stays stuck that way forever otherwise, since a later tick with no stat for
+// that rank never touches an existing entry. Correcting it here (not just
+// skipping future writes) also pushes the fix to every other device/user via
+// the normal lastNight sync in syncPricesToFirestore - same per-rank dotted
+// write, so it can't clobber any other player's entry.
+let _healedPhantomInjuredLines = false;
+function _healPhantomInjuredGameLines(){
+  if (_healedPhantomInjuredLines) return;
+  const inj = window._mlbInjuryStatus;
+  if (!inj) return;
+  _healedPhantomInjuredLines = true;
+  const cutoff = localDateStr(3);
+  let healed = 0;
+  mlbPlayers.forEach(p => {
+    if (!inj[p.rank]) return;
+    const ln = lastNight[p.rank];
+    if (!ln || !ln.played || !ln.date || ln.date < cutoff) return;
+    lastNight[p.rank] = { ...ln, played: false };
+    healed++;
+  });
+  if (healed > 0) { _saveLastNight(); console.log(`[mlb] healed ${healed} phantom game line(s) for IL players`); }
+}
+
 // ── The MLB tick: fetch schedule + boxscores, stage into engine, derive. ────
 // Replaces fetchMLBLiveStats. Live games and final games both handled cleanly by
 // the official state field, so afternoon games and night games work identically.
@@ -5160,6 +5186,7 @@ async function mlbTick(isFinal=false){
     const today = localDateStr(0);                 // YYYY-MM-DD
     const yday  = localDateStr(1);                 // yesterday
     await mlbFetchInjuries();                       // refresh IL status (once/day) before pricing
+    _healPhantomInjuredGameLines();
     const sched = await mlbFetchSchedule(today);
 
     // Live-team set (for the "game in progress" display gate).
@@ -5181,6 +5208,14 @@ async function mlbTick(isFinal=false){
       mlbPlayers.forEach(p => {
         const stat = statMap[p.rank];
         if (!stat) return;
+        // A player on the IL cannot have a real box-score line today - MLB's own
+        // stats API has occasionally handed back a stray/misattributed stat row for
+        // one anyway (confirmed live 2026-09-16: Ohtani, out since 8/27 with a
+        // biceps injury, and Wetherholt both picked up a phantom "played today" line
+        // this way), which then froze permanently in lastNight/Firestore since a
+        // later tick with no stat for that rank never overwrites an existing entry.
+        // Reject it at the source instead of trusting the feed.
+        if (window._mlbInjuryStatus && window._mlbInjuryStatus[p.rank]) return;
         writeMLBStatLineOfficial(p, stat, today, !!liveStatMap[p.rank]);
       });
     }
@@ -5209,6 +5244,7 @@ async function mlbTick(isFinal=false){
         const yst = yStatMap[p.rank];
         if (!yst) return;
         if (statMap[p.rank]) return;             // already has a game today → today wins
+        if (window._mlbInjuryStatus && window._mlbInjuryStatus[p.rank]) return; // see today's branch above
         const yIsLive = !!yLiveStatMap[p.rank];
         // Write yesterday's display line + ensure a close exists for yesterday.
         writeMLBStatLineOfficial(p, yst, yday, yIsLive);
