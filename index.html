@@ -8607,13 +8607,6 @@ function getYesterdayClose(rank) {
   return 0;
 }
 
-// Shared "today's opening reference" - the SINGLE baseline used by both the % badge
-// (getTodayPct) and the chart's 1D anchor, so they can never describe different moves.
-function _dayOpenBase(rank){
-  const p = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].find(x => x.rank === rank);
-  return p ? ENGINE.baseFor(p) : null;
-}
-
 function getTodayPct(rank){
   const todayStr = localDateStr(0);
   const ln = lastNight[rank];
@@ -8698,6 +8691,20 @@ function get24hPct(rank){
   // in that case instead, same as having no log at all.
   if (priorPts.length) {
     const basePrice = priorPts[priorPts.length - 1].price;
+    if (basePrice > 0) return Math.round((cur - basePrice) / basePrice * 1000) / 10;
+  }
+  // The log doesn't reach the full 24h cutoff, but still holds SOME real
+  // ticks - use the earliest one as a partial anchor before falling through
+  // to the stat-based number below. A live game already in progress can
+  // move the real traded price (buzz/volume, not just that game's own box
+  // score) before the stat line itself changes - jumping straight to
+  // getTodayPct in that case reports a stale flat 0% while the actual price
+  // has already moved. Confirmed live 2026-09-17: Elly De La Cruz's price
+  // climbed +5.5% since last night while his live game was still scoreless
+  // (0-for-0) - getTodayPct correctly says 0% for HIS game so far, but
+  // that's a different question than "how has the price moved in 24h".
+  if (arr.length) {
+    const basePrice = arr[0].price;
     if (basePrice > 0) return Math.round((cur - basePrice) / basePrice * 1000) / 10;
   }
   const ln = lastNight[rank];
@@ -9559,10 +9566,7 @@ function drawMain(hoverX){
 
   // ── RANGE CUTOFF ─────────────────────────────────────────────────────────
   let hx = allPts;
-  const _chartPct = getTodayPct(selRank);
-  const _chartAnchor = _chartPct !== 0 ? liveP[selRank] / (1 + _chartPct / 100) : 0;
   const _nowDay = (Date.now() - EPOCH) / 86400000;
-  const _selPlayer = players.find(x => x.rank === selRank);
 
   if (chartRange === 1) {
     // True rolling 24h window, built from ENGINE's rolling price log
@@ -9577,7 +9581,7 @@ function drawMain(hoverX){
     // 2026-09-16: Riley Greene's log only had points from AFTER his
     // first-inning hit - anchoring on the oldest of those would have drawn
     // flat for a real +3.3% game. Falls through to the else branch below
-    // (which correctly uses _dayOpenBase for an actual today-game) instead.
+    // (which derives its anchor from get24hPct itself) instead.
     const cutoffMs = Date.now() - 24 * 3600 * 1000;
     const rollingArr = (intraday[selRank] || []).slice().sort((a, b) => a.t - b.t);
     const toDay = t => (t - EPOCH) / 86400000;
@@ -9594,7 +9598,19 @@ function drawMain(hoverX){
       // No rolling log yet (e.g. right after a fresh page load, before any
       // tick has run) - fall back to the old "since yesterday evening"
       // heuristic so the chart still draws something meaningful.
-      const ydDay = dateToDayNum(new Date(localDateStr(1) + 'T23:59:00'));
+      // Anchor at the true 24h-ago instant (not a fixed "yesterday 23:59")
+      // so it's mathematically guaranteed to sort before every real tick
+      // here - this branch only runs when priorPts is empty, i.e. every
+      // tick in the rolling log is already after cutoffMs by definition.
+      // A fixed 23:59 timestamp doesn't have that guarantee (real ticks
+      // from earlier in the evening sort BEFORE it), which is exactly what
+      // caused Bregman's fake dip. Confirmed live 2026-09-17: Brice
+      // Turang's 24H chart showed +2.4% (based on the earliest real tick,
+      // ~7:30pm yesterday) while the badge showed -1.5% (get24hPct's own
+      // fallback, anchored on getTodayPct/anchor1d) - two different anchors
+      // for what's supposed to be the same number. Anchoring here on
+      // anchor1d too, at a timestamp guaranteed to lead the real data,
+      // makes the chart's implied % match the badge again.
       const yesterdayEvening = dateToDayNum(new Date(localDateStr(1) + 'T17:00:00'));
       const livePt = { day: _nowDay, price: liveP[selRank] };
       let todayPts = todayTicks.length > 0
@@ -9608,34 +9624,23 @@ function drawMain(hoverX){
       // ended at 11:01pm - the chart's "now" dot showed "11:01pm" all
       // morning even though it was actually 10:44am.
       todayPts = [...todayPts, livePt];
-      // _dayOpenBase is today's calendar-day open - the right anchor ONLY when
-      // the player has actually played TODAY. When their last game was
-      // yesterday (the getTodayPct/get24hPct sparse-history fallback case),
-      // _dayOpenBase equals the current live price (nothing has moved since
-      // this morning) and would draw a flat line while the badge above it
-      // correctly shows yesterday's real move. Confirmed live 2026-09-16:
-      // Juan Soto's badge read +3.0% (his game was yesterday) but the chart
-      // was dead flat because _dayOpenBase (his unchanged today-open) won out
-      // over _chartAnchor (the anchor that actually implies +3.0%). Match
-      // getTodayPct's own "hasGameToday" branch exactly instead of always
-      // preferring _dayOpenBase.
-      const _lnToday = lastNight[selRank];
-      const _hasGameToday = _lnToday && _lnToday.played && _lnToday.date === localDateStr();
-      const anchor1d = (_hasGameToday && _dayOpenBase(selRank)) || _chartAnchor;
+      // Derive the anchor straight from get24hPct(selRank) itself - the
+      // exact number the 24H badge already shows - instead of re-deriving
+      // "did they play, when, use which base price" independently here.
+      // Two parallel implementations of the same "24h ago" question drift
+      // apart the moment either one's edge cases change (that's how the
+      // Juan Soto/_dayOpenBase mismatch happened, and again how Max Fried -
+      // last game two days ago, correctly flat per get24hPct's own recency
+      // gate - still showed a fake +2.4% here because _chartAnchor doesn't
+      // check recency at all, only whether getTodayPct is nonzero).
+      // Confirmed live 2026-09-17: Brice Turang's chart showed +2.4% against
+      // a -1.5% badge for exactly this reason. Backing the anchor out of
+      // get24hPct's own answer makes them the same number by construction.
+      const _24hPct = get24hPct(selRank);
+      const anchor1d = _24hPct !== 0 ? liveP[selRank] / (1 + _24hPct / 100) : 0;
       todayPts.sort((a, b) => a.day - b.day);
-      // Only prepend the synthetic yesterday-23:59 anchor if it actually
-      // precedes the real data. `intraday` now persists across midnight for
-      // the rolling-24h feature (see chartRange===1 above), so todayPts can
-      // already reach back into yesterday evening - prepending the anchor
-      // ahead of real ticks that are chronologically earlier planted a fake
-      // price (the %-badge's implied anchor, never an actual traded price)
-      // in the middle of the real line, drawing a dip/spike that never
-      // happened. Confirmed live 2026-09-17: Alex Bregman's chart showed a
-      // sharp fake drop to 35.54 right after his real 11:01pm close of
-      // 38.78, because the anchor (35.54) sorted in between that tick and
-      // "now" instead of before all of today's ticks like it was meant to.
-      hx = (anchor1d > 0 && (!todayPts.length || ydDay < todayPts[0].day))
-        ? [{ day: ydDay, price: anchor1d }, ...todayPts]
+      hx = anchor1d > 0
+        ? [{ day: toDay(cutoffMs), price: anchor1d }, ...todayPts]
         : todayPts;
     }
   } else if (chartRange > 1) {
@@ -9643,39 +9648,26 @@ function drawMain(hoverX){
     const todayStr = localDateStr();
     const c = closes[selRank] || {};
     const allCloseDates = Object.keys(c).filter(ds => c[ds] > 0 && ds < todayStr).sort();
-    // Only use closes from dates before today and where price differs from current liveP
-    const differingDates = allCloseDates.filter(ds => Math.abs(c[ds] - liveP[selRank]) > 0.01);
-    const closePts = differingDates
+    // Real closes within the window (excluding ones that already match the
+    // live price) - just for the line's shape between the anchor and now.
+    const closePts = allCloseDates
+      .filter(ds => Math.abs(c[ds] - liveP[selRank]) > 0.01)
       .map(ds => ({ day: dateToDayNum(new Date(ds + 'T12:00:00')), price: c[ds] }))
       .filter(h => h.day >= cutoffDay);
-    if (closePts.length) {
-      hx = [{ day: cutoffDay, price: closePts[0].price }, ...closePts.slice(1), { day: _nowDay, price: liveP[selRank] }];
-    } else if (differingDates.length) {
-      // A real prior close exists and differs from the live price, but it's
-      // OLDER than this exact N-day window (sparse history - true for anyone
-      // who hasn't played every single day). Anchor on the OLDEST one we have
-      // instead of falling through to the preseason statPrice below - matches
-      // ENGINE.pct's own fallback for this identical case (see its comment),
-      // so the chart's implied move agrees with the %-badge above it. Confirmed
-      // live 2026-09-15: Chase Burns had exactly one prior close (9/7, just
-      // outside the 7D cutoff of 9/8) - the chart jumped all the way back to
-      // his preseason statPrice and showed 7D +4.9%, while the badge correctly
-      // used that 9/7 close and showed -0.4%.
-      hx = [{ day: cutoffDay, price: c[differingDates[0]] }, { day: _nowDay, price: liveP[selRank] }];
-    } else {
-      // No close differs from today's live price (e.g. exactly one recorded close and
-      // the price hasn't moved since - true for a player with just one game played this
-      // season). That close IS the current price, so it can't anchor a real move -
-      // fall back to the pre-history fair value instead (same anchor ENGINE.pct uses
-      // for this exact case), so the line actually shows the real move instead of
-      // drawing flat while the % badge above it reports a gain.
-      const earliestClose = allCloseDates.length ? c[allCloseDates[0]] : 0;
-      const statAnchor = _selPlayer?.statPrice > 0 ? _selPlayer.statPrice : 0;
-      const anchorPrice = statAnchor > 0 ? statAnchor : (earliestClose > 0 ? earliestClose : _chartAnchor);
-      hx = anchorPrice > 0
-        ? [{ day: cutoffDay, price: anchorPrice }, { day: _nowDay, price: liveP[selRank] }]
-        : [{ day: _nowDay, price: liveP[selRank] }];
-    }
+    // The anchor PRICE comes straight from ENGINE.pct(rank, chartRange) - the
+    // exact number the range button badge already shows - instead of
+    // re-deriving "which close counts as N days ago" independently here.
+    // Two parallel implementations of that question drift apart the moment
+    // either one's edge cases change: ENGINE.pct anchors on the most recent
+    // close ON/BEFORE the cutoff (see its own comment for why - it already
+    // fixed this same "picked the earliest close AFTER the cutoff instead"
+    // bug once), but this branch was still doing exactly that old, buggy
+    // thing, just never updated to match. Confirmed live 2026-09-17: Brice
+    // Turang's 7D chart didn't match his 7D badge for this reason - and so
+    // did roughly a third of all players when checked in bulk.
+    const rangePct = ENGINE.pct(selRank, chartRange);
+    const anchorPrice = liveP[selRank] / (1 + rangePct / 100);
+    hx = [{ day: cutoffDay, price: anchorPrice }, ...closePts, { day: _nowDay, price: liveP[selRank] }];
     hx = hx.filter((h, i) => i === 0 || Math.abs(h.day - hx[i-1].day) > 0.01);
   } else if (chartRange === 0) {
     const seasonStart = dateToDayNum(new Date('2026-03-26T12:00:00'));
@@ -9685,16 +9677,13 @@ function drawMain(hoverX){
     const closePts = allCloseDates
       .filter(ds => Math.abs(c[ds] - liveP[selRank]) > 0.01)
       .map(ds => ({ day: dateToDayNum(new Date(ds + 'T12:00:00')), price: c[ds] }));
-    if (closePts.length) {
-      hx = [{ day: seasonStart, price: closePts[0].price }, ...closePts.slice(1), { day: _nowDay, price: liveP[selRank] }];
-    } else {
-      const earliestClose = allCloseDates.length ? c[allCloseDates[0]] : 0;
-      const statAnchor = _selPlayer?.statPrice > 0 ? _selPlayer.statPrice : 0;
-      const anchorPrice = statAnchor > 0 ? statAnchor : (earliestClose > 0 ? earliestClose : _chartAnchor);
-      hx = anchorPrice > 0
-        ? [{ day: seasonStart, price: anchorPrice }, { day: _nowDay, price: liveP[selRank] }]
-        : [{ day: _nowDay, price: liveP[selRank] }];
-    }
+    // Same reasoning as chartRange>1 above: derive the anchor price from
+    // ENGINE.pct(rank, 0) itself (which already handles the outlier guard
+    // and the "earliest close equals current price" statPrice fallback)
+    // rather than re-implementing those same edge cases a second time here.
+    const rangePct = ENGINE.pct(selRank, 0);
+    const anchorPrice = liveP[selRank] / (1 + rangePct / 100);
+    hx = [{ day: seasonStart, price: anchorPrice }, ...closePts, { day: _nowDay, price: liveP[selRank] }];
     hx = hx.filter((h, i) => i === 0 || Math.abs(h.day - hx[i-1].day) > 0.01);
   }
 
