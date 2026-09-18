@@ -5091,9 +5091,17 @@ function _saveInjurySetbackApplied(obj){
   try { localStorage.setItem('ax_mlb_injury_applied', JSON.stringify(obj)); } catch(e){}
 }
 
-// One-time price hit the day a player NEWLY lands on the IL - real news, real
-// reaction. Idempotent per injury stint (keyed by rank + onset date), so re-running
-// the same day's tick, or reloading the page, can never apply it twice.
+// Price only moves on actual injury NEWS - the initial announcement, and a
+// genuine setback (the recovery turning out worse than first thought) - each
+// a one-time hit, never a continuous day-by-day bleed just for remaining on
+// the IL. A player who's been out 3 days and one who's been out 40 with no
+// new news are the same story to the market; the OLD ongoing-decay version
+// of this function (removed) kept eroding price every single day regardless
+// of any real update, which isn't how a market actually reacts to injuries -
+// see mlbInjuryPerf below, which now returns flat (0) for as long as the
+// status is unchanged. Idempotent per event (keyed by rank + event date), so
+// re-running the same day's tick, or reloading the page, can never apply the
+// same hit twice.
 const MLB_INJURY_SETBACK = { S:-0.045, A:-0.048, B:-0.052, C:-0.056, D:-0.06 };
 function applyInjurySetback(rank, since){
   const p = mlbPlayers.find(x => x.rank === rank);
@@ -5111,16 +5119,13 @@ function applyInjurySetback(rank, since){
   _saveInjurySetbackApplied(applied);
 }
 
-// Ongoing drift while sidelined - the market gradually discounts an absent player
-// instead of freezing him flat forever. Ramps for ~53 days then caps at -8%; a
-// season-ending injury shouldn't erode a price to nothing, the market just moves on.
-const MLB_INJURY_DECAY_DAILY = 0.0015;
-const MLB_INJURY_DECAY_MAX   = 0.08;
+// While actually hurt, hold flat - the one-time announcement/setback hits
+// above are the only price impact an injury has. No ongoing per-day decay:
+// see the comment on MLB_INJURY_SETBACK for why that was removed.
 function mlbInjuryPerf(p){
   const inj = window._mlbInjuryStatus && window._mlbInjuryStatus[p.rank];
   if (!inj) return null;                       // not hurt → caller uses its normal path
-  const days = Math.max(0, Math.round((new Date(localDateStr(0)) - new Date(inj.since)) / 86400000));
-  return -Math.min(MLB_INJURY_DECAY_MAX, days * MLB_INJURY_DECAY_DAILY);
+  return 0;
 }
 
 // Refresh the IL map (30 roster calls - expensive, so once per calendar day only).
@@ -5136,6 +5141,14 @@ async function mlbFetchInjuries(){
   // instead of freshly injured.
   const isColdStart = Object.keys(prev).filter(k => k !== '_fetchedDate').length === 0;
   const backdated = localDateStr(20);
+
+  // Severity ranking used ONLY to detect a genuine setback (the injury
+  // turning out worse than first thought, e.g. a 10-day IL stint escalating
+  // to 60-day) vs a lateral/administrative code change that isn't real news
+  // and shouldn't move the price. D7 = concussion protocol, D10/D15 = short-
+  // term IL (treated as equivalent - MLB rarely uses D15 today), D60 = long-
+  // term/season-threatening.
+  const MLB_IL_SEVERITY = { D7:1, D10:2, D15:2, D60:3 };
 
   const lookup = _mlbNameLookup();
   const next = { _fetchedDate: today };
@@ -5156,7 +5169,14 @@ async function mlbFetchInjuries(){
         note: entry.note || entry.status?.description || '',
         since: wasInjured ? priorEntry.since : (isColdStart ? backdated : today),
       };
-      if (!wasInjured && !isColdStart) applyInjurySetback(p.rank, today);
+      if (!wasInjured && !isColdStart) {
+        applyInjurySetback(p.rank, today);
+      } else if (wasInjured && !isColdStart && (MLB_IL_SEVERITY[code] || 0) > (MLB_IL_SEVERITY[priorEntry.code] || 0)) {
+        // Real setback, not just still-hurt - the SAME hit as a fresh
+        // announcement (a worse-than-expected update is the same kind of
+        // shock to the market), keyed by today's date so it applies once.
+        applyInjurySetback(p.rank, today);
+      }
     });
   });
 
