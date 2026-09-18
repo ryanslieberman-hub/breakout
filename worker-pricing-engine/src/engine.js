@@ -193,12 +193,29 @@ export function golfPerf(p, s, fieldAvg) {
   return Math.max(-0.15, Math.min(0.22, move));
 }
 
-// stat: { fpts } - this game's synthesized fantasy points (see nfl.js).
+// stat: { fpts, gameFrac } - this game's synthesized fantasy points and how
+// much of the 60-minute game clock has elapsed (see nfl.js). Pace-adjusted
+// like MLB's per-9-innings rate stats: comparing a raw cumulative fpts total
+// straight to a full-game baseline (the old behavior here) reads every
+// player as badly underperforming for as long as the game is in progress,
+// purely because less time has passed - 5 fpts by halftime isn't a bad pace,
+// it's half of a perfectly good one. Mirrors index.html's embedded nflPerf -
+// keep both in sync, this worker computes prices independently of the
+// client and both need to agree with what players see.
 export function nflPerf(p, stat) {
   if (!stat) return 0;
   const base = p.fpts || 8;
   const got = stat.fpts != null ? stat.fpts : base;
-  const rel = (got - base) / Math.max(base, 4);
+  const frac = Math.min(1, Math.max(0.15, stat.gameFrac != null ? stat.gameFrac : 1));
+  const pace = got / frac;
+  let rel = (pace - base) / Math.max(base, 4);
+  // A pace built from a handful of plays is mostly noise, not a reliable
+  // signal, in EITHER direction - damp both by the square of elapsed game
+  // time so a small early sample moves the price only a little, ramping to
+  // full weight as the game actually plays out. See index.html's nflPerf for
+  // the live-confirmed cases (Hutchinson downside, Josh Allen upside) this
+  // was tuned against.
+  rel *= frac * frac;
   return bound(p, rel);
 }
 

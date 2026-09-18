@@ -1,7 +1,24 @@
 const BASE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl';
 
 export function normalizeName(n) {
-  return (n || '').toLowerCase().trim().replace(/[.'-]/g, '').replace(/\s+/g, ' ');
+  return (n || '').toLowerCase().trim()
+    .replace(/\b(jr|sr|ii|iii|iv)\b/g, '')          // strip suffixes
+    .replace(/[.'-]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+// Fraction (0-1) of the 60-minute NFL game clock elapsed, from an ESPN
+// scoreboard event's status. Mirrors the client's _nflGameFrac (index.html) -
+// keep both in sync, this worker computes nflPerf independently of the
+// client and needs the same pace-confidence signal.
+export function gameFrac(status) {
+  if (!status) return 1;
+  if (status.type?.completed || status.type?.state === 'post') return 1;
+  const period = status.period || 1;
+  if (period >= 5) return 1; // OT - game is effectively over
+  const clock = (status.displayClock || '15:00').split(':').map(Number);
+  const secsLeftInPeriod = (clock[0] || 0) * 60 + (clock[1] || 0);
+  const secsElapsed = (period - 1) * 900 + Math.max(0, 900 - secsLeftInPeriod);
+  return Math.min(1, Math.max(0, secsElapsed / 3600));
 }
 
 export async function fetchScoreboard(dateYYYYMMDD) {

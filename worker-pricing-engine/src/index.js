@@ -426,17 +426,20 @@ async function tickNfl(env, today) {
   if (!relevant.length) return { league: 'nfl', games: 0, processed: 0, finalized: 0 };
 
   const fptsByRank = {};
+  const gameFracByRank = {}; // same value for every player in a given event - one game per player per tick
   const byName = {};
   const byRank = {};
   for (const p of nflRaw) { byName[nfl.normalizeName(p.name)] = p; byRank[p.rank] = p; }
 
   for (const ev of relevant) {
+    const frac = nfl.gameFrac(ev.status);
     const summary = await nfl.fetchSummary(ev.id);
     const points = nfl.extractNflFantasyPoints(summary);
     for (const [name, pts] of Object.entries(points)) {
       const player = byName[name];
       if (!player) continue;
       fptsByRank[player.rank] = (fptsByRank[player.rank] || 0) + pts;
+      gameFracByRank[player.rank] = frac;
     }
   }
 
@@ -453,9 +456,10 @@ async function tickNfl(env, today) {
   let finalized = 0;
   for (const player of toProcess) {
     const fpts = fptsByRank[player.rank];
+    const gameFrac = gameFracByRank[player.rank];
     const st = states[player.rank];
     const p = { rank: player.rank, tier: st.tier, fpts: st.fpts, statPrice: st.statPrice };
-    const perf = nflPerf(p, { fpts });
+    const perf = nflPerf(p, { fpts, gameFrac });
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
     const fields = { base: newBaseRecord, tier: st.tier, statPrice: st.statPrice, fpts: st.fpts };
     if (isFinal) {
