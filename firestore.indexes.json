@@ -1,0 +1,41 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "config",
+      "fieldPath": "closes",
+      "ttl": false,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "config",
+      "fieldPath": "liveP",
+      "ttl": false,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "config",
+      "fieldPath": "intraday",
+      "ttl": false,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "config",
+      "fieldPath": "todayHx",
+      "ttl": false,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "config",
+      "fieldPath": "dates",
+      "ttl": false,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "config",
+      "fieldPath": "data",
+      "ttl": false,
+      "indexes": []
+    }
+  ]
+}
