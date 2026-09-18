@@ -8717,6 +8717,29 @@ function getTodayPct(rank){
 function get24hPct(rank){
   const cur = liveP[rank];
   if (!(cur > 0)) return 0;
+  // If the current price IS a locked close (no live game moving it right
+  // now) and that close is the most recent one on record, the close-to-close
+  // diff getTodayPct computes is authoritative - prefer it outright, before
+  // ever consulting the rolling log. The log can go stale the moment nothing
+  // ticks again after a game finalizes: its last surviving point can predate
+  // the FINAL settled price (e.g. a mid-game live tick superseded by
+  // finalize(), never followed by a fresh log entry at the real close), and
+  // that stale point can still fall OUTSIDE the 24h cutoff (i.e. genuinely
+  // "prior" by timestamp) while being nothing like a real 24h-ago price -
+  // the priorPts branch below has no way to tell a real snapshot from a
+  // stuck one. Confirmed live 2026-09-19: Baker Mayfield's log was frozen at
+  // $178.93 (a mid-game tick from his 9/13 game, 38+ hours stale) while his
+  // real, closed price had settled at $175.35 with zero actual movement
+  // since - his 24H badge read -2% off a game that ended almost two days
+  // earlier, instead of the correct flat 0%. A LIVE game is unaffected (see
+  // the arr.length branch below) - lastNight[rank].live guards against this
+  // shortcut firing mid-game.
+  const _cHist = closes[rank] || {};
+  const _latestCloseDate = Object.keys(_cHist).filter(d => _cHist[d] > 0).sort().pop();
+  const _ln = lastNight[rank];
+  if (_latestCloseDate && !(_ln && _ln.live) && Math.abs(_cHist[_latestCloseDate] - cur) < 0.005) {
+    return getTodayPct(rank);
+  }
   const cutoff = Date.now() - 24 * 3600 * 1000;
   const arr = (intraday[rank] || []).slice().sort((a, b) => a.t - b.t);
   const priorPts = arr.filter(pt => pt.t <= cutoff);
