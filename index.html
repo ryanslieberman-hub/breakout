@@ -8727,16 +8727,35 @@ function get24hPct(rank){
   // that's a different question than "how has the price moved in 24h".
   if (arr.length) {
     const basePrice = arr[0].price;
-    // basePrice === cur means every point the log has is a duplicate of
-    // today's already-priced-in move, not evidence the player was flat -
-    // same "wiped mid-move" situation as an empty log (see Riley Greene
-    // above), just with leftover duplicate ticks instead of zero ticks.
-    // Confirmed live 2026-09-17: Jordan Romano's log held 3 fresh points,
-    // all logged ~70 min AFTER his 1IP/2K scoreless outing had already
-    // moved his price, so arr[0].price already equalled the live price -
-    // this read a real stat-worthy outing as a flat 0% instead of falling
-    // through to the stat-based number below.
-    if (basePrice > 0 && basePrice !== cur) {
+    const ln0 = lastNight[rank];
+    // A SETTLED game (played, no longer live) has an authoritative answer
+    // below - getTodayPct's close-to-close diff off the real persisted
+    // `closes` record - that doesn't depend on how much of the rolling log
+    // survived retention/pruning. A partial array that doesn't reach the
+    // true 24h cutoff is NOT reliable evidence for a settled game: it may
+    // simply have started logging again after the game already finished and
+    // the price already settled at its new, flat plateau, in which case
+    // arr[0] silently reads as the "after" price too and the real move gets
+    // missed by pure floating-point luck. Confirmed live 2026-09-18: Xander
+    // Bogaerts's log held 45 points, none older than ~14h, all sitting at
+    // his post-game settled price (a real +8.1% night, 3-for-5 with a HR) -
+    // arr[0] differed from the live price by only 0.06% floating-point
+    // noise, reading a real overnight move as flat instead of falling
+    // through. A LIVE game is different (see Elly De La Cruz below) - the
+    // game itself hasn't finished moving yet, so the partial array is the
+    // only place a mid-game price move (buzz/volume) can show up at all;
+    // getTodayPct's stat-line diff isn't a substitute for that case.
+    const gameSettled = ln0 && ln0.played && !ln0.live;
+    // basePrice === cur (exactly) means every point the log has is a
+    // duplicate of today's already-priced-in move, not evidence the player
+    // was flat - same "wiped mid-move" situation as an empty log (see Riley
+    // Greene above), just with leftover duplicate ticks instead of zero
+    // ticks. Confirmed live 2026-09-17: Jordan Romano's log held 3 fresh
+    // points, all logged ~70 min AFTER his 1IP/2K scoreless outing had
+    // already moved his price, so arr[0].price already equalled the live
+    // price - this read a real stat-worthy outing as a flat 0% instead of
+    // falling through to the stat-based number below.
+    if (!gameSettled && basePrice > 0 && basePrice !== cur) {
       return Math.round((cur - basePrice) / basePrice * 1000) / 10;
     }
   }
