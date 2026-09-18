@@ -108,34 +108,74 @@ async function getPricesDoc(token) {
   return fromFsFields((await res.json()).fields);
 }
 
-// Surgical merge: PATCH only `closes.<rank>` and `liveP.<rank>` leaves, so
-// sibling ranks and the other leagues' history are untouched (same effect the
-// client's setDoc(..., {merge:true}) has). Numeric segments must be
-// backtick-quoted in a Firestore field path.
+// Build the intraday points this backfill's own closes SHOULD have produced
+// had a real browser been open to log them live. Without this, closes/liveP
+// end up correct while intraday still holds whatever stale tick a browser
+// happened to log mid-game (or nothing at all) - get24hPct now sidesteps a
+// stale log once a close is locked (see index.html), so this isn't user-
+// visible anymore, but leaving the raw data inconsistent is still worth
+// closing. Confirmed live: Baker Mayfield's intraday sat frozen at a
+// mid-game tick ($178.93) for 38+ hours after his real close ($175.35) had
+// already been backfilled - closes/liveP were right, intraday just never
+// heard about it.
+//
+// Appends to whatever's already there (never replaces) - a rank whose
+// intraday already has real, more-recent ticks (e.g. the player has since
+// played a live-watched game) keeps them untouched; this only fills the
+// specific dates THIS run backfilled, each timestamped at that date's own
+// 11pm local (a reasonable "game just ended" anchor, no real intraday
+// granularity to recover this long after the fact).
+function buildIntradayFields(closesByRank, existingIntraday) {
+  const out = {};
+  for (const [rank, dateMap] of Object.entries(closesByRank)) {
+    const existing = (existingIntraday && existingIntraday[rank]) || [];
+    const added = Object.entries(dateMap).map(([dateStr, price]) => ({
+      t: new Date(`${dateStr}T23:00:00`).getTime(),
+      price,
+    }));
+    const merged = [...existing, ...added]
+      .filter((pt) => pt && pt.t > 0 && pt.price > 0)
+      .sort((a, b) => a.t - b.t);
+    // De-dupe same-timestamp points (re-running this script for an
+    // already-backfilled date would otherwise stack duplicates).
+    const deduped = merged.filter((pt, i) => i === 0 || pt.t !== merged[i - 1].t);
+    out[rank] = deduped;
+  }
+  return out;
+}
+
+// Surgical merge: PATCH only `closes.<rank>`, `liveP.<rank>`, and
+// `intraday.<rank>` leaves, so sibling ranks and the other leagues' history
+// are untouched (same effect the client's setDoc(..., {merge:true}) has).
+// Numeric segments must be backtick-quoted in a Firestore field path.
 //
 // Chunked into groups of ranks rather than one PATCH for everything - a full
 // Sunday slate is 180+ ranks, and one request listing every rank's fieldPath
-// in the URL (2 per rank) runs long enough that Google's front-end rejects it
-// outright as a malformed request (a generic 400 page, not a Firestore JSON
-// error) before it ever reaches Firestore. A single game day (the only case
-// this script had run for before) never had enough ranks to hit that.
+// in the URL (3 per rank now) runs long enough that Google's front-end
+// rejects it outright as a malformed request (a generic 400 page, not a
+// Firestore JSON error) before it ever reaches Firestore. A single game day
+// (the only case this script had run for before) never had enough ranks to
+// hit that.
 const PATCH_CHUNK_SIZE = 25;
-async function patchCloses(token, closesByRank, livePByRank) {
+async function patchCloses(token, closesByRank, livePByRank, intradayByRank) {
   const ranks = Object.keys(closesByRank);
   for (let i = 0; i < ranks.length; i += PATCH_CHUNK_SIZE) {
     const chunk = ranks.slice(i, i + PATCH_CHUNK_SIZE);
     const fieldPaths = [];
     const closesFields = {};
     const livePFields = {};
+    const intradayFields = {};
     for (const r of chunk) {
       closesFields[r] = toFsValue(closesByRank[r]);
       livePFields[r] = toFsValue(livePByRank[r]);
-      fieldPaths.push('closes.`' + r + '`', 'liveP.`' + r + '`');
+      intradayFields[r] = { arrayValue: { values: (intradayByRank[r] || []).map(toFsValue) } };
+      fieldPaths.push('closes.`' + r + '`', 'liveP.`' + r + '`', 'intraday.`' + r + '`');
     }
     const body = {
       fields: {
         closes: { mapValue: { fields: closesFields } },
         liveP: { mapValue: { fields: livePFields } },
+        intraday: { mapValue: { fields: intradayFields } },
       },
     };
     const qs = fieldPaths
@@ -293,7 +333,9 @@ const beforeNflCloses = Object.keys(before.closes || {}).filter(
 ).length;
 console.log(`\nconfig/prices currently has ${beforeNflCloses} NFL ranks with non-empty closes.`);
 
-await patchCloses(token, closesByRank, livePByRank);
+const intradayByRank = buildIntradayFields(closesByRank, before.intraday);
+
+await patchCloses(token, closesByRank, livePByRank, intradayByRank);
 
 const after = await getPricesDoc(token);
 const afterNflCloses = Object.keys(after.closes || {}).filter(
