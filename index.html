@@ -4633,7 +4633,19 @@ const ENGINE = (() => {
     // extrapolate into an absurd pace via division by a near-zero elapsed time.
     const frac = Math.min(1, Math.max(0.15, stat.gameFrac != null ? stat.gameFrac : 1));
     const pace = got / frac;
-    const rel = (pace - base) / Math.max(base, 4);   // relative over/under-performance, on pace
+    let rel = (pace - base) / Math.max(base, 4);   // relative over/under-performance, on pace
+    // Early in the game, "0 fpts so far" isn't evidence of underperforming - it's
+    // just that nobody's numbers are in yet. Without this, a defender with zero
+    // tackles two minutes in reads as -100% relative-to-pace (rel = -base/base),
+    // the exact same as a defender who played a FULL game and never touched the
+    // ball. Damp the downside quadratically by elapsed game time so it's nearly
+    // flat at kickoff and reaches full weight only once the game's mostly over -
+    // upside is left alone since a real early big play (a pick-six, a long TD)
+    // is an actual event worth showing right away, not a false pace signal.
+    // Confirmed live 2026-09-17: Aidan Hutchinson read -2.7% a few minutes into
+    // the Lions/Bills game off a single tackle, before he'd had any real chance
+    // to be judged against his full-game baseline.
+    if (rel < 0) rel *= frac * frac;
     return bound(p, rel);
   }
 
@@ -7275,7 +7287,16 @@ setTimeout(() => window._mlbStatUpdate(), 4000);
     }
   } catch(e){}
 })();
-function _normName(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z ]/g,'').trim(); }
+// NOTE: _normName is defined once, near the top of the MLB section (strips
+// accents/punctuation AND Jr/Sr/II/III/IV suffixes) - do not redeclare it
+// here. A second `function _normName(){}` at this scope would silently
+// overwrite that one for every caller (MLB, NFL, golf alike), since both are
+// plain top-level declarations in the same script. A duplicate that DIDN'T
+// strip suffixes lived here for a while and broke NFL matching for any
+// player whose ESPN displayName carries a suffix the roster name doesn't -
+// confirmed live 2026-09-17: ESPN listed James Cook as "James Cook III",
+// which no longer matched the roster's "James Cook" once suffix-stripping
+// was gone, so his real rushing line silently never made it into lineByRank.
 
 let _golfFetchRunning = false;
 async function fetchGolfLiveStats(isFinal=false) {
