@@ -4634,18 +4634,19 @@ const ENGINE = (() => {
     const frac = Math.min(1, Math.max(0.15, stat.gameFrac != null ? stat.gameFrac : 1));
     const pace = got / frac;
     let rel = (pace - base) / Math.max(base, 4);   // relative over/under-performance, on pace
-    // Early in the game, "0 fpts so far" isn't evidence of underperforming - it's
-    // just that nobody's numbers are in yet. Without this, a defender with zero
-    // tackles two minutes in reads as -100% relative-to-pace (rel = -base/base),
-    // the exact same as a defender who played a FULL game and never touched the
-    // ball. Damp the downside quadratically by elapsed game time so it's nearly
-    // flat at kickoff and reaches full weight only once the game's mostly over -
-    // upside is left alone since a real early big play (a pick-six, a long TD)
-    // is an actual event worth showing right away, not a false pace signal.
-    // Confirmed live 2026-09-17: Aidan Hutchinson read -2.7% a few minutes into
-    // the Lions/Bills game off a single tackle, before he'd had any real chance
-    // to be judged against his full-game baseline.
-    if (rel < 0) rel *= frac * frac;
+    // A "pace" built from a handful of plays is mostly noise, not a reliable
+    // signal, in EITHER direction - a defender with 0 tackles 2 minutes in
+    // hasn't "failed" (rel would read -100% vs pace, same as a genuinely bad
+    // full game), and one early rushing TD extrapolated at full confidence
+    // over 60 minutes overstates a QB's whole game just as badly the other
+    // way. Damp BOTH directions quadratically by elapsed game time so a
+    // small early sample moves the price only a little, then ramps up to
+    // full weight as the game actually plays out and the sample gets real.
+    // Confirmed live 2026-09-17: Aidan Hutchinson read -2.7% off a single
+    // early tackle, and separately Josh Allen's 24H read +15.8% off a pass
+    // TD + rush TD just 17% into his game - both real events, just given
+    // far more confidence than a few plays' worth of data deserves.
+    rel *= frac * frac;
     return bound(p, rel);
   }
 
