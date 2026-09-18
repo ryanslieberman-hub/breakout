@@ -12212,14 +12212,39 @@ async function _backgroundSync() {
         if (!snap.exists()) return;
         const d = snap.data();
         if (!d.closes) return;
-        const cleaned = {};
+        // Surgical per-leaf deletes (`closes.<rank>.<date>`) via updateDoc, NOT a
+        // wholesale `setDoc({closes: cleaned}, {merge:true})` of the whole map -
+        // that replaces the ENTIRE shared `closes` field with whatever this one
+        // device read a moment ago, silently discarding any write another device
+        // or worker-pricing-engine made to a DIFFERENT rank in between the read
+        // above and this write - the exact bug already fixed once in
+        // syncPricesToFirestore (see its own comment) and the reason a stray
+        // per-browser one-time flag like this one is dangerous to begin with: it
+        // WILL refire on every device that hasn't set it yet. Each field path
+        // here only touches the one stale date leaf it names.
+        const staleFieldPaths = {};
+        let staleCount = 0;
         Object.entries(d.closes).forEach(([rank, c]) => {
           if (!c || typeof c !== 'object') return;
-          const fresh = {};
-          Object.entries(c).forEach(([ds, price]) => { if (ds >= cutoff && price > 0) fresh[ds] = price; });
-          if (Object.keys(fresh).length) cleaned[rank] = fresh;
+          Object.entries(c).forEach(([ds, price]) => {
+            if (ds < cutoff || !(price > 0)) {
+              staleFieldPaths[`closes.${rank}.${ds}`] = window._fbDeleteField();
+              staleCount++;
+            }
+          });
         });
-        window._fbSetDoc(window._fbDoc(dbInst, 'config', 'prices'), { closes: cleaned }, { merge: true }).catch(()=>{});
+        if (!staleCount) return;
+        // Chunk - a full season's worth of stale leaves across the whole roster
+        // can be thousands of field paths in one request.
+        const entries = Object.entries(staleFieldPaths);
+        const CHUNK = 400;
+        const ref = window._fbDoc(dbInst, 'config', 'prices');
+        (async () => {
+          for (let i = 0; i < entries.length; i += CHUNK) {
+            const batch = Object.fromEntries(entries.slice(i, i + CHUNK));
+            try { await window._fbUpdateDoc(ref, batch); } catch (e) { break; }
+          }
+        })();
       }).catch(()=>{});
     }
 
@@ -16231,7 +16256,7 @@ window.addEventListener('appinstalled', () => {
            GoogleAuthProvider, signInWithPopup, signInWithRedirect,
            signOut, getRedirectResult,
            setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-  import { getFirestore, initializeFirestore, serverTimestamp, doc, getDoc, getDocFromServer, setDoc, updateDoc, collection, getDocs, getDocsFromServer, limit, query, orderBy, where, onSnapshot, addDoc, deleteDoc, increment }  from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+  import { getFirestore, initializeFirestore, serverTimestamp, doc, getDoc, getDocFromServer, setDoc, updateDoc, collection, getDocs, getDocsFromServer, limit, query, orderBy, where, onSnapshot, addDoc, deleteDoc, deleteField, increment }  from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
   import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-messaging.js";
 
   const firebaseConfig = {
@@ -16274,6 +16299,7 @@ window.addEventListener('appinstalled', () => {
   window._fbGetDocFromServer = getDocFromServer;
   window._fbSetDoc     = setDoc;
   window._fbUpdateDoc  = updateDoc;
+  window._fbDeleteField = deleteField;
   window._fbCollection = collection;
   window._fbGetDocs    = getDocs;
   window._fbGetDocsFromServer = getDocsFromServer;
