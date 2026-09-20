@@ -4013,6 +4013,25 @@ const TEAM_ESPN_ID = {
 // showed anything, while a coincidental name match on a live NFL game night
 // (e.g. Kenneth Walker III, playing and producing real stats) could still
 // read OUT. Each league below now matches ONLY against its own roster.
+
+// Last "real" surname token for the loose fallback match below - strips
+// generic suffixes (Jr/Sr/II/III/IV/V) first instead of using them AS the
+// match token. A suffix alone is far too generic to `name.includes(...)`
+// against: "iii" matches ANY injured player whose name ends in III, not just
+// the one roster player it was meant for. Confirmed live 2026-09-20: 5
+// unrelated real "Out" players (Bobby Brown III, Trey Pipkins III, Leonard
+// Taylor III, Carlton Davis III, John Ridgeway III) all satisfied
+// `name.includes('iii')` and incorrectly tagged Kenneth Walker III (who was
+// genuinely Active, playing that night) as OUT - the exact failure the
+// comment above already named as a risk, just from a different cause than
+// the cross-league bug it was actually fixed for.
+function _injurySurnameToken(fullName){
+  const suffixes = new Set(['jr','sr','ii','iii','iv','v']);
+  const parts = fullName.toLowerCase().replace(/\./g,'').split(' ').filter(Boolean);
+  while (parts.length > 1 && suffixes.has(parts[parts.length-1])) parts.pop();
+  return parts[parts.length-1] || '';
+}
+
 async function _fetchLeagueInjuries(espnUrl, idMap, leaguePlayers) {
   const data = await espnFetch(espnUrl);
   let count = 0;
@@ -4061,10 +4080,27 @@ async function _fetchLeagueInjuries(espnUrl, idMap, leaguePlayers) {
       // which is ordered by team/position, not alphabetically (confirmed live:
       // "a.j. brown" matched "Chase Brown" instead of "A.J. Brown" this way,
       // because Chase Brown's rank happens to come first in NFL_RAW). Only
-      // fall back to the loose substring match when no exact name exists.
+      // fall back to the loose match when no exact name exists - and even
+      // then, require the surname as a WHOLE WORD (not a raw substring - a
+      // plain .includes() matched "all" inside "Allar", and generic surnames
+      // like "thomas"/"harrison" collided with a different real player who
+      // happens to share just that surname) PLUS a matching first initial,
+      // which is enough to tell apart two different real people who share a
+      // surname (e.g. "Ronnie Harrison Jr." vs "Marvin Harrison Jr.").
+      // Confirmed live 2026-09-20: Drew Allar ("out") false-matched Erick All
+      // Jr. via raw substring, and Daniel/Nate/Jakobe Thomas + Ronnie
+      // Harrison Jr. (all genuinely "out", unrelated players) false-matched
+      // Brian Thomas Jr. and Marvin Harrison Jr. (both genuinely Active) via
+      // the surname-only check before the first-initial requirement existed.
       if (name) {
+        const nameTokens = name.replace(/\./g,'').split(' ').filter(Boolean);
+        const firstInitial = nameTokens[0]?.[0] || '';
         const p = leaguePlayers.find(p2 => p2.name.toLowerCase() === name)
-               || leaguePlayers.find(p2 => name.includes(p2.name.toLowerCase().split(' ').pop()));
+               || leaguePlayers.find(p2 => {
+                    const tok = _injurySurnameToken(p2.name);
+                    if (!tok || !nameTokens.includes(tok)) return false;
+                    return p2.name.toLowerCase()[0] === firstInitial;
+                  });
         if (p) { addToSet(p.rank); }
       }
     });
