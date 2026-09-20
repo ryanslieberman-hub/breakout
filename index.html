@@ -9664,79 +9664,48 @@ function drawMain(hoverX){
   const _nowDay = (Date.now() - EPOCH) / 86400000;
 
   if (chartRange === 1) {
-    // True rolling 24h window, built from ENGINE's rolling price log
-    // (`intraday`, see _logPricePoint) instead of "since local midnight" - a
-    // game that ended at 11pm and another that starts at 6pm the next day
-    // both land in the same window here. Matches get24hPct exactly - ONLY
-    // trusts a log entry actually at/before the 24h cutoff as the anchor. A
-    // log that doesn't reach back that far (freshly wiped, or a player just
-    // started being tracked tonight) has no evidence of the price 24h ago;
-    // its own oldest point can already reflect today's move, so treating it
-    // as "before" would draw a flat line for a real move. Confirmed live
-    // 2026-09-16: Riley Greene's log only had points from AFTER his
-    // first-inning hit - anchoring on the oldest of those would have drawn
-    // flat for a real +3.3% game. Falls through to the else branch below
-    // (which derives its anchor from get24hPct itself) instead.
+    // Single source of truth: the anchor ALWAYS comes straight from
+    // get24hPct(selRank) - the exact number the 24H badge already shows -
+    // never independently re-derived here. This chart branch used to have
+    // its OWN copy of "which log point counts as 24h ago", and every time
+    // get24hPct's own version of that question got a fix for some edge case
+    // (a stale/wiped log, a settled game whose log predates its final
+    // close, etc.), this copy didn't - so the two silently drifted apart
+    // again. Confirmed live 2026-09-16 through 2026-09-20 across several
+    // separate incidents (Riley Greene, Brice Turang, Baker Mayfield, Isaac
+    // Paredes): the badge would get fixed and the chart would keep showing
+    // a different, stale-log-derived percentage, because this branch never
+    // inherited get24hPct's fixes. Deriving the anchor from get24hPct's
+    // OWN answer, unconditionally, makes them the same number by
+    // construction and closes that whole category of drift for good.
     const cutoffMs = Date.now() - 24 * 3600 * 1000;
     const rollingArr = (intraday[selRank] || []).slice().sort((a, b) => a.t - b.t);
     const toDay = t => (t - EPOCH) / 86400000;
-    const priorPts = rollingArr.filter(pt => pt.t <= cutoffMs);
     const withinPts = rollingArr.filter(pt => pt.t > cutoffMs);
-    const anchor24h = priorPts.length ? priorPts[priorPts.length - 1].price : 0;
-    if (anchor24h > 0) {
+    const livePt = { day: _nowDay, price: liveP[selRank] };
+    const _24hPct = get24hPct(selRank);
+    const anchor1d = liveP[selRank] / (1 + _24hPct / 100);
+    if (anchor1d > 0) {
       hx = [
-        { day: toDay(cutoffMs), price: anchor24h },
+        { day: toDay(cutoffMs), price: anchor1d },
         ...withinPts.map(pt => ({ day: toDay(pt.t), price: pt.price })),
-        { day: _nowDay, price: liveP[selRank] },
+        livePt,
       ];
     } else {
-      // No rolling log yet (e.g. right after a fresh page load, before any
-      // tick has run) - fall back to the old "since yesterday evening"
-      // heuristic so the chart still draws something meaningful.
-      // Anchor at the true 24h-ago instant (not a fixed "yesterday 23:59")
-      // so it's mathematically guaranteed to sort before every real tick
-      // here - this branch only runs when priorPts is empty, i.e. every
-      // tick in the rolling log is already after cutoffMs by definition.
-      // A fixed 23:59 timestamp doesn't have that guarantee (real ticks
-      // from earlier in the evening sort BEFORE it), which is exactly what
-      // caused Bregman's fake dip. Confirmed live 2026-09-17: Brice
-      // Turang's 24H chart showed +2.4% (based on the earliest real tick,
-      // ~7:30pm yesterday) while the badge showed -1.5% (get24hPct's own
-      // fallback, anchored on getTodayPct/anchor1d) - two different anchors
-      // for what's supposed to be the same number. Anchoring here on
-      // anchor1d too, at a timestamp guaranteed to lead the real data,
-      // makes the chart's implied % match the badge again.
+      // No usable anchor at all (liveP itself isn't positive, or pct math
+      // came out non-finite) - fall back to whatever real ticks exist since
+      // yesterday evening so the chart still draws something meaningful.
       const yesterdayEvening = dateToDayNum(new Date(localDateStr(1) + 'T17:00:00'));
-      const livePt = { day: _nowDay, price: liveP[selRank] };
       let todayPts = todayTicks.length > 0
         ? todayTicks
         : allPts.filter(h => h.day >= yesterdayEvening);
       // Always extend to "now", even when the price hasn't moved since the
       // last tick - otherwise the chart's rightmost point (and its tooltip/
       // x-axis time label) stays frozen at that stale tick's timestamp
-      // instead of reflecting the real current time. Confirmed live
-      // 2026-09-17: Alex Bregman's price was flat since last night's game
-      // ended at 11:01pm - the chart's "now" dot showed "11:01pm" all
-      // morning even though it was actually 10:44am.
+      // instead of reflecting the real current time.
       todayPts = [...todayPts, livePt];
-      // Derive the anchor straight from get24hPct(selRank) itself - the
-      // exact number the 24H badge already shows - instead of re-deriving
-      // "did they play, when, use which base price" independently here.
-      // Two parallel implementations of the same "24h ago" question drift
-      // apart the moment either one's edge cases change (that's how the
-      // Juan Soto/_dayOpenBase mismatch happened, and again how Max Fried -
-      // last game two days ago, correctly flat per get24hPct's own recency
-      // gate - still showed a fake +2.4% here because _chartAnchor doesn't
-      // check recency at all, only whether getTodayPct is nonzero).
-      // Confirmed live 2026-09-17: Brice Turang's chart showed +2.4% against
-      // a -1.5% badge for exactly this reason. Backing the anchor out of
-      // get24hPct's own answer makes them the same number by construction.
-      const _24hPct = get24hPct(selRank);
-      const anchor1d = _24hPct !== 0 ? liveP[selRank] / (1 + _24hPct / 100) : 0;
       todayPts.sort((a, b) => a.day - b.day);
-      hx = anchor1d > 0
-        ? [{ day: toDay(cutoffMs), price: anchor1d }, ...todayPts]
-        : todayPts;
+      hx = todayPts;
     }
   } else if (chartRange > 1) {
     const cutoffDay = dateToDayNum(new Date(localDateStr(chartRange) + 'T00:00:00'));
