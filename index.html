@@ -8865,7 +8865,30 @@ function get24hPct(rank){
     // price - this read a real stat-worthy outing as a flat 0% instead of
     // falling through to the stat-based number below.
     if (!gameSettled && basePrice > 0 && basePrice !== cur) {
-      return Math.round((cur - basePrice) / basePrice * 1000) / 10;
+      const logPct = Math.round((cur - basePrice) / basePrice * 1000) / 10;
+      // The log's oldest point might not reach back far enough to have
+      // captured the FULL day's move either - e.g. it only just started
+      // logging fresh ticks a few minutes ago, understating today's real
+      // move the same way an empty log would. Compare against the stat-based
+      // number (anchored on yesterday's close, reaching back much further)
+      // and take whichever shows MORE movement in the same direction -
+      // trusting the log only when it shows evidence of movement the stat
+      // line CAN'T explain (real buzz/volume beyond the box score, the Elly
+      // De La Cruz case above), not less. A sign disagreement keeps the log's
+      // answer, same as before - it's the direct, ground-truth price signal,
+      // whatever the reason for the move. Confirmed live 2026-09-20: Chuba
+      // Hubbard's log only had ~17 minutes of ticks (all from mid-game), so
+      // its own anchor understated his real move - 24H read +2.3% while
+      // 7D/getTodayPct correctly showed +3.1% off the same close history.
+      const gameToday = ln0 && ln0.played && ln0.date &&
+        (ln0.date === localDateStr() || ln0.date === localDateStr(1));
+      if (gameToday) {
+        const statPct = getTodayPct(rank);
+        if (Math.sign(statPct) === Math.sign(logPct) && Math.abs(statPct) > Math.abs(logPct)) {
+          return statPct;
+        }
+      }
+      return logPct;
     }
   }
   const ln = lastNight[rank];
