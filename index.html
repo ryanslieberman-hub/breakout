@@ -5644,14 +5644,19 @@ try {
 // ═══════════════════════════════════════════
 //  AMM
 // ═══════════════════════════════════════════
-function ammBuy(rank,shares){
-  const p=activePool(rank);
+// `pool` is optional - defaults to the live/active portfolio's pool for the
+// normal instant-trade path. A queued live-game trade re-calls this at
+// settlement time with an explicit pool (poolFor(pid, rank)) to get a FRESH
+// quote off whatever the price has become by then, not the stale one
+// captured when the order was placed - see settleTrade.
+function ammBuy(rank,shares,pool){
+  const p=pool||activePool(rank);
   if(shares<=0||shares>=p.x)return null;
   const nx=p.x-shares,ny=p.k/nx,cost=ny-p.y,np=ny/nx,avg=cost/shares,imp=(np-p.y/p.x)/(p.y/p.x)*100;
   return{cost,newX:nx,newY:ny,newPrice:np,avgPrice:avg,impact:imp};
 }
-function ammSell(rank,shares){
-  const p=activePool(rank);
+function ammSell(rank,shares,pool){
+  const p=pool||activePool(rank);
   if(shares<=0)return null;
   const nx=p.x+shares,ny=p.k/nx,ret=p.y-ny,np=ny/nx,avg=ret/shares,imp=(np-p.y/p.x)/(p.y/p.x)*100;
   return{returned:ret,newX:nx,newY:ny,newPrice:np,avgPrice:avg,impact:imp};
@@ -6875,7 +6880,23 @@ async function nflTick() {
   const finals = events.filter(e => e.status?.type?.completed);
   const live   = events.filter(e => e.status?.type?.state === 'in');
   const relevant = [...finals, ...live];
-  if (!relevant.length) return; // no NFL games today (off-season / off-day)
+  if (!relevant.length) return { live: false }; // no NFL games today (off-season / off-day)
+
+  // Feed NFL's own live status into the SAME isGameLive/fast-polling system
+  // MLB and NBA already use - this was missing entirely, so a live NFL game
+  // never sped up polling and never activated executeTrade()'s live-game
+  // trade-confirmation delay (see LIVE_DELAY_MS there). Confirmed live
+  // 2026-09-21: a user bought Jaxon Smith-Njigba immediately after watching
+  // a big play happen on TV, before the app's own price had caught up -
+  // exactly the latency-arbitrage window that delay exists to close, just
+  // never wired up for this league.
+  if (live.length > 0) {
+    window._anyLiveThisCycle = true;
+    if (!isGameLive) {
+      isGameLive = true;
+      localStorage.setItem('ax_isGameLive', 'true');
+    }
+  }
 
   const lineByRank = {};   // rank -> merged raw stat line this game (see _nflRawLine)
   for (const ev of relevant) {
@@ -6958,6 +6979,7 @@ async function nflTick() {
   }
   if (currentLeague === 'NFL') { try { renderAll(); updateMovers(); } catch(e){} }
   console.log(`[nfl] scored ${moved} players from ${relevant.length} game(s)${isFinal ? ' (finalized)' : ' (live)'}`);
+  return { live: live.length > 0 };
 }
 
 // Corrects an NFL "last night" entry left stuck mid-game. nflTick() only ever
@@ -7884,8 +7906,17 @@ async function executeTrade(){
   if(shares<=0)return;
 
   // MLB live games: 90s delay (TV broadcast ~15-30s lag + time to trade = ~60s edge)
+  // NFL live games: 60s delay - same broadcast-lag reasoning; a scoring play is
+  // exactly the kind of highlight moment someone watching live TV could act on
+  // before the app's own price catches up. Confirmed live 2026-09-21: a user
+  // bought Jaxon Smith-Njigba right after a big play, before the price had
+  // moved - this delay never applied to NFL at all before, since isLiveNow
+  // never triggered for it (NFL had no automatic recurring poll at all, let
+  // alone one that set isGameLive - see nflTick's own fix for that).
   // NBA live games: 30s delay (faster pace, less broadcast lag)
-  const LIVE_DELAY_MS = (currentLeague === 'MLB' && _refreshSecs <= 30) ? 90000 : 30000;
+  const LIVE_DELAY_MS = (currentLeague === 'MLB' && _refreshSecs <= 30) ? 90000
+    : (currentLeague === 'NFL' && _refreshSecs <= 30) ? 60000
+    : 30000;
   const isLiveNow = _refreshSecs <= 30; // 30s refresh = live games active
 
   if(tradeMode==='buy'){
@@ -8053,11 +8084,27 @@ function settleTrade(id){
   const trade = pendingTrades.splice(idx,1)[0];
   clearInterval(trade._interval);
 
-  const {mode, rank, shares, ammResult, name, portfolioId} = trade;
+  const {mode, rank, shares, ammResult: queuedQuote, name, portfolioId} = trade;
   const pid = portfolioId || 'regular'; // trades queued before this field existed
 
+  // Re-quote against the CURRENT pool state, not the snapshot captured when
+  // the order was placed - this is the entire point of the live-game delay
+  // (see executeTrade's LIVE_DELAY_MS). Settling on the stale queue-time
+  // quote made the delay purely cosmetic: a user could click buy the instant
+  // they saw a big play, lock in the pre-play price right there, and just
+  // wait out a countdown with zero actual price risk. Confirmed live
+  // 2026-09-21: a user bought Jaxon Smith-Njigba this exact way. Falls back
+  // to the queue-time quote only if the pool has moved so far the trade can
+  // no longer execute at all (shares >= pool.x) - vanishingly rare, and
+  // better than silently dropping the trade.
+  const pool = poolFor(pid, rank);
+  const ammResult = (mode==='buy' ? ammBuy(rank, shares, pool) : ammSell(rank, shares, pool)) || queuedQuote;
+
   if(mode==='buy'){
-    // cash was already deducted on queue - just apply the rest
+    // cash reserved the queue-time cost as a hold; true it up to what this
+    // actually costs now (refund if the price fell, charge more if it rose -
+    // same real-market risk in both directions, not just in the house's favor).
+    cash += queuedQuote.cost - ammResult.cost;
     if(!holdings[rank])holdings[rank]={shares:0,totalCost:0};
     holdings[rank].shares+=shares;
     holdings[rank].totalCost+=ammResult.cost;
@@ -8072,7 +8119,8 @@ function settleTrade(id){
     flashHero(true);
     showToast(`\u2705 BUY executed: ${shares} × ${name}`);
   } else {
-    // shares already removed on queue - apply proceeds
+    // shares already removed on queue - credit the FRESH proceeds, not the
+    // queue-time estimate.
     cash += ammResult.returned;
     if(holdings[rank]){
       const avg=(holdings[rank].totalCost||0)/Math.max(1,(holdings[rank].shares||0)+shares);
@@ -8122,7 +8170,7 @@ function renderPendingTrades(){
       <div style="background:#0d0d1a;border-radius:4px;height:4px;overflow:hidden;">
         <div style="height:100%;width:${pct}%;background:${isBuy?'#00c896':'#ff6b6b'};transition:width 0.4s linear;"></div>
       </div>
-      <div style="font-size:10px;color:#666;margin-top:4px;">Locked at ${fmt(t.ammResult.avgPrice || t.ammResult.newPrice)}/share &middot; Price may shift before execution</div>
+      <div style="font-size:10px;color:#666;margin-top:4px;">~${fmt(t.ammResult.avgPrice || t.ammResult.newPrice)}/share estimate &middot; final price fills at execution</div>
     `;
     el.appendChild(card);
   });
@@ -11977,6 +12025,28 @@ async function smartTracker() {
     }
   } catch(e) { console.log('MLB tracker error:', e.message); }
   if (!trackerInterval) { trackerInterval = setInterval(smartTracker, 60 * 1000); setRefreshInterval(60000); }
+
+  // Also poll NFL every tick, regardless of current tab - same "always on"
+  // treatment MLB gets above, instead of never running on a recurring
+  // interval at all. Before this, nflTick() only ever fired once at page
+  // load, once on a midnight day-rollover, or on a manual refresh click -
+  // a user who left the app open through a live NFL game got a price that
+  // simply never moved on its own. That's both a stale-price UX problem AND
+  // the reason isGameLive/executeTrade()'s live-game trade-confirmation
+  // delay never activated for NFL (see nflTick's own isGameLive-propagation
+  // comment) - a real user could buy a player right after watching a big
+  // play on TV, before the app had any chance to catch up, since nothing
+  // was polling in the background to catch up in the first place. nflTick()
+  // is a cheap no-op scoreboard check on an NFL off-day. Only escalates to
+  // a faster interval, never slows one down - MLB/NBA above may already
+  // have it faster.
+  try {
+    const nflResult = await nflTick();
+    if (nflResult?.live && _refreshSecs > 20) {
+      clearInterval(trackerInterval);
+      trackerInterval = setInterval(smartTracker, 20 * 1000); setRefreshInterval(20000);
+    }
+  } catch(e) { console.log('NFL tracker error:', e.message); }
 
   // Also run NBA tracker if on NBA tab
   if (currentLeague !== 'NBA') {
