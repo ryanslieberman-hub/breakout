@@ -6907,7 +6907,8 @@ async function nflTick() {
       (tm.statistics || []).forEach(cat => {
         const isOffense = ['passing','rushing','receiving'].includes(cat.name);
         const isDefense = ['defensive','interceptions'].includes(cat.name);
-        if (!isOffense && !isDefense) return;
+        const isKicking = cat.name === 'kicking';
+        if (!isOffense && !isDefense && !isKicking) return;
         (cat.athletes || []).forEach(a => {
           const nm = a.athlete?.displayName;
           if (!nm) return;
@@ -7015,7 +7016,8 @@ async function nflReconcileStaleLive() {
         (tm.statistics || []).forEach(cat => {
           const isOffense = ['passing','rushing','receiving'].includes(cat.name);
           const isDefense = ['defensive','interceptions'].includes(cat.name);
-          if (!isOffense && !isDefense) return;
+          const isKicking = cat.name === 'kicking';
+          if (!isOffense && !isDefense && !isKicking) return;
           (cat.athletes || []).forEach(a => {
             const nm = a.athlete?.displayName;
             if (!nm) return;
@@ -16046,7 +16048,8 @@ async function loadLast10(rank) {
             (tm.statistics || []).forEach(cat => {
               const isOffense = ['passing','rushing','receiving'].includes(cat.name);
               const isDefense = ['defensive','interceptions'].includes(cat.name);
-              if (!isOffense && !isDefense) return;
+              const isKicking = cat.name === 'kicking';
+              if (!isOffense && !isDefense && !isKicking) return;
               (cat.athletes || []).forEach(a => {
                 const nm = (a.athlete?.displayName || '').toLowerCase();
                 if (nm !== pNameLower) return;
