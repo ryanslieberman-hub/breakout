@@ -4695,14 +4695,24 @@ const ENGINE = (() => {
     // hasn't "failed" (rel would read -100% vs pace, same as a genuinely bad
     // full game), and one early rushing TD extrapolated at full confidence
     // over 60 minutes overstates a QB's whole game just as badly the other
-    // way. Damp BOTH directions quadratically by elapsed game time so a
-    // small early sample moves the price only a little, then ramps up to
-    // full weight as the game actually plays out and the sample gets real.
-    // Confirmed live 2026-09-17: Aidan Hutchinson read -2.7% off a single
-    // early tackle, and separately Josh Allen's 24H read +15.8% off a pass
-    // TD + rush TD just 17% into his game - both real events, just given
-    // far more confidence than a few plays' worth of data deserves.
-    rel *= frac * frac;
+    // way. Damp BOTH directions by elapsed game time so a small early sample
+    // moves the price only a little, then ramps up to full weight as the
+    // game actually plays out and the sample gets real. Confirmed live
+    // 2026-09-17: Aidan Hutchinson read -2.7% off a single early tackle, and
+    // separately Josh Allen's 24H read +15.8% off a pass TD + rush TD just
+    // 17% into his game - both real events, just given far more confidence
+    // than a few plays' worth of data deserves.
+    //
+    // Linear, not quadratic: quadratic damping (frac*frac) over-corrected the
+    // other way - confirmed live 2026-09-20, Derrick Henry (7 car/28 yds/1
+    // rush TD, ~33% into the game) and Tank Bigsby (similar line) both read
+    // barely +1-2% despite an already-real, already-banked touchdown, which
+    // read as "doesn't make sense" - a TD that already happened deserves more
+    // weight at 33% through the game than frac² (≈11%) was giving it. Linear
+    // damping still meaningfully discounts a small sample (Hutchinson's one
+    // tackle still reads under -1%) without flattening a genuinely good
+    // quarter-plus of real production down to noise.
+    rel *= frac;
     return bound(p, rel);
   }
 

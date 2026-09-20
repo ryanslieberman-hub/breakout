@@ -210,12 +210,14 @@ export function nflPerf(p, stat) {
   const pace = got / frac;
   let rel = (pace - base) / Math.max(base, 4);
   // A pace built from a handful of plays is mostly noise, not a reliable
-  // signal, in EITHER direction - damp both by the square of elapsed game
-  // time so a small early sample moves the price only a little, ramping to
-  // full weight as the game actually plays out. See index.html's nflPerf for
-  // the live-confirmed cases (Hutchinson downside, Josh Allen upside) this
-  // was tuned against.
-  rel *= frac * frac;
+  // signal, in EITHER direction - damp both by elapsed game time so a small
+  // early sample moves the price only a little, ramping to full weight as
+  // the game actually plays out. Linear, not quadratic: quadratic (frac²)
+  // over-corrected the other way, flattening an already-real, already-banked
+  // TD down to ~1-2% a third of the way into the game. See index.html's
+  // nflPerf for the live-confirmed cases (Hutchinson, Josh Allen, Derrick
+  // Henry/Tank Bigsby) this was tuned against.
+  rel *= frac;
   return bound(p, rel);
 }
 
