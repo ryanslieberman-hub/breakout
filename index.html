@@ -3771,15 +3771,35 @@ async function loadPortfolioBlob(portfolioId){
 function pushPortHx(){
   const v = portVal();
   const now = Date.now();
+  // Snapshot totalGranted (free claims + purchases, see computeCoinsReturnPct)
+  // alongside the raw value, so the portfolio chart can later show P&L from
+  // PLAYER PERFORMANCE only - claiming Coins bumps `value` (via portVal's
+  // `cash`) but doesn't represent any trading skill, so a diff of raw values
+  // across a claim reads as a fake "gain". See _perfAdjustedDiff below.
+  const tg = _coinsTotalGranted;
   const last = portHx[portHx.length-1];
   if (last && last.t && (now - last.t) < 60*1000) {
     // Within a minute of the last point - just update it in place.
-    last.value = v; last.t = now; last.day = todayDayNum();
+    last.value = v; last.t = now; last.day = todayDayNum(); last.totalGranted = tg;
     return;
   }
-  portHx.push({ day: todayDayNum(), value: v, t: now });
+  portHx.push({ day: todayDayNum(), value: v, t: now, totalGranted: tg });
   // Cap stored history to keep memory/localStorage reasonable.
   if (portHx.length > 2000) portHx.splice(0, portHx.length - 2000);
+}
+
+// Value change between two portHx-shaped points ({value, totalGranted}),
+// isolating PLAYER PERFORMANCE from Coins deposits (free claims/purchases).
+// Falls back to a plain raw-value diff when either point predates
+// totalGranted tracking (no field at all) - mixing an adjusted "now" against
+// an unadjusted legacy point would read as a bogus swing in whichever
+// direction totalGranted has grown since, which is worse than just not
+// adjusting for that one comparison. Self-heals as fresh tracked points
+// naturally replace old ones over time.
+function _perfAdjustedDiff(endPt, startPt){
+  const raw = endPt.value - startPt.value;
+  if (endPt.totalGranted == null || startPt.totalGranted == null) return raw;
+  return raw - (endPt.totalGranted - startPt.totalGranted);
 }
 let selRank=players[0].rank,tradeMode='buy',chartRange=7,tierF='all',posF='all',searchQ='';
 let isGameLive = localStorage.getItem('ax_isGameLive') === 'true';
@@ -9955,14 +9975,14 @@ function _portSeries(range){
   // We drop anything without a genuine recent timestamp instead of inventing one.
   const yearAgo = now - 366*DAY;
   let pts = portHx
-    .map(h => ({ t: h.t || 0, value: h.value }))
+    .map(h => ({ t: h.t || 0, value: h.value, totalGranted: h.totalGranted }))
     .filter(p => p.value > 0 && p.t >= yearAgo && p.t <= now + DAY)
     .sort((a,b) => a.t - b.t);
 
   // Always make sure the newest point reflects the current value "now".
   const curVal = (typeof portVal === 'function') ? portVal() : (pts.length ? pts[pts.length-1].value : START_VALUE);
   if (!pts.length || (now - pts[pts.length-1].t) > 60*1000) {
-    pts.push({ t: now, value: curVal });
+    pts.push({ t: now, value: curVal, totalGranted: _coinsTotalGranted });
   }
 
   if (range === 'ALL') return pts;
@@ -9988,11 +10008,25 @@ function drawPortChartRanged(range){
     // "no % to show" (see its own `pct = baseValue ? ... : 0`), so 0 is the
     // correct empty-history fallback for a wallet, not START_VALUE.
     const emptyBase = isWalletContext(activePortfolioId) ? 0 : START_VALUE;
-    _setPchartHead(series.length?series[series.length-1].value:portVal(), series.length?series[0].value:emptyBase, null);
+    _setPchartHead(
+      series.length ? series[series.length-1] : { value: portVal(), totalGranted: _coinsTotalGranted },
+      series.length ? series[0] : { value: emptyBase, totalGranted: _coinsTotalGranted },
+      null
+    );
     return;
   }
 
-  const vals = series.map(p=>p.value);
+  // Chart the line's SHAPE by player performance only (raw value minus Coins
+  // granted so far via free claims/purchases - see pushPortHx/_perfAdjustedDiff)
+  // whenever every point in the window has that data, so claiming Coins draws
+  // as flat instead of a fake spike - matching the header %/$ below it, which
+  // uses the same adjustment. Falls back to plotting raw wallet value when any
+  // point in the window predates totalGranted tracking, rather than mixing
+  // adjusted and unadjusted points in the same line.
+  const canAdjust = series.every(p => p.totalGranted != null);
+  const shapeVal = p => canAdjust ? p.value - p.totalGranted : p.value;
+
+  const vals = series.map(shapeVal);
   const minV = Math.min(...vals), maxV = Math.max(...vals);
   const pad = (maxV-minV)*0.08 || maxV*0.02 || 1;
   const lo = minV-pad, hi = maxV+pad, rng = hi-lo || 1;
@@ -10006,22 +10040,27 @@ function drawPortChartRanged(range){
 
   // Resample to evenly-spaced points along time, so long gaps (app was closed) become
   // a gentle slope instead of a jagged diagonal + cliff. Then draw a smooth curve.
+  // Carries the RAW value and totalGranted along too (as a step, not
+  // interpolated - a Coins deposit happens at an instant, not gradually) so
+  // scrubbing can show the real wallet size and still compute a correct
+  // perf-adjusted diff against the window's start.
   const SAMPLES = Math.max(2, Math.min(60, series.length * 3));
   const resampled = [];
   for (let i = 0; i < SAMPLES; i++){
     const t = t0 + (tspan * i) / (SAMPLES - 1);
-    // linear-interpolate value at time t from the real series
-    let v = series[0].value;
+    let v = vals[0], rawV = series[0].value, tg = series[0].totalGranted;
     for (let j = 0; j < series.length - 1; j++){
       const a = series[j], b = series[j+1];
       if (t >= a.t && t <= b.t){
         const f = (t - a.t) / ((b.t - a.t) || 1);
-        v = a.value + (b.value - a.value) * f;
+        v = vals[j] + (vals[j+1] - vals[j]) * f;
+        rawV = a.value + (b.value - a.value) * f;
+        tg = a.totalGranted;
         break;
       }
-      if (t > b.t) v = b.value;
+      if (t > b.t) { v = vals[j+1]; rawV = b.value; tg = b.totalGranted; }
     }
-    resampled.push({ t, value: v });
+    resampled.push({ t, value: v, raw: rawV, totalGranted: tg });
   }
 
   // Build a smooth path (Catmull-Rom → cubic bezier) through the resampled points.
@@ -10041,7 +10080,7 @@ function drawPortChartRanged(range){
   const area = line + ` L${px(t1).toFixed(1)},${H} L${px(t0).toFixed(1)},${H} Z`;
 
   // Baseline (starting value of the window) as a faint dashed reference
-  const baseY = py(series[0].value).toFixed(1);
+  const baseY = py(vals[0]).toFixed(1);
 
   holder.innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none"
@@ -10060,7 +10099,7 @@ function drawPortChartRanged(range){
     </svg>`;
 
   // Header: range start vs current (or scrub point)
-  _setPchartHead(series[series.length-1].value, series[0].value, null);
+  _setPchartHead(series[series.length-1], series[0], null);
 
   // ── Scrubbing ──
   const svg = document.getElementById('pchart-svg');
@@ -10087,11 +10126,11 @@ function drawPortChartRanged(range){
     const x = px(p.t), y = py(p.value);
     cursor.setAttribute('x1',x); cursor.setAttribute('x2',x); cursor.setAttribute('opacity','0.5');
     dot.setAttribute('cx',x); dot.setAttribute('cy',y); dot.setAttribute('opacity','1');
-    _setPchartHead(p.value, series[0].value, p.t);
+    _setPchartHead({ value: p.raw, totalGranted: p.totalGranted }, series[0], p.t);
   };
   const clearScrub = ()=>{
     cursor.setAttribute('opacity','0'); dot.setAttribute('opacity','0');
-    _setPchartHead(series[series.length-1].value, series[0].value, null);
+    _setPchartHead(series[series.length-1], series[0], null);
   };
 
   const onMove = (e)=>{ const x=(e.touches?e.touches[0].clientX:e.clientX); moveTo(nearestIdx(x)); };
@@ -10104,14 +10143,18 @@ function drawPortChartRanged(range){
 
 // Update the chart header value / change / date. If scrubTs is null, shows the
 // range's net change; otherwise shows value at the scrubbed point and its date.
-function _setPchartHead(value, baseValue, scrubTs){
+// endPt/startPt are portHx-shaped ({value, totalGranted}) - the headline
+// number shows the real wallet value (endPt.value), but the +/- change is
+// PLAYER PERFORMANCE only, via _perfAdjustedDiff: claiming Coins moves the
+// wallet size without moving this number, so it can't be mistaken for P&L.
+function _setPchartHead(endPt, startPt, scrubTs){
   const valEl = document.getElementById('pchart-val');
   const chgEl = document.getElementById('pchart-chg');
   const dateEl = document.getElementById('pchart-date');
   if (!valEl) return;
-  valEl.textContent = fmt(value);
-  const diff = value - baseValue;
-  const pct = baseValue ? diff/baseValue*100 : 0;
+  valEl.textContent = fmt(endPt.value);
+  const diff = _perfAdjustedDiff(endPt, startPt);
+  const pct = startPt.value ? diff/startPt.value*100 : 0;
   const up = diff >= 0;
   if (chgEl){
     chgEl.textContent = `${up?'+':''}${fmt(diff)} (${up?'+':''}${pct.toFixed(2)}%)`;
