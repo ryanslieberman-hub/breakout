@@ -8868,25 +8868,31 @@ function get24hPct(rank){
       const logPct = Math.round((cur - basePrice) / basePrice * 1000) / 10;
       // The log's oldest point might not reach back far enough to have
       // captured the FULL day's move either - e.g. it only just started
-      // logging fresh ticks a few minutes ago, understating today's real
-      // move the same way an empty log would. Compare against the stat-based
-      // number (anchored on yesterday's close, reaching back much further)
-      // and take whichever shows MORE movement in the same direction -
-      // trusting the log only when it shows evidence of movement the stat
-      // line CAN'T explain (real buzz/volume beyond the box score, the Elly
-      // De La Cruz case above), not less. A sign disagreement keeps the log's
-      // answer, same as before - it's the direct, ground-truth price signal,
-      // whatever the reason for the move. Confirmed live 2026-09-20: Chuba
-      // Hubbard's log only had ~17 minutes of ticks (all from mid-game), so
-      // its own anchor understated his real move - 24H read +2.3% while
-      // 7D/getTodayPct correctly showed +3.1% off the same close history.
+      // logging fresh ticks a few minutes ago, or its earliest tick landed
+      // right at kickoff where the (deliberately damped, but not perfectly
+      // flat) early-game formula can read a hair off from the real baseline.
+      // Either way, that partial anchor doesn't represent a real "24h ago"
+      // price the way it's meant to. getTodayPct's stat-based number reaches
+      // back to yesterday's close - whenever IT shows real movement (i.e.
+      // this game has actually produced a stat line, not just kicked off),
+      // it's the more complete, more trustworthy answer, even if the log's
+      // own number happens to be bigger. Only fall through to the log when
+      // stats show NOTHING (statPct === 0, e.g. a scoreless game in
+      // progress) - that's the one case where the log is uniquely capturing
+      // something stats can't: real buzz/volume ahead of the box score.
+      // Confirmed live 2026-09-20 - two different failure directions:
+      // Chuba Hubbard's log (only ~17 min old) understated his real move
+      // (24H +2.3% vs the correct +3.1%); Darius Cooper's log anchor (from
+      // right at kickoff, a rookie with a low fpts baseline) OVERSTATED his
+      // (24H +11% vs the correct +8.2%, since that early tick had already
+      // dipped slightly below his true baseline before his game got going).
+      // "Trust whichever is bigger" got Cooper's case backwards - the log
+      // being bigger doesn't mean it's more informative, just noisier.
       const gameToday = ln0 && ln0.played && ln0.date &&
         (ln0.date === localDateStr() || ln0.date === localDateStr(1));
       if (gameToday) {
         const statPct = getTodayPct(rank);
-        if (Math.sign(statPct) === Math.sign(logPct) && Math.abs(statPct) > Math.abs(logPct)) {
-          return statPct;
-        }
+        if (statPct !== 0) return statPct;
       }
       return logPct;
     }
