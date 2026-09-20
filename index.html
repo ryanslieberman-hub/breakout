@@ -10931,13 +10931,13 @@ function buildPortfolio(){
       <div class="pcard"><div class="pclbl">Total Value</div><div class="pcval" style="color:var(--green)">${fmt(total)}</div></div>
       <div class="pcard"><div class="pclbl">Coins</div><div class="pcval">${fmt(cash)}</div></div>
       <div class="pcard"><div class="pclbl">Holdings</div><div class="pcval">${fmt(total-cash)}</div></div>
-      <div class="pcard"><div class="pclbl">Today</div>
+      <div class="pcard"><div class="pclbl">Portfolio Today</div>
         <div class="pcval" style="color:${todayPnl>=0?'var(--green)':'var(--red)'}">${fmtS(todayPnl)}</div>
         <div class="pcsub" style="color:${todayPnl>=0?'var(--green)':'var(--red)'}">${fmtP(todayPp)}</div>
       </div>
       ${isWallet
         ? `<div class="pcard"><div class="pclbl">Balance</div><div class="pcval">${fmt(total)}</div></div>`
-        : `<div class="pcard"><div class="pclbl">Total Return</div>
+        : `<div class="pcard"><div class="pclbl">Total Coins Gain</div>
         <div class="pcval" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${fmtS(pnl)}</div>
         <div class="pcsub" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${fmtP(pp)}</div>
       </div>`}
