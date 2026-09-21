@@ -9205,6 +9205,15 @@ function syncPricesToFirestore() {
   clearTimeout(_priceSyncTimeout);
   _priceSyncTimeout = setTimeout(() => {
     try {
+      // Never sync before the initial Firestore load has actually finished. Something on
+      // boot (well before loadPricesFromFirestore's several sequential awaits resolve) was
+      // triggering a sync using still-default/pre-load local state, and this debounced timer
+      // could fire before that load caught up - overwriting a just-corrected server value
+      // with stale local data. Confirmed live 2026-09-21: a hand-patched NFL close got
+      // clobbered back to its pre-fix value within seconds of a page load for exactly this
+      // reason. window._closesRestoredFromFirestore is set in loadPricesFromFirestore's
+      // `finally`, so this can't fire until that load has fully settled one way or another.
+      if (!window._closesRestoredFromFirestore) return;
       const todayInt = Math.floor(todayDayNum());
       const todayStr = localDateStr();
       const livePSnap = {};
