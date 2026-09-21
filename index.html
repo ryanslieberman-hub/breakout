@@ -4459,13 +4459,23 @@ const ENGINE = (() => {
   function baseFor(p){
     const today = localDateStr(0);
     const [lo, hi] = band(p);
-    const rec = BASE[p.rank];
-    if (rec && rec.date === today && rec.price >= lo && rec.price <= hi) return rec.price;
     const c = closes[p.rank] || {};
     const priorValid = Object.keys(c)
       .filter(d => d < today && c[d] >= lo && c[d] <= hi)
       .sort();
-    if (!priorValid.length && !window._closesRestoredFromFirestore) {
+    const freshBase = priorValid.length ? c[priorValid[priorValid.length - 1]] : null;
+    const rec = BASE[p.rank];
+    // Trust today's cached base ONLY if it still agrees with the best close we actually
+    // have right now. The cache exists so `dayOpen` holds steady through a single day's
+    // ticks, not to shield a stale value from a real correction to a close arriving later
+    // that same day - confirmed live 2026-09-21: a same-day fix to a mis-finalized NFL
+    // close never reached any device whose BASE cache had already locked in the bad
+    // value earlier that day, since this used to trust rec.price unconditionally.
+    if (rec && rec.date === today && rec.price >= lo && rec.price <= hi
+        && (freshBase == null || Math.abs(rec.price - freshBase) < 0.01)) {
+      return rec.price;
+    }
+    if (freshBase == null && !window._closesRestoredFromFirestore) {
       // Firestore's close history hasn't finished loading yet on this device - a real
       // prior close may exist but just hasn't arrived, not that one doesn't exist. Locking
       // in statPrice as today's BASE here silently turns a routine game into a phantom
@@ -4476,7 +4486,7 @@ const ENGINE = (() => {
       // caching it, so the next tick (after history has loaded) retries properly.
       return Math.min(Math.max(p.statPrice, lo), hi);
     }
-    let base = priorValid.length ? c[priorValid[priorValid.length - 1]] : p.statPrice;
+    let base = freshBase != null ? freshBase : p.statPrice;
     base = Math.min(Math.max(base, lo), hi);
     BASE[p.rank] = { date: today, price: base };
     saveBase();
@@ -7035,11 +7045,20 @@ async function nflReconcileStaleLive() {
       const r = +rank;
       if (!(lastNight[r]?.live && lastNight[r]?.date === dateStr)) return; // only touch the stale ones
       const fpts = _nflFptsFromRaw(line);
-      window._engineStats[r] = { fpts };
+      window._engineStats[r] = { fpts, gameFrac: 1 }; // reconciled game is over - full weight, no pace damping
       _setLastNight(r, { played:true, date: dateStr, live:false, nfl:true, fpts: Math.round(fpts*10)/10, ...line });
       moved++;
     });
     if (Object.keys(lineByRank).length) {
+      // deriveAll() BEFORE finalize() - finalize() doesn't compute anything itself, it just
+      // locks in whatever liveP already holds. Without this, it was locking in the stale
+      // mid-game liveP left over from before the browser closed (heavily damped toward base
+      // by nflPerf's small-sample logic, often landing right on statPrice) instead of the
+      // real final price the _engineStats line just above actually implies. nflTick() (the
+      // non-stale path) already does derive-then-finalize in this order; this reconcile path
+      // was skipping straight to finalize. Confirmed live 2026-09-21: every rank finalized
+      // through this path locked in flat at statPrice regardless of real performance.
+      try { if (ENGINE.deriveAll) ENGINE.deriveAll(); } catch(e){}
       nflPlayers.forEach(p => { if (lineByRank[p.rank]) ENGINE.finalize(p, dateStr); });
     }
   }
