@@ -8851,7 +8851,16 @@ function getTodayPct(rank){
   // real move by falling back to the pre-history stat price. Mirror that same
   // fallback here so the list/movers badge agrees with the chart.
   let prev = dates.length >= 2 ? c[dates[dates.length - 2]] : null;
-  if (prev == null) {
+  // The statPrice fallback below is only correct for a close that just landed
+  // TODAY or YESTERDAY - a genuine first-game-ever case, where "since
+  // preseason" and "since the last game" are the same question. A single
+  // close sitting right at the outer edge of the 2-day window above (cutoff
+  // is inclusive) is not that case - it's a real prior game whose earlier
+  // history didn't survive, and comparing IT to career-baseline statPrice
+  // reports an entire season's drift as a one-day move. Confirmed live
+  // 2026-09-21: Luke Keaschall's only surviving close was 2 days stale (a
+  // pedestrian 1-for-5 night) and this fallback read it as +34.9% "today".
+  if (prev == null && dates[dates.length - 1] >= localDateStr(1)) {
     const p = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].find(x => x.rank === rank);
     if (p?.statPrice > 0) prev = p.statPrice;
   }
@@ -8904,9 +8913,21 @@ function get24hPct(rank){
   // the arr.length branch below) - lastNight[rank].live guards against this
   // shortcut firing mid-game.
   const _cHist = closes[rank] || {};
-  const _latestCloseDate = Object.keys(_cHist).filter(d => _cHist[d] > 0).sort().pop();
+  const _closeDates = Object.keys(_cHist).filter(d => _cHist[d] > 0).sort();
+  const _latestCloseDate = _closeDates[_closeDates.length - 1];
   const _ln = lastNight[rank];
-  if (_latestCloseDate && !(_ln && _ln.live) && Math.abs(_cHist[_latestCloseDate] - cur) < 0.005) {
+  // Require at least 2 real closes before trusting getTodayPct here - with
+  // only one ever recorded, IT has no real prior close to diff against and
+  // falls back to comparing against career-baseline statPrice instead (a
+  // legitimate fallback for ITS OWN calendar-day badge, which explicitly
+  // tolerates that). Borrowing that same fallback for "24H" mislabels an
+  // entire season's worth of gains as a one-day move. Confirmed live
+  // 2026-09-21: Luke Keaschall, one close ever recorded (9/19, from a
+  // pedestrian 1-for-5 night) two days stale, read +34.9% "24H" - actually
+  // his full-season move off statPrice wearing a 24H label. Same failure
+  // mode this function's own header comment already describes (Gavin
+  // Williams) - the shortcut below just wasn't actually guarding against it.
+  if (_latestCloseDate && _closeDates.length >= 2 && !(_ln && _ln.live) && Math.abs(_cHist[_latestCloseDate] - cur) < 0.005) {
     return getTodayPct(rank);
   }
   const cutoff = Date.now() - 24 * 3600 * 1000;
