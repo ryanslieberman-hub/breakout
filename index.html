@@ -9294,10 +9294,12 @@ function syncPricesToFirestore() {
       window._fbUpdateDoc(window._fbDoc(db, 'config', 'prices'), pricesUpdate).catch(e => {
         // updateDoc requires the doc to already exist (unlike setDoc) - fall back
         // once for the (very unlikely, e.g. brand-new project) case it doesn't.
-        window._fbSetDoc(window._fbDoc(db, 'config', 'prices'), {
-          liveP: livePSnap, todayHx: todayPts, intraday: intradaySnap, closes: closesSnap,
-          isGameLive: isGameLive, date: todayStr, savedAt: Date.now(),
-        }, { merge: true }).catch(() => {});
+        // MUST reuse the same already-dotted pricesUpdate object here, not a raw
+        // `closes: closesSnap` - this fallback isn't gated to "doc truly doesn't
+        // exist" (it catches ANY updateDoc error, including a transient one on an
+        // existing doc), and a literal nested `closes` key is exactly the
+        // wholesale-overwrite shape the dotted rewrite above exists to avoid.
+        window._fbSetDoc(window._fbDoc(db, 'config', 'prices'), pricesUpdate, { merge: true }).catch(() => {});
       });
 
       // Write priceApplied to SEPARATE doc - never wiped, only grows. Same
