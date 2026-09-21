@@ -9229,16 +9229,36 @@ function syncPricesToFirestore() {
       // right after an ordinary client tick synced). Addressing each rank as
       // `closes.<rank>` merges just that leaf and leaves every sibling rank -
       // written by this device, another device, or the server - untouched.
+      //
+      // That still wasn't deep enough for `closes` specifically: `closes.<rank>`
+      // is itself a {date: price} map, and writing it as ONE leaf still replaces
+      // every date under that rank with whatever subset this device happens to
+      // hold locally. Confirmed live 2026-09-21: 364 of 381 NFL players'
+      // `config/prices` closes were flattened to a single date each (the one
+      // date whichever half-loaded client last synced actually had in memory),
+      // wiping weeks of real history and collapsing every range (24H/7D/14D/
+      // 30D/All) to +0.0% since there was nothing left to diff against. `closes`
+      // needs the SAME per-rank safety taken one level further, down to
+      // `closes.<rank>.<date>`, so a sync only ever touches the exact dates this
+      // device actually computed - matching what worker-pricing-engine's own
+      // firestoreSetDeepFields(['closes', rank, date], ...) already does safely.
       const dotted = (prefix, snap) => {
         const out = {};
         for (const [k, v] of Object.entries(snap)) out[`${prefix}.${k}`] = v;
+        return out;
+      };
+      const dottedCloses = (snap) => {
+        const out = {};
+        for (const [rank, byDate] of Object.entries(snap)) {
+          for (const [date, price] of Object.entries(byDate)) out[`closes.${rank}.${date}`] = price;
+        }
         return out;
       };
       const pricesUpdate = {
         ...dotted('liveP', livePSnap),
         ...dotted('todayHx', todayPts),
         ...dotted('intraday', intradaySnap),
-        ...dotted('closes', closesSnap),
+        ...dottedCloses(closesSnap),
         isGameLive: isGameLive,
         date: todayStr,
         savedAt: Date.now(),
