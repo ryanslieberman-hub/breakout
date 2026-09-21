@@ -4423,8 +4423,42 @@ function _mergeRecentGames(recent, prev) {
 //  Nothing else may write a stat-based price. All old writers are deleted/neutralized.
 // ═══════════════════════════════════════════════════════════════════════════
 // ★★★ VERSION MARKER - if you see this in the console, the ENGINE build IS deployed ★★★
-console.log('%c★★★ BREAKOUT ENGINE BUILD v-ENGINE-102 (native push bridge: shell-only FCM token registration to user doc) LOADED ★★★', 'background:#12d47e;color:#000;font-size:20px;padding:8px;');
-window.BREAKOUT_VERSION = "ENGINE-102";
+console.log('%c★★★ BREAKOUT ENGINE BUILD v-ENGINE-103 (safe per-date closes sync + stale-tab update banner) LOADED ★★★', 'background:#12d47e;color:#000;font-size:20px;padding:8px;');
+window.BREAKOUT_VERSION = "ENGINE-103";
+
+// ── STALE-TAB UPDATE DETECTION ───────────────────────────────────────────────
+// A tab keeps running whatever JS it loaded, indefinitely, regardless of HTTP
+// cache headers - those only affect a NEW navigation/reload, not an already-
+// running session. config/prices is client-writable from every open tab
+// (see syncPricesToFirestore), so a tab left open from before a pricing-bug
+// fix deployed keeps writing with the OLD, buggy code no matter how many
+// times the bug gets fixed and redeployed - confirmed live 2026-09-21, MLB
+// closes kept collapsing back to ~2 dates hours after the sync-overwrite fix
+// shipped, because other already-open tabs were still running the pre-fix
+// version. Polling for a version mismatch and prompting a refresh is the only
+// way to get a stale tab off old code without waiting for it to be closed and
+// reopened on its own.
+function _checkForNewVersion(){
+  fetch('/index.html', { cache: 'no-store' }).then(r => r.text()).then(html => {
+    const m = html.match(/BREAKOUT_VERSION\s*=\s*"([^"]+)"/);
+    if (m && m[1] && m[1] !== window.BREAKOUT_VERSION) _showUpdateBanner();
+  }).catch(() => {});
+}
+function _showUpdateBanner(){
+  if (document.getElementById('update-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'update-banner';
+  banner.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#0b1320;border:1px solid #12d47e44;border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:9999;font-family:var(--font-mono);font-size:11px;box-shadow:0 4px 24px #000a;max-width:320px;width:90%;cursor:pointer;';
+  banner.innerHTML = `
+    <div style="flex:1">
+      <div style="color:#ddeeff;font-weight:600;margin-bottom:2px">Update available</div>
+      <div style="color:#4a6280">Tap to refresh and get the latest fixes</div>
+    </div>`;
+  banner.onclick = () => window.location.reload();
+  document.body.appendChild(banner);
+}
+setInterval(_checkForNewVersion, 5 * 60 * 1000);
+setTimeout(_checkForNewVersion, 30 * 1000); // also check shortly after load, not just every 5min
 // Console escape hatch: run  breakoutReset()  in the console to force a clean reset
 // even if the button fails. Also clears Firestore so corruption can't sync back.
 window.breakoutReset = async function(){
