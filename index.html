@@ -8946,7 +8946,25 @@ function get24hPct(rank){
   // in that case instead, same as having no log at all.
   if (priorPts.length) {
     const basePrice = priorPts[priorPts.length - 1].price;
-    if (basePrice > 0) return Math.round((cur - basePrice) / basePrice * 1000) / 10;
+    // Reject an anchor that's wildly out of step with BOTH the current price
+    // AND the player's actual settled close/statPrice - same outlier test
+    // already used for the chart line and ENGINE.pct's own badges. A log
+    // entry can survive as "genuine" by timestamp while no longer being
+    // true: a live in-game price that later settled down at finalize (a
+    // real, intentional correction) leaves its pre-correction value sitting
+    // in the log with nothing to mark it stale. Confirmed live 2026-09-21:
+    // Kazuma Okamoto's log jumped straight from a Sunday-afternoon $38.60
+    // plateau to Monday's real ~$28 with no point logged in between - the
+    // finalize() point that should have recorded his actual $27.43 close
+    // never survived a later device's sync (see syncPricesToFirestore's
+    // intraday comment) - so this anchor read a real +2.5% since his actual
+    // close as -27.2% off a stale pre-correction price instead.
+    const _fairRef = _cHist[_latestCloseDate] > 0 ? _cHist[_latestCloseDate]
+      : ([...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].find(x => x.rank === rank)?.statPrice || 0);
+    const _anchorIsStale = _fairRef > 0 && cur > 0
+      && Math.abs(basePrice - _fairRef) / _fairRef > 0.35
+      && Math.abs(basePrice - cur) / cur > 0.35;
+    if (basePrice > 0 && !_anchorIsStale) return Math.round((cur - basePrice) / basePrice * 1000) / 10;
   }
   // The log doesn't reach the full 24h cutoff, but still holds SOME real
   // ticks - use the earliest one as a partial anchor before falling through
@@ -9337,10 +9355,37 @@ function syncPricesToFirestore() {
         }
         return out;
       };
+      // intraday has the exact same wholesale-overwrite shape closes had:
+      // `intraday.<rank>` written as one leaf replaces the WHOLE rolling-24h
+      // array with whatever subset this device's local copy holds, so a
+      // device that hasn't caught up yet (or missed finalize()'s point) can
+      // erase another device's more complete log. get24hPct trusts this log
+      // as "the price N hours ago" with no sanity check against current
+      // value, so losing exactly the point logged when a game finalized
+      // (a real price correction, e.g. a live in-game price settling down at
+      // the final line) leaves a stale pre-correction price as the "24h ago"
+      // anchor. Confirmed live 2026-09-21: Kazuma Okamoto's log had no entry
+      // between a Sunday-afternoon plateau at $38.60 and Monday evening at
+      // $28.11 - the finalize() point that should have logged the drop to
+      // his real $27.43 close never survived a later device's sync - so 24H
+      // read -27.2% off a stale pre-correction price instead of his real
+      // ~+2.5% since that close. arrayUnion only ever ADDS points (de-duped
+      // by exact {t,price} match), never replaces the array, so this can't
+      // happen again. Trade-off: unlike closes (meant to grow forever), this
+      // array is meant to stay a short rolling window and arrayUnion has no
+      // way to prune it - it'll grow slowly over time until a separate
+      // trim pass is added; not urgent, but worth knowing.
+      const dottedIntraday = (snap) => {
+        const out = {};
+        for (const [rank, arr] of Object.entries(snap)) {
+          if (arr.length) out[`intraday.${rank}`] = window._fbArrayUnion(...arr);
+        }
+        return out;
+      };
       const pricesUpdate = {
         ...dotted('liveP', livePSnap),
         ...dotted('todayHx', todayPts),
-        ...dotted('intraday', intradaySnap),
+        ...dottedIntraday(intradaySnap),
         ...dottedCloses(closesSnap),
         isGameLive: isGameLive,
         date: todayStr,
@@ -16564,7 +16609,7 @@ window.addEventListener('appinstalled', () => {
            GoogleAuthProvider, signInWithPopup, signInWithRedirect,
            signOut, getRedirectResult,
            setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-  import { getFirestore, initializeFirestore, serverTimestamp, doc, getDoc, getDocFromServer, setDoc, updateDoc, collection, getDocs, getDocsFromServer, limit, query, orderBy, where, onSnapshot, addDoc, deleteDoc, deleteField, increment }  from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+  import { getFirestore, initializeFirestore, serverTimestamp, doc, getDoc, getDocFromServer, setDoc, updateDoc, collection, getDocs, getDocsFromServer, limit, query, orderBy, where, onSnapshot, addDoc, deleteDoc, deleteField, increment, arrayUnion }  from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
   import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-messaging.js";
 
   const firebaseConfig = {
@@ -16608,6 +16653,7 @@ window.addEventListener('appinstalled', () => {
   window._fbSetDoc     = setDoc;
   window._fbUpdateDoc  = updateDoc;
   window._fbDeleteField = deleteField;
+  window._fbArrayUnion = arrayUnion;
   window._fbCollection = collection;
   window._fbGetDocs    = getDocs;
   window._fbGetDocsFromServer = getDocsFromServer;
