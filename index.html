@@ -8931,7 +8931,17 @@ function get24hPct(rank){
     return getTodayPct(rank);
   }
   const cutoff = Date.now() - 24 * 3600 * 1000;
-  const arr = (intraday[rank] || []).slice().sort((a, b) => a.t - b.t);
+  let arr = (intraday[rank] || []).slice().sort((a, b) => a.t - b.t);
+  // A log whose NEWEST point is itself long stale isn't evidence about the
+  // last 24 hours at all - it's a leftover from a game days ago that never
+  // got pruned, since pruning only happens as a side effect of a NEW point
+  // being logged (see _logPricePoint/finalize). Treat it the same as having
+  // no log. Confirmed live 2026-09-22: Aaron Nola hadn't pitched in 5 days,
+  // but his log's one-hour cluster from his last start (9/17) was still the
+  // newest thing in it - get24hPct anchored on it anyway and read a real 0%
+  // (nothing has happened since, price is just resting at that old close)
+  // as +11%, the unrelated intra-start wobble from that 5-day-old outing.
+  if (arr.length && arr[arr.length - 1].t < Date.now() - 30 * 3600 * 1000) arr = [];
   const priorPts = arr.filter(pt => pt.t <= cutoff);
   // Only trust the log when it actually HAS a point at/before the 24h
   // cutoff - that's the real "price 24h ago". A log that doesn't reach back
