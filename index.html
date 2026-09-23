@@ -8928,7 +8928,22 @@ function get24hPct(rank){
   // mode this function's own header comment already describes (Gavin
   // Williams) - the shortcut below just wasn't actually guarding against it.
   if (_latestCloseDate && _closeDates.length >= 2 && !(_ln && _ln.live) && Math.abs(_cHist[_latestCloseDate] - cur) < 0.005) {
-    return getTodayPct(rank);
+    // getTodayPct's close-to-close diff isn't a real 24h move just because
+    // the game was "recent" by calendar date - it compares the latest close
+    // to whatever close PRECEDES it, however long ago that was (a full WEEK,
+    // for NFL's once-a-game-per-week cadence). Once the game that produced
+    // this close is itself more than ~24h in the past, the price has been
+    // sitting flat right here ever since (that's what the Math.abs check
+    // above just confirmed) - the honest 24H answer is flat 0%, not that
+    // whole game's since-last-week move re-reported as "24H" indefinitely
+    // until the next game overwrites it. _ln.ts approximates real kickoff
+    // time (see _setLastNight) - a much safer within-24h test than comparing
+    // date STRINGS, which can call a game "yesterday" right up to 47h stale
+    // depending on what time of day it's checked. Confirmed live 2026-09-23:
+    // Monday Night Football players still read their full since-last-week
+    // move as "24H" on Wednesday, two days after the game actually ended.
+    if (_ln && _ln.ts && Date.now() - _ln.ts < 24 * 3600 * 1000) return getTodayPct(rank);
+    return 0;
   }
   const cutoff = Date.now() - 24 * 3600 * 1000;
   let arr = (intraday[rank] || []).slice().sort((a, b) => a.t - b.t);
@@ -9050,8 +9065,13 @@ function get24hPct(rank){
     }
   }
   const ln = lastNight[rank];
-  const todayStr = localDateStr(), ydStr = localDateStr(1);
-  if (ln && ln.played && ln.date && (ln.date === todayStr || ln.date === ydStr)) {
+  // Same real-elapsed-time test as the close-to-close shortcut above, instead
+  // of a date-STRING match against today/yesterday - a game logged "yesterday"
+  // can be anywhere from minutes to ~47h stale depending on what time of day
+  // this runs, and getTodayPct's answer for it is only a genuine 24h move
+  // when the game itself happened within the last real 24h (see that
+  // shortcut's comment for the NFL week-over-week failure mode this avoids).
+  if (ln && ln.played && ln.ts && Date.now() - ln.ts < 24 * 3600 * 1000) {
     return getTodayPct(rank);
   }
   return 0;
