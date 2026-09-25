@@ -9694,6 +9694,18 @@ async function loadPricesFromFirestore() {
   }
 }
 
+// Last name for display (movers ticker, share cards, schedule chips) - plain
+// `name.split(' ').pop()` breaks for any player whose full name ends in a
+// generational suffix (e.g. "Marvin Harrison Jr.", "Kenneth Walker III"),
+// showing just the bare suffix ("Jr.", "III") instead of a name. Strip
+// trailing suffix tokens first so the real surname is what gets picked.
+const _NAME_SUFFIX_RE = /^(jr\.?|sr\.?|ii|iii|iv|v)$/i;
+function playerLastName(name){
+  const parts = (name || '').split(' ').filter(Boolean);
+  while (parts.length > 1 && _NAME_SUFFIX_RE.test(parts[parts.length - 1])) parts.pop();
+  return parts[parts.length - 1] || name || '';
+}
+
 function updateMovers(){
   const leaguePlayers = currentLeague === 'MLB' ? mlbPlayers
                       : currentLeague === 'GOLF' ? golfPlayers
@@ -9705,11 +9717,22 @@ function updateMovers(){
   const ydStr = localDateStr(1);
   const _todayInt = Math.floor(todayDayNum());
 
+  // `isGameLive` is deliberately a CROSS-league flag (any league's tick sets it,
+  // used to speed up polling / gate trade-confirmation delay - see nflTick's
+  // comment above its own isGameLive write). Using it here to decide THIS
+  // league's "Today" vs "Last Night" movers label was wrong: with e.g. a live
+  // golf event, switching to the NFL tab kept the header on "Today" and
+  // mislabeled last night's already-final NFL slate as if it were live right
+  // now. Each `lastNight` entry already records whether THAT player's own
+  // game was live when written (`live: true/false`), so derive a
+  // league-scoped signal from that instead of the global flag.
+  const leagueIsLive = [...leaguePlayers].some(p => lastNight[p.rank]?.live === true);
+
   // Decide what slate to show:
   //   - If a game is LIVE now or today already produced data → show TODAY's movers.
   //   - Otherwise (pre-game, between slates) → show the most recent completed slate
   //     (last night's guys) until tonight's games actually start.
-  const todayHasData = isGameLive ||
+  const todayHasData = leagueIsLive ||
     [...leaguePlayers].some(p => {
       const ln = lastNight[p.rank];
       return ln && ln.played && ln.date === todayStr;
@@ -9867,13 +9890,13 @@ function updateMovers(){
     const ln = lastNight[p.rank];
     return ln && ln.date === todayStr;
   });
-  const label = isGameLive ? 'Today' : _todayMovers ? 'Today' : 'Last Night';
+  const label = leagueIsLive ? 'Today' : _todayMovers ? 'Today' : 'Last Night';
   const moversHeader = document.getElementById('movers-header');
   if (moversHeader) moversHeader.textContent = label;
 
   const moversHtml = sorted.map(p=>`
     <div class="mover-item" onclick="selectPlayerFromList(${p.rank})" style="cursor:pointer">
-      <span class="mover-name">${p.name.split(' ').pop()}</span>
+      <span class="mover-name">${playerLastName(p.name)}</span>
       <span class="mover-price">${fmt(liveP[p.rank])}</span>
       <span class="mover-pct ${p.pct>=0?'up':'down'}">${fmtP(p.pct)}</span>
     </div>`).join('');
@@ -11421,7 +11444,7 @@ function sharePortfolio() {
       const cur = liveP[r];
       const avg = h.totalCost / h.shares;
       const holdPct = avg > 0 ? ((cur - avg) / avg * 100) : 0;
-      return { name: p?.name || '', lastName: (p?.name || '').split(' ').pop(), val: h.shares * cur, holdPct };
+      return { name: p?.name || '', lastName: playerLastName(p?.name), val: h.shares * cur, holdPct };
     })
     .sort((a, b) => b.val - a.val)
     .slice(0, 4);
@@ -11476,7 +11499,7 @@ function copyShareText() {
   const name = currentUser?.displayName || 'Anonymous';
   const topHeld = Object.entries(holdings)
     .filter(([, h]) => h.shares > 0)
-    .map(([r, h]) => [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers].find(p => p.rank == r)?.name.split(' ').pop())
+    .map(([r, h]) => playerLastName([...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers].find(p => p.rank == r)?.name))
     .filter(Boolean).slice(0, 3).join(', ');
   const rankEl = document.getElementById('share-rank-num');
   const rankStr = rankEl?.textContent && rankEl.textContent !== '—' ? ' · ' + rankEl.textContent + ' globally' : '';
@@ -14072,7 +14095,7 @@ async function loadSchedule() {
               const thruStr = standing.thru ? ` · thru ${standing.thru}` : '';
               return `<div class="sched-player-chip" onclick="goMarketFrom('schedule',${p.rank})">
                 <div class="sched-player-tier" style="background:${TIER_COLOR[p.tier]}22;color:${TIER_COLOR[p.tier]};border:1px solid ${TIER_COLOR[p.tier]}44;">${p.tier}</div>
-                <span class="sched-player-name">${standing.pos ? standing.pos + ' ' : ''}${p.name.split(' ').pop()} ${toParStr}${thruStr}</span>
+                <span class="sched-player-name">${standing.pos ? standing.pos + ' ' : ''}${playerLastName(p.name)} ${toParStr}${thruStr}</span>
               </div>`;
             }).join('')}
           </div>`
@@ -14152,7 +14175,7 @@ async function loadSchedule() {
               const pctStr = Math.abs(pct) > 0.1 ? `<span class="sched-player-pct" style="color:${pct>=0?'var(--green)':'var(--red)'};">${pct>=0?'+':''}${pct.toFixed(1)}%</span>` : '';
               return `<div class="sched-player-chip" onclick="goMarketFrom('schedule',${p.rank})">
                 <div class="sched-player-tier" style="background:${TIER_COLOR[p.tier]}22;color:${TIER_COLOR[p.tier]};border:1px solid ${TIER_COLOR[p.tier]}44;">${p.tier}</div>
-                <span class="sched-player-name">${p.name.split(' ').pop()}</span>
+                <span class="sched-player-name">${playerLastName(p.name)}</span>
                 ${pctStr}
               </div>`;
             }).join('')}
