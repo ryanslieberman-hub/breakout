@@ -29,11 +29,11 @@ crons = ["0 * * * *"]
 # Plain (non-secret) vars - safe to keep here or move to .dev.vars for local dev:
 [vars]
 FIREBASE_PROJECT_ID = "athletex-ae63d"
-ALLOWED_ORIGIN = "https://square-block-4d1b.ryanslieberman.workers.dev"
-CHECKOUT_SUCCESS_URL = "https://square-block-4d1b.ryanslieberman.workers.dev/?challenge_paid=1"
-CHECKOUT_CANCEL_URL = "https://square-block-4d1b.ryanslieberman.workers.dev/?challenge_paid=0"
-IDENTITY_RETURN_URL = "https://square-block-4d1b.ryanslieberman.workers.dev/?identity_return=1"
-CONNECT_RETURN_URL = "https://square-block-4d1b.ryanslieberman.workers.dev/?connect_return=1"
+ALLOWED_ORIGIN = "https://breakoutmarket.com"
+CHECKOUT_SUCCESS_URL = "https://breakoutmarket.com/?challenge_paid=1"
+CHECKOUT_CANCEL_URL = "https://breakoutmarket.com/?challenge_paid=0"
+IDENTITY_RETURN_URL = "https://breakoutmarket.com/?identity_return=1"
+CONNECT_RETURN_URL = "https://breakoutmarket.com/?connect_return=1"
 PLATFORM_FEE_BPS = "1000"
 
 # Native Cloudflare rate limiting, keyed per-uid in code (see checkRateLimit
