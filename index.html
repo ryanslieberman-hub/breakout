@@ -12851,6 +12851,17 @@ async function handleAuthChange(user) {
     updateSettingsAccount();
     showToast('Signed in as ' + user.displayName);
 
+    // Started independently of the profile/portfolio sync below - that
+    // block does a lot (portfolio load, coins total, a Firestore write) and
+    // any single failure in it used to also silently kill the claim badge,
+    // since startClaimBadgePolling() only ran at the very end of that same
+    // try block. Confirmed live: the claim button/banner just permanently
+    // vanished for a user, with no visible error, because something earlier
+    // in that chain had thrown. The claim UI has nothing to do with whether
+    // the rest of profile sync succeeds, so it shouldn't be able to take it
+    // down with it.
+    try { startClaimBadgePolling(); } catch(e){}
+
     // Write to Firestore
     try {
       const ref = window._fbDoc(db, 'users', user.uid);
