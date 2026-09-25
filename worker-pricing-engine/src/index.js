@@ -187,10 +187,12 @@ async function tickNba(env, today) {
 
   // Phase 2: one batched read.
   const states = await loadStatesBatch(env, 'nba', toProcess.map(t => t.player));
+  const clientCloses = (await firestoreGetDoc(env, 'config/prices').catch(() => null))?.closes || {};
 
   // Phase 3: compute every update in memory.
   const updates = [];
   const movers = [];
+  const configWrites = []; // mirrors finalized closes into config/prices - see mirrorClose's comment above tickMlb
   const now = Date.now();
   let finalized = 0;
   for (const { player, stat, isFinal } of toProcess) {
@@ -199,7 +201,13 @@ async function tickNba(env, today) {
     const perf = nbaPerf(p, stat);
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
     const fields = { base: newBaseRecord, tier: st.tier, statPrice: st.statPrice, ppg: st.ppg, rpg: st.rpg, apg: st.apg };
-    if (isFinal) { fields.closes = { ...st.closes, [today]: finalize(value, today, st.closes) }; finalized++; }
+    if (isFinal) {
+      const closeVal = finalize(value, today, st.closes);
+      fields.closes = { ...st.closes, [today]: closeVal };
+      finalized++;
+      const mirrored = mirrorClose(player.rank, perf, closeVal, st.statPrice, today, clientCloses);
+      configWrites.push({ segments: ['closes', String(player.rank), today], value: mirrored });
+    }
     const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: today, now });
     Object.assign(fields, moveFields);
     movers.push(...events);
@@ -208,6 +216,13 @@ async function tickNba(env, today) {
 
   // Phase 4: one batched write.
   await firestoreBatchWriteDocs(env, updates);
+  if (configWrites.length) {
+    try {
+      await firestoreSetDeepFields(env, 'config/prices', configWrites);
+    } catch (e) {
+      console.error('config/prices NBA close mirror failed:', e.message);
+    }
+  }
   const notified = await announceMovers(env, movers);
   return { league: 'nba', games: events.length, processed: toProcess.length, finalized, movers: movers.length, notified };
 }
@@ -381,9 +396,11 @@ async function tickGolf(env, today) {
   for (const player of tracked) cumHxByRank[player.rank] = states[player.rank].cumHx || {};
 
   const fieldAvg = golf.computeFieldAverage(byName, rankByNorm, cumHxByRank);
+  const clientCloses = (await firestoreGetDoc(env, 'config/prices').catch(() => null))?.closes || {};
 
   const updates = [];
   const movers = [];
+  const configWrites = []; // mirrors finalized closes into config/prices - see mirrorClose's comment above tickMlb
   const now = Date.now();
   let finalized = 0;
   for (const player of tracked) {
@@ -396,7 +413,13 @@ async function tickGolf(env, today) {
     const perf = golfPerf(p, { toPar: derived.toPar }, fieldAvg);
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
     const fields = { base: newBaseRecord, cumHx: derived.updatedHx, tier: st.tier, statPrice: st.statPrice };
-    if (isComplete) { fields.closes = { ...st.closes, [derived.date]: finalize(value, derived.date, st.closes) }; finalized++; }
+    if (isComplete) {
+      const closeVal = finalize(value, derived.date, st.closes);
+      fields.closes = { ...st.closes, [derived.date]: closeVal };
+      finalized++;
+      const mirrored = mirrorClose(player.rank, perf, closeVal, st.statPrice, derived.date, clientCloses);
+      configWrites.push({ segments: ['closes', String(player.rank), derived.date], value: mirrored });
+    }
     const { events, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: derived.date, now });
     Object.assign(fields, moveFields);
     movers.push(...events);
@@ -404,6 +427,13 @@ async function tickGolf(env, today) {
   }
 
   await firestoreBatchWriteDocs(env, updates);
+  if (configWrites.length) {
+    try {
+      await firestoreSetDeepFields(env, 'config/prices', configWrites);
+    } catch (e) {
+      console.error('config/prices golf close mirror failed:', e.message);
+    }
+  }
   const notified = await announceMovers(env, movers);
   return { league: 'golf', players: Object.keys(byName).length, processed: updates.length, finalized, movers: movers.length, notified };
 }
@@ -431,8 +461,20 @@ async function tickNfl(env, today) {
   const byRank = {};
   for (const p of nflRaw) { byName[nfl.normalizeName(p.name)] = p; byRank[p.rank] = p; }
 
+  // Per-player final tracking, not one global flag for the whole tick - a
+  // Sunday slate has early games final hours before the late/SNF window even
+  // kicks off, and `live.length === 0` for the ENTIRE relevant set stays
+  // false almost the whole day. That silently blocked every player's close
+  // from ever finalizing on a normal game day (confirmed live: priceEngine's
+  // NFL docs had gone essentially unwritten since 2026-08-14, preseason -
+  // the whole regular season's worth of finalized games never locked in a
+  // close). Same bug class MLB already hit and fixed per-player in
+  // mlb.js's fetchBoxscores (see its header comment) - ported that pattern
+  // here instead of reproducing the global-flag version for a second sport.
+  const finalByRank = {};
   for (const ev of relevant) {
     const frac = nfl.gameFrac(ev.status);
+    const isEventFinal = !!ev.status?.type?.completed;
     const summary = await nfl.fetchSummary(ev.id);
     const points = nfl.extractNflFantasyPoints(summary);
     for (const [name, pts] of Object.entries(points)) {
@@ -440,10 +482,10 @@ async function tickNfl(env, today) {
       if (!player) continue;
       fptsByRank[player.rank] = (fptsByRank[player.rank] || 0) + pts;
       gameFracByRank[player.rank] = frac;
+      finalByRank[player.rank] = isEventFinal; // one NFL game per player per day - no doubleheader merge needed
     }
   }
 
-  const isFinal = live.length === 0; // every relevant event this tick is complete
   const toProcess = Object.keys(fptsByRank).map(Number).filter(r => byRank[r]).map(r => byRank[r]);
   if (!toProcess.length) return { league: 'nfl', games: relevant.length, processed: 0, finalized: 0 };
 
@@ -462,7 +504,7 @@ async function tickNfl(env, today) {
     const perf = nflPerf(p, { fpts, gameFrac });
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
     const fields = { base: newBaseRecord, tier: st.tier, statPrice: st.statPrice, fpts: st.fpts };
-    if (isFinal) {
+    if (finalByRank[player.rank]) {
       const closeVal = finalize(value, today, st.closes);
       fields.closes = { ...st.closes, [today]: closeVal };
       finalized++;
