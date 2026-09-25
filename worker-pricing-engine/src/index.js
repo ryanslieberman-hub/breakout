@@ -637,6 +637,56 @@ export async function runPortfolioSummary(env) {
   return { date: today, portfolios: portfolios.length, updated };
 }
 
+// config/prices.intraday is written client-side via arrayUnion (only ever
+// ADDS points, by design - see index.html's dottedIntraday comment, which
+// already flags this as a known, unaddressed gap: "this array is meant to
+// stay a short rolling window and arrayUnion has no way to prune it - it'll
+// grow slowly over time until a separate trim pass is added"). Similarly,
+// config/prices.todayHx is written as a per-rank wholesale replace, but only
+// for ranks a client is actively syncing "today" data for - a rank nobody
+// has open (or whose game ended days ago) just keeps its last-written value
+// forever, with nothing to ever clear it. Both are meant to hold only recent
+// data (intraday: ~last 30h, matching the client's own local prune cutoff in
+// smartTracker; todayHx: only the current day), so anything older is pure
+// staleness.
+//
+// Confirmed live 2026-09-25: a stale todayHx point from days earlier (Kyle
+// Pitts: a ~Sept 20 tick at 29.50) got read by the client's 24H calculation
+// as if it were current, producing a fake ~-10% move instead of his real
+// -3.8%. One-off scripts (prune-stale-intraday.mjs, prune-stale-todayhx.mjs)
+// fixed the existing backlog, but nothing was actually stopping it from
+// re-accumulating - this closes that gap for good by running the same prune
+// automatically on the existing once-daily cron, instead of only on demand.
+async function pruneStaleHistory(env) {
+  const EPOCH = new Date('2025-01-01').getTime();
+  const todayInt = Math.floor((Date.now() - EPOCH) / 86400000);
+  const intradayCutoff = Date.now() - 30 * 3600 * 1000;
+
+  const prices = await firestoreGetDoc(env, 'config/prices');
+  const entries = [];
+  let intradayPruned = 0, todayHxPruned = 0;
+
+  for (const [rank, pts] of Object.entries(prices.intraday || {})) {
+    if (!Array.isArray(pts) || !pts.length) continue;
+    const fresh = pts.filter((p) => p.t >= intradayCutoff);
+    if (fresh.length !== pts.length) {
+      intradayPruned += pts.length - fresh.length;
+      entries.push({ segments: ['intraday', String(rank)], value: fresh });
+    }
+  }
+  for (const [rank, pts] of Object.entries(prices.todayHx || {})) {
+    if (!Array.isArray(pts) || !pts.length) continue;
+    const fresh = pts.filter((p) => p.day >= todayInt);
+    if (fresh.length !== pts.length) {
+      todayHxPruned += pts.length - fresh.length;
+      entries.push({ segments: ['todayHx', String(rank)], value: fresh });
+    }
+  }
+
+  if (entries.length) await firestoreSetDeepFields(env, 'config/prices', entries);
+  return { ranksTouched: entries.length, intradayPruned, todayHxPruned };
+}
+
 export async function runDailyRefresh(env) {
   const results = [];
   for (const fn of [runNbaDailyRefresh, runMlbDailyRefresh]) {
@@ -646,6 +696,12 @@ export async function runDailyRefresh(env) {
       console.error(`${fn.name} failed:`, e.message);
       results.push({ fn: fn.name, error: e.message });
     }
+  }
+  try {
+    results.push({ fn: 'pruneStaleHistory', ...(await pruneStaleHistory(env)) });
+  } catch (e) {
+    console.error('pruneStaleHistory failed:', e.message);
+    results.push({ fn: 'pruneStaleHistory', error: e.message });
   }
   return { results };
 }
