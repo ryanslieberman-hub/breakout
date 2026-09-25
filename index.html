@@ -9902,6 +9902,19 @@ function updateMovers(){
     </div>`).join('');
 
   const scrollEl = document.getElementById('movers-scroll');
+  // Skip the rebuild entirely when the list is unchanged since the last call.
+  // updateMovers() fires on a lot of events (league switch, every tracker
+  // tick, price syncs, etc.) - rebuilding scrollEl's innerHTML every time
+  // replaces the ticker's DOM nodes, which restarts the CSS scroll animation
+  // (moversTick) from position 0 even though nothing visible changed.
+  // Confirmed live on a phone: the ticker looked permanently "stuck"
+  // oscillating between two adjacent names because updateMovers() was
+  // getting called faster than the 36s scroll could ever complete a lap,
+  // resetting it back to the start on every call. A cheap signature compare
+  // avoids the reset unless the actual mover list changed.
+  const signature = sorted.map(p => `${p.rank}:${p.pct.toFixed(2)}`).join('|');
+  if (scrollEl.dataset.sig === signature) return;
+  scrollEl.dataset.sig = signature;
   // Duplicated so the CSS animation can slide exactly one copy's width and
   // loop seamlessly (same trick as the onboarding ticker). Only worth doing
   // - and only worth animating - when there's an actual list to loop through.

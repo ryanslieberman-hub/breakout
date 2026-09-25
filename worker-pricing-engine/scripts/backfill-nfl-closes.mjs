@@ -144,50 +144,86 @@ function buildIntradayFields(closesByRank, existingIntraday) {
   return out;
 }
 
-// Surgical merge: PATCH only `closes.<rank>`, `liveP.<rank>`, and
-// `intraday.<rank>` leaves, so sibling ranks and the other leagues' history
-// are untouched (same effect the client's setDoc(..., {merge:true}) has).
-// Numeric segments must be backtick-quoted in a Firestore field path.
+// Surgical merge: PATCH only `closes.<rank>.<date>` (one leaf per date, NOT
+// the whole `closes.<rank>` map), plus `liveP.<rank>` and `intraday.<rank>`,
+// so sibling ranks/dates and the other leagues' history are untouched (same
+// effect the client's setDoc(..., {merge:true}) has). Numeric/date segments
+// must be backtick-quoted in a Firestore field path.
 //
-// Chunked into groups of ranks rather than one PATCH for everything - a full
-// Sunday slate is 180+ ranks, and one request listing every rank's fieldPath
-// in the URL (3 per rank now) runs long enough that Google's front-end
-// rejects it outright as a malformed request (a generic 400 page, not a
-// Firestore JSON error) before it ever reaches Firestore. A single game day
-// (the only case this script had run for before) never had enough ranks to
-// hit that.
+// CONFIRMED LIVE BUG 2026-09-25: this used to PATCH the whole `closes.<rank>`
+// map as one field. That's fine for a full-season run (closesByRank[r] IS the
+// complete history), but a narrower `--from` run - e.g. `--from 20260921` to
+// backfill just a couple of recent game days - only computes THOSE dates, and
+// the whole-map PATCH replaced each touched rank's entire closes history with
+// just that narrow slice, silently deleting every earlier date. Confirmed on
+// Bijan Robinson: a `--from 20260921` run wiped his 09-13/09-20 closes down
+// to only 09-24. Per-date leaf writes make this impossible - a narrow run can
+// only ever ADD the dates it actually computed, never remove ones it didn't.
+//
+// Chunked into groups of date-leaves rather than one PATCH for everything - a
+// full Sunday slate is 180+ ranks, and one request listing every fieldPath in
+// the URL runs long enough that Google's front-end rejects it outright as a
+// malformed request (a generic 400 page, not a Firestore JSON error) before
+// it ever reaches Firestore.
 const PATCH_CHUNK_SIZE = 25;
 async function patchCloses(token, closesByRank, livePByRank, intradayByRank) {
-  const ranks = Object.keys(closesByRank);
-  for (let i = 0; i < ranks.length; i += PATCH_CHUNK_SIZE) {
-    const chunk = ranks.slice(i, i + PATCH_CHUNK_SIZE);
+  // Flatten to one entry per (rank, date) leaf so chunking never splits a
+  // rank's map into two competing partial writes.
+  const closeEntries = [];
+  for (const [rank, byDate] of Object.entries(closesByRank)) {
+    for (const [date, price] of Object.entries(byDate)) closeEntries.push({ rank, date, price });
+  }
+  for (let i = 0; i < closeEntries.length; i += PATCH_CHUNK_SIZE) {
+    const chunk = closeEntries.slice(i, i + PATCH_CHUNK_SIZE);
     const fieldPaths = [];
     const closesFields = {};
-    const livePFields = {};
-    const intradayFields = {};
-    for (const r of chunk) {
-      closesFields[r] = toFsValue(closesByRank[r]);
-      livePFields[r] = toFsValue(livePByRank[r]);
-      intradayFields[r] = { arrayValue: { values: (intradayByRank[r] || []).map(toFsValue) } };
-      fieldPaths.push('closes.`' + r + '`', 'liveP.`' + r + '`', 'intraday.`' + r + '`');
+    for (const { rank, date, price } of chunk) {
+      if (!closesFields[rank]) closesFields[rank] = { mapValue: { fields: {} } };
+      closesFields[rank].mapValue.fields[date] = toFsValue(price);
+      fieldPaths.push('closes.`' + rank + '`.`' + date + '`');
     }
-    const body = {
-      fields: {
-        closes: { mapValue: { fields: closesFields } },
-        liveP: { mapValue: { fields: livePFields } },
-        intraday: { mapValue: { fields: intradayFields } },
-      },
-    };
-    const qs = fieldPaths
-      .map((p) => `updateMask.fieldPaths=${encodeURIComponent(p)}`)
-      .join('&');
+    const body = { fields: { closes: { mapValue: { fields: closesFields } } } };
+    const qs = fieldPaths.map((p) => `updateMask.fieldPaths=${encodeURIComponent(p)}`).join('&');
     const res = await fetch(`${DOCS}/config/prices?${qs}`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`patch failed (ranks ${chunk[0]}..${chunk[chunk.length - 1]}): ${await res.text()}`);
-    console.log(`  patched ${chunk.length} ranks (${i + chunk.length}/${ranks.length})`);
+    if (!res.ok) throw new Error(`closes patch failed (entries ${i}..${i + chunk.length}): ${await res.text()}`);
+    console.log(`  patched ${chunk.length} close date(s) (${i + chunk.length}/${closeEntries.length})`);
+  }
+
+  // liveP/intraday are still whole-value-per-rank (not maps of dates), so a
+  // wholesale PATCH per rank is fine there - but only for ranks whose
+  // backfilled data is actually the freshest thing known for that rank.
+  // livePByRank/intradayByRank are already pre-filtered to just those ranks
+  // by the caller (see the `freshRanks` filter below `buildIntradayFields`).
+  const ranks = Object.keys(livePByRank);
+  for (let i = 0; i < ranks.length; i += PATCH_CHUNK_SIZE) {
+    const chunk = ranks.slice(i, i + PATCH_CHUNK_SIZE);
+    if (!chunk.length) continue;
+    const fieldPaths = [];
+    const livePFields = {};
+    const intradayFields = {};
+    for (const r of chunk) {
+      livePFields[r] = toFsValue(livePByRank[r]);
+      intradayFields[r] = { arrayValue: { values: (intradayByRank[r] || []).map(toFsValue) } };
+      fieldPaths.push('liveP.`' + r + '`', 'intraday.`' + r + '`');
+    }
+    const body = {
+      fields: {
+        liveP: { mapValue: { fields: livePFields } },
+        intraday: { mapValue: { fields: intradayFields } },
+      },
+    };
+    const qs = fieldPaths.map((p) => `updateMask.fieldPaths=${encodeURIComponent(p)}`).join('&');
+    const res = await fetch(`${DOCS}/config/prices?${qs}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`liveP/intraday patch failed (ranks ${chunk[0]}..${chunk[chunk.length - 1]}): ${await res.text()}`);
+    console.log(`  patched liveP/intraday for ${chunk.length} rank(s) (${i + chunk.length}/${ranks.length})`);
   }
 }
 
@@ -335,7 +371,25 @@ console.log(`\nconfig/prices currently has ${beforeNflCloses} NFL ranks with non
 
 const intradayByRank = buildIntradayFields(closesByRank, before.intraday);
 
-await patchCloses(token, closesByRank, livePByRank, intradayByRank);
+// Only overwrite liveP/intraday for a rank if this run's own most recent
+// backfilled date is not older than what the client already has - otherwise
+// a narrow `--from` catch-up run could regress liveP backward past a more
+// recent price the live mirror already wrote (e.g. re-running for an old
+// gap after this week's games have already priced in).
+const freshLivePByRank = {};
+const freshIntradayByRank = {};
+for (const [rank, m] of Object.entries(closesByRank)) {
+  const lastBackfilled = Object.keys(m).sort().pop();
+  const existing = before.closes?.[rank] || {};
+  const existingDates = Object.keys(existing).filter((d) => existing[d] > 0).sort();
+  const lastExisting = existingDates[existingDates.length - 1];
+  if (!lastExisting || lastBackfilled >= lastExisting) {
+    freshLivePByRank[rank] = livePByRank[rank];
+    freshIntradayByRank[rank] = intradayByRank[rank];
+  }
+}
+
+await patchCloses(token, closesByRank, freshLivePByRank, freshIntradayByRank);
 
 const after = await getPricesDoc(token);
 const afterNflCloses = Object.keys(after.closes || {}).filter(
