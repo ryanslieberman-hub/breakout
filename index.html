@@ -1502,6 +1502,154 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
   .xbtn{min-height:48px;}
 
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   LABEL + LIST PASS
+   Section labels and controls were all 8-10px mono, uppercase, tracked
+   1-2px ("PLAYERS · 340", "PRICE HISTORY") - the default dashboard voice.
+   Labels now speak in the body face at a readable size; mono stays only
+   where it measures something (prices, stats, shares). Rows are a list
+   divided by hairlines, not a stack of outlined boxes. Appended so it
+   overrides by source order and reverts by deleting to the end of the
+   stylesheet.
+   ════════════════════════════════════════════════════════════════════════ */
+.movers-label,.ls-title,.chart-lbl,.pclbl,.section-hdr,.port-chart-lbl,
+.modal-label,.profile-stat-lbl,.profile-section-lbl,.money-label,
+.friend-status-badge,.sched-status,.drawer-header,.drawer-section-label,
+.trending-sub,.inp-lbl,.pvl,.hsub,.psub,.tcard-sub,.ulb-sub,.news-meta{
+  font-family:var(--font-body);text-transform:none;letter-spacing:0;
+}
+.movers-label,.ls-title,.chart-lbl,.section-hdr,.port-chart-lbl,
+.profile-section-lbl,.drawer-section-label{font-size:12px;font-weight:600;color:var(--muted);}
+.inp-lbl,.pvl,.modal-label,.profile-stat-lbl,.money-label,.pclbl{font-size:11px;font-weight:500;}
+.trending-sub{font-size:12px;}
+.hsub,.psub,.tcard-sub,.ulb-sub{font-size:12px;}
+
+.nav-tab,.nbtn,.tf,.ctab,.mt,.ut-btn,.mbtn,.trend-tab,.trend-range-btn,
+.ulb-sort-btn,.ulb-tab,.rb,.qc{
+  font-family:var(--font-body);text-transform:none;letter-spacing:0;font-weight:500;font-size:12px;
+}
+.nav-tab{font-size:13px;}
+.ut-btn{font-size:11px;}
+.rb,.qc{font-variant-numeric:tabular-nums;}
+
+/* Player list: plain rows. The green/red inset outline on every row made
+   the list read as ~300 cards; direction already lives in the % colour. */
+.prow-up,.prow-down{box-shadow:none;}
+.prow.active{border-left-color:transparent;background:var(--card2);}
+.pname,.psub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* Hero: name, then the season line, then one quiet market line. */
+.hstats{gap:18px;margin-top:8px;}
+.hs-l{font-family:var(--font-body);letter-spacing:0;font-size:11px;}
+.hmarket{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;font-size:12px;color:var(--muted);}
+.hmarket b{font-family:var(--font-mono);font-weight:500;color:var(--text);font-variant-numeric:tabular-nums;}
+.hmarket [hidden]{display:none;}
+
+/* Empty states */
+.empty-state{padding:40px 20px;text-align:center;max-width:360px;margin:0 auto;}
+.es-title{font-family:var(--font-heading);font-weight:700;font-size:17px;color:var(--text);margin-bottom:6px;}
+.es-body{font-size:13px;line-height:1.5;color:var(--muted);}
+.es-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px;}
+.es-btn{font-family:var(--font-body);font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;border:1px solid var(--green);background:var(--green);color:#03130a;cursor:pointer;}
+.es-btn.ghost{background:transparent;border-color:var(--border2);color:var(--text);}
+.es-btn:hover{filter:brightness(1.08);}
+.sched-day-btn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:32px;background:var(--card);border:1px solid var(--hairline);border-radius:8px;color:var(--text);cursor:pointer;}
+.sched-day-btn:hover{border-color:var(--border2);}
+
+/* Signed-out profile: say what signing in gets you */
+.signin-sub{font-family:var(--font-body);font-size:14px;color:var(--muted);margin-bottom:18px;}
+.signin-perks{list-style:none;margin:0 0 22px;padding:0;border-top:1px solid var(--border);}
+.signin-perks li{padding:12px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--muted);line-height:1.4;}
+.signin-perks b{display:block;color:var(--text);font-weight:600;font-size:14px;}
+.signin-browse{width:100%;}
+.ob-tagline{font-family:var(--font-body);font-size:14px;letter-spacing:0;}
+.ob-body{font-size:15px;line-height:1.6;}
+.ob-btn,.ob-skip{font-family:var(--font-body);font-size:13px;font-weight:600;letter-spacing:0;white-space:nowrap;}
+.ob-btn{padding:10px 20px;}
+.ob-skip{padding:9px 14px;}
+
+/* ════════════════════════════════════════════════════════════════════════
+   LEADERS TAB
+   Was: giant tracked-mono title, pill buttons in three different accent
+   colours, a stack of rounded cards with 28px rank numerals, and a card
+   grid with coloured left stripes below. Now: a standings table - one
+   column grid, hairline rows, right-aligned tabular numbers - with a
+   segmented control per choice and your own rank pulled up top.
+   ════════════════════════════════════════════════════════════════════════ */
+.lb-view{max-width:760px;margin:0 auto;width:100%;box-sizing:border-box;}
+.lb-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.lb-title{font-family:var(--font-heading);font-weight:700;font-size:28px;letter-spacing:-0.3px;margin:0;}
+.lb-title.sm{font-size:20px;}
+.lb-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.lb-updated{font-size:12px;color:var(--muted);}
+.lb-section{margin-top:40px;}
+
+/* Segmented control - one visual for every "pick one" on this tab */
+.seg{display:inline-flex;gap:2px;padding:3px;background:var(--card);border:1px solid var(--hairline);border-radius:9px;margin:0;}
+.seg > button{position:relative;border:none;background:transparent;color:var(--muted);padding:6px 12px;border-radius:7px;cursor:pointer;transition:background .12s,color .12s;white-space:nowrap;}
+.seg > button:hover{color:var(--text);}
+.seg > button.active{background:var(--card2);color:var(--text);border:none;box-shadow:0 1px 2px rgba(0,0,0,.35);}
+
+/* Your standing */
+.ulb-me{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;margin-bottom:14px;background:var(--card);border:1px solid var(--hairline);border-radius:10px;}
+.ulb-me-rank{font-family:var(--font-mono);font-size:26px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;}
+.ulb-me-rank span{font-family:var(--font-body);font-size:13px;font-weight:500;color:var(--muted);}
+.ulb-me-title{font-weight:600;font-size:15px;}
+.ulb-me-sub{font-size:13px;color:var(--muted);margin-top:2px;}
+
+/* Standings rows (also used by Friends, requests and search results) */
+.ulb-head{display:flex;align-items:center;gap:12px;padding:0 8px 8px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--muted);}
+.ulb-head span:nth-child(1){width:28px;text-align:center;}
+.ulb-head span:nth-child(2){flex:1;padding-left:44px;}
+.ulb-head span:nth-child(3){width:96px;text-align:right;}
+.ulb-head span:nth-child(4){width:64px;text-align:right;}
+.ulb-head span:nth-child(5){width:28px;}
+.ulb-card{background:transparent;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:10px 8px;margin:0;gap:12px;}
+.ulb-card:hover{background:rgba(255,255,255,.025);}
+.ulb-you{background:rgba(18,212,126,.06) !important;border-color:var(--border) !important;}
+.ulb-you-tag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;background:rgba(18,212,126,.15);color:var(--green);font-size:10px;font-weight:700;vertical-align:1px;}
+.ulb-rank{font-family:var(--font-mono);font-size:13px;font-weight:600;width:28px;flex-shrink:0;color:var(--muted);font-variant-numeric:tabular-nums;}
+.ulb-rank.gold{color:var(--gold);}
+.ulb-rank.silver{color:#c3ccd6;}
+.ulb-rank.bronze{color:#d08a4f;}
+.ulb-ava{width:32px;height:32px;font-size:14px;}
+.ulb-name{font-size:14px;font-weight:600;}
+.ulb-ret{width:96px;font-size:14px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;}
+.ulb-ret.flat{color:var(--muted);}
+.ulb-num{width:64px;flex-shrink:0;text-align:right;font-family:var(--font-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
+.ulb-num.pos{color:var(--green);} .ulb-num.neg{color:var(--red);}
+.ulb-act{width:28px;flex-shrink:0;display:flex;justify-content:flex-end;}
+
+/* Market movers rows */
+.mv-list{display:block;}
+.mv-head span:nth-child(3){width:84px;}
+.mv-head span:nth-child(4){width:64px;}
+.mv-row{display:flex;align-items:center;gap:12px;padding:10px 8px;border-bottom:1px solid var(--border);cursor:pointer;}
+.mv-row:hover{background:rgba(255,255,255,.025);}
+.mv-av{position:relative;width:32px;height:32px;flex-shrink:0;}
+.mv-av img,.mv-init{position:absolute;inset:0;width:32px;height:32px;border-radius:50%;object-fit:cover;background:var(--card);border:1px solid var(--border2);}
+.mv-init{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;}
+.mv-info{flex:1;min-width:0;}
+.mv-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mv-sub{font-size:12px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mv-vol{height:2px;margin-top:6px;background:var(--border);border-radius:1px;max-width:160px;}
+.mv-vol span{display:block;height:100%;background:var(--gold);border-radius:1px;opacity:.8;}
+.mv-price{width:84px;flex-shrink:0;text-align:right;font-family:var(--font-mono);font-size:14px;font-weight:500;font-variant-numeric:tabular-nums;}
+.mv-pct{width:64px;flex-shrink:0;text-align:right;font-family:var(--font-mono);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;}
+.mv-pct.up{color:var(--green);} .mv-pct.down{color:var(--red);} .mv-pct.flat{color:var(--muted);}
+
+@media (max-width:768px){
+  .lb-view{padding:16px 14px 24px;}
+  .lb-title{font-size:24px;}
+  .ulb-head span:nth-child(3){width:78px;}
+  .ulb-head span:nth-child(4),.ulb-num{display:none;}
+  .ulb-ret{width:78px;font-size:13px;}
+  .mv-head span:nth-child(4){display:inline;}
+  .mv-head span:nth-child(3),.mv-price{width:70px;}
+  .mv-price{font-size:13px;}
+  .lb-toolbar .seg{max-width:100%;overflow-x:auto;scrollbar-width:none;}
+}
 </style>
 </head>
 <body>
@@ -1602,7 +1750,7 @@ function defaultLeague(now = new Date()) {
       <div class="ls-head">
       <div class="ls-title" style="display:flex;align-items:center;justify-content:space-between;">
           <span>Players · <span id="player-count">250</span></span>
-          <button onclick="toggleWatchlist(this)" id="wl-btn" style="background:none;border:none;cursor:pointer;font-family:var(--font-mono);font-size:9px;color:var(--muted);letter-spacing:1px;padding:0;transition:color .15s;display:inline-flex;align-items:center;gap:4px;" title="Show watchlist"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>WATCHLIST</button>
+          <button onclick="toggleWatchlist(this)" id="wl-btn" style="background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);padding:0;transition:color .15s;display:inline-flex;align-items:center;gap:4px;" title="Show watchlist"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Watchlist</button>
         </div>
         <input class="search-bar" placeholder="Search player or team…" oninput="filterList(this.value)">
         <div class="tfilters tier-filters">
@@ -1646,15 +1794,17 @@ function defaultLeague(now = new Date()) {
             <div class="hs"><div class="hs-v" id="h-ppg">28.5</div><div class="hs-l">PPG</div></div>
             <div class="hs"><div class="hs-v" id="h-rpg">7</div><div class="hs-l">RPG</div></div>
             <div class="hs"><div class="hs-v" id="h-apg">5.2</div><div class="hs-l">APG</div></div>
-            <div class="hs"><div class="hs-v" id="h-mcap">—</div><div class="hs-l">Mkt Cap</div></div>
-            <div class="hs"><div class="hs-v" id="h-own">—</div><div class="hs-l">You Own</div></div>
-            <div class="hs"><div class="hs-v" id="h-vol">0</div><div class="hs-l">Vol Today</div></div>
-            <div class="hs"><div class="hs-v" id="h-hi">—</div><div class="hs-l">7D High</div></div>
-            <div class="hs"><div class="hs-v" id="h-lo">—</div><div class="hs-l">7D Low</div></div>
+          </div>
+          <!-- Market context: secondary to the season line above, so one quiet
+               sentence instead of five more equal-weight stat columns. -->
+          <div class="hmarket">
+            <span id="h-own-wrap" hidden>You own <b id="h-own">—</b></span>
+            <span>7-day range <b id="h-lo">—</b>–<b id="h-hi">—</b></span>
+            <span>Volume today <b id="h-vol">0</b></span>
           </div>
           <!-- Last night box score -->
           <div id="last-night-wrap" style="display: none; margin-top: 8px; opacity: 1;">
-            <div style="font-family:var(--font-mono);font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;">
+            <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;">
               <span id="ln-header">Last Night</span> · <span id="ln-game">26pts 8reb 11ast · Last Night</span>
             </div>
             <div id="ln-chip-row" style="display:flex;gap:0;flex-wrap:wrap;">
@@ -1865,9 +2015,9 @@ function defaultLeague(now = new Date()) {
     <button class="league-btn-compact" onclick="openLeagueDrawer()"><span id="league-label-compact-sched">NBA</span><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
   </div>
   <div id="schedule-date-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-    <button onclick="scheduleOffset--; loadSchedule()" style="background:var(--card);border:1px solid var(--hairline);border-radius:6px;padding:5px 12px;color:var(--fg);font-family:var(--font-mono);font-size:12px;cursor:pointer;">◀</button>
+    <button class="sched-day-btn" aria-label="Previous day" onclick="scheduleOffset--; loadSchedule()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
     <div id="schedule-date-label" style="font-family:var(--font-mono);font-size:11px;color:var(--muted);flex:1;text-align:center;"></div>
-    <button onclick="scheduleOffset++; loadSchedule()" style="background:var(--card);border:1px solid var(--hairline);border-radius:6px;padding:5px 12px;color:var(--fg);font-family:var(--font-mono);font-size:12px;cursor:pointer;">▶</button>
+    <button class="sched-day-btn" aria-label="Next day" onclick="scheduleOffset++; loadSchedule()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
   </div>
   <div id="schedule-content" style="display:flex;flex-direction:column;gap:12px;">
     <div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Loading schedule…</div>
@@ -5775,6 +5925,11 @@ function fmtShares(n){return(Math.round((n||0)*1000)/1000).toString();}
 function isFlatPct(n){return !(Math.abs(n)>=0.05);}
 function fmtP(n){return isFlatPct(n)?'0.0%':(n>0?'+':'')+n.toFixed(1)+'%';}
 function pctDir(n,up='up',down='down'){return isFlatPct(n)?'flat':n>0?up:down;}
+// One shape for every "nothing here" screen: what's missing, why, and what to
+// do next - instead of a single grey line floating in an empty view.
+function emptyState(title, body, actionsHtml=''){
+  return `<div class="empty-state"><div class="es-title">${title}</div>${body?`<div class="es-body">${body}</div>`:''}${actionsHtml?`<div class="es-actions">${actionsHtml}</div>`:''}</div>`;
+}
 // The brand mark, generated rather than hand-copied so the nav logo, the
 // onboarding logo, and a real mover's HOT/COLD tag are provably the same
 // glyph: a price line clearing a resistance level ('up') or falling through
@@ -5790,7 +5945,6 @@ function breakoutMark(dir){
 }
 // Coins is the app's only currency - no '$' here either (see fmt()). Keeps the
 // B/M/K suffix so a market cap still reads compactly.
-function fmtMcap(n){if(n>=1e9)return(n/1e9).toFixed(1)+'B';if(n>=1e6)return(n/1e6).toFixed(1)+'M';return(n/1e3).toFixed(0)+'K';}
 // Gold coin icon, drawn (not emoji) - the actual U+1FA99 coin emoji renders
 // silver/grey on most platforms (Apple, Twemoji, etc.), not gold, and can't
 // be recolored. Used ONLY in the two spots that call for it: buying Coins
@@ -8362,9 +8516,7 @@ function updateHero(){
   // Header % reflects the SELECTED range so it matches the active range button and
   // the chart's line (not a separate "today" number that reads as contradictory).
   const pct=_rangePct(selRank, chartRange);
-  const mcap=price*getPool(p.tier);
   const ownShares=holdings[selRank]?.shares||0;
-  const ownPct=((ownShares/getPool(p.tier))*100).toFixed(4);
   const p7=get7DPrices(selRank);
   const hi7=Math.max(...p7),lo7=Math.min(...p7);
 
@@ -8397,7 +8549,7 @@ function updateHero(){
   document.getElementById('hname').textContent=p.name;
   const heroInj = INJURED.has(p.rank);
   const heroQtm = !heroInj && QUESTIONABLE.has(p.rank);
-  document.getElementById('hsub').innerHTML=`${p.team} · ${p.pos} · TIER ${p.tier}${heroInj?' <span class="inj-badge">OUT</span>':heroQtm?' <span class="q-badge">Q</span>':''}`;
+  document.getElementById('hsub').innerHTML=`${p.team} · ${p.pos}${heroInj?' <span class="inj-badge">OUT</span>':heroQtm?' <span class="q-badge">Q</span>':''}`;
 
   // Season stat labels: NBA = PPG/RPG/APG, MLB pitchers = ERA/K9/IP, MLB hitters = AVG/HR/RBI
   const ppgEl = document.getElementById('h-ppg');
@@ -8463,9 +8615,8 @@ function updateHero(){
     if(rpgLbl) rpgLbl.textContent = 'RPG';
     if(apgLbl) apgLbl.textContent = 'APG';
   }
-  // true value hidden from users
-  document.getElementById('h-mcap').textContent=fmtMcap(mcap);
-  document.getElementById('h-own').textContent=ownShares>0?`${ownShares} (${ownPct}%)`:'—';
+  document.getElementById('h-own-wrap').hidden = !(ownShares > 0);
+  document.getElementById('h-own').textContent = ownShares > 0 ? `${fmtShares(ownShares)} shares` : '—';
   document.getElementById('h-vol').textContent=(volume[selRank]||0).toLocaleString();
   document.getElementById('h-hi').textContent=fmt(hi7);
   document.getElementById('h-lo').textContent=fmt(lo7);
@@ -11223,68 +11374,39 @@ function renderTrending(){
       .filter(p=>watchlist.has(p.rank))
       .sort((a,b)=>Math.abs(b.pct) - Math.abs(a.pct));
     if(!sorted.length){
-      grid.innerHTML='<div class="trend-empty">No players on your watchlist yet.<br>Star players from the Market to add them here.</div>';
+      grid.innerHTML = emptyState('Your watchlist is empty', 'Tap the star next to any player in the Market to follow them here.');
       return;
     }
   }
 
   const maxVol = Math.max(1, ...sorted.map(p=>p.vol||0));
-  const avSize = isMobile ? 38 : 42;
+  const rangeLbl = trendRange === 1 ? '1D' : trendRange === 7 ? '1W' : '1M';
 
-  grid.innerHTML = sorted.map((p, i)=>{
+  // Same list grammar as the standings above: hairline-divided rows, numbers
+  // in right-aligned columns. Volume shows as a thin meter under the name so
+  // "most traded" is visible at a glance without another number column.
+  grid.innerHTML = `<div class="ulb-head mv-head"><span>#</span><span>Player</span><span>Price</span><span>${rangeLbl}</span></div>` + sorted.map((p, i)=>{
     const rank = i+1;
     const rankClass = rank===1?'gold':rank===2?'silver':rank===3?'bronze':'';
     const price = liveP[p.rank];
     const pct = (p.pct !== undefined) ? p.pct : getTodayPct(p.rank);
     const vol = volume[p.rank]||0;
     const volPct = Math.round((vol/maxVol)*100);
-    const isUp = pct >= 0;
-    const cardClass = pct >= 3 ? 'tcard hot-up' : pct <= -3 ? 'tcard hot-dn' : vol > maxVol*0.3 ? 'tcard vol-spike' : 'tcard';
-    const _tcHsUrl = headshotUrl(p.rank);
-    // Same fix as the list row's avatarHtml above - photo first, initials
-    // hidden-by-default and only revealed via onerror, not rendered
-    // immediately underneath a photo that just hasn't loaded yet.
-    const imgHtml = _tcHsUrl
-      ? `<div style="position:relative;width:${avSize}px;height:${avSize}px;flex-shrink:0;">
-           <img style="position:absolute;inset:0;width:${avSize}px;height:${avSize}px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border2);" src="${_tcHsUrl}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-           <div class="tcard-av" style="background:${p.cols[0]};color:${p.cols[1]};width:${avSize}px;height:${avSize}px;display:none;">${p.initials}</div>
-         </div>`
-      : `<div class="tcard-av" style="background:${p.cols[0]};color:${p.cols[1]};width:${avSize}px;height:${avSize}px;">${p.initials}</div>`;
-    const flameLabel = pct >= 5 ? '' : pct >= 3 ? '' : pct <= -5 ? '' : pct <= -3 ? '' : '';
-
-    if(isMobile){
-      // Mobile: single clean row - rank | photo | name+team | price+pct
-      return `<div class="${cardClass}" onclick="goToTrendingPlayer(${p.rank})" style="padding:10px 12px;gap:10px;align-items:center;">
-        <div class="tcard-rank ${rankClass}" style="width:18px;font-size:16px;">${rank}</div>
-        ${imgHtml}
-        <div class="tcard-info" style="flex:1;min-width:0;">
-          <div style="font-family:var(--font-heading);font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name} <span style="font-size:11px;">${flameLabel}</span></div>
-          <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);margin-top:1px;">${p.team} · <span style="color:var(--blue)">${p.pos}</span></div>
-        </div>
-        <div style="text-align:right;flex-shrink:0;">
-          <div style="font-family:var(--font-display);font-size:17px;line-height:1;">${fmt(price)}</div>
-          <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${isFlatPct(pct)?'var(--muted)':isUp?'var(--green)':'var(--red)'};">${fmtP(pct)}</div>
-        </div>
-        <div class="tcard-vol-bar" style="width:${volPct}%"></div>
-      </div>`;
-    }
-
-    return `<div class="${cardClass}" onclick="goToTrendingPlayer(${p.rank})">
-      <div class="tcard-rank ${rankClass}">${rank}</div>
+    const hs = headshotUrl(p.rank);
+    // Photo first, initials revealed only if it fails - same as the market list.
+    const imgHtml = hs
+      ? `<div class="mv-av"><img src="${hs}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="mv-init" style="background:${p.cols[0]};color:${p.cols[1]};display:none;">${p.initials}</div></div>`
+      : `<div class="mv-av"><div class="mv-init" style="background:${p.cols[0]};color:${p.cols[1]};">${p.initials}</div></div>`;
+    return `<div class="mv-row" role="button" tabindex="0" onclick="goToTrendingPlayer(${p.rank})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToTrendingPlayer(${p.rank});}">
+      <div class="ulb-rank ${rankClass}">${rank}</div>
       ${imgHtml}
-      <div class="tcard-info">
-        <div class="tcard-name">${p.name} <span class="flame-badge">${flameLabel}</span></div>
-        <div class="tcard-sub">${p.team} · <span style="color:var(--blue)">${p.pos}</span></div>
-        <div class="tcard-metrics">
-          <div class="tcard-metric"><div class="tcard-mval">${vol.toLocaleString()}</div><div class="tcard-mlbl">Vol</div></div>
-          <div class="tcard-metric"><div class="tcard-mval">${seasonStat(p).val}</div><div class="tcard-mlbl">${seasonStat(p).label}</div></div>
-        </div>
+      <div class="mv-info">
+        <div class="mv-name">${p.name}</div>
+        <div class="mv-sub">${p.team} · ${p.pos}${vol ? ` · ${vol.toLocaleString()} traded` : ''}</div>
+        ${activeTrendTab === 'volume' && vol ? `<div class="mv-vol"><span style="width:${volPct}%"></span></div>` : ''}
       </div>
-      <div class="tcard-right">
-        <div class="tcard-price">${fmt(price)}</div>
-        <div class="tcard-pct ${pctDir(pct,'up','dn')}">${fmtP(pct)}</div>
-      </div>
-      <div class="tcard-vol-bar" style="width:${volPct}%"></div>
+      <div class="mv-price">${fmt(price)}</div>
+      <div class="mv-pct ${pctDir(pct)}">${fmtP(pct)}</div>
     </div>`;
   }).join('');
 }
@@ -12716,8 +12838,6 @@ updateLeagueDrawerUI();
 updatePosFilters();
 const _g10TabBoot = document.getElementById('ctab-g10');
 if (_g10TabBoot) _g10TabBoot.textContent = currentLeague === 'MLB' ? 'Game Log' : 'Last 10';
-const _obTagline = document.getElementById('ob-tagline');
-if (_obTagline) _obTagline.textContent = currentLeague === 'MLB' ? 'MLB PLAYER STOCK MARKET' : 'NBA PLAYER STOCK MARKET';
 refreshAll().then(() => { try { handleOpenPlayerDeepLink(); } catch(e){} try { handleOpenChatDeepLink(); } catch(e){} });
 // Note: trackerInterval is managed entirely by smartTracker itself
 
@@ -13107,12 +13227,17 @@ function renderProfileView() {
     // Show sign-in screen
     inner.innerHTML = `
       <div class="signin-title">Join Breakout</div>
-      <div class="signin-sub">Sign in to save your portfolio, compete on the leaderboard, and track your returns across devices.</div>
+      <div class="signin-sub">You can browse without an account. Sign in to start trading.</div>
+      <ul class="signin-perks">
+        <li><b>Free Coins every day</b> to trade with, no purchase needed</li>
+        <li><b>A spot on the leaderboard</b> against everyone else playing</li>
+        <li><b>Your portfolio saved</b> across your phone and computer</li>
+      </ul>
       <button class="google-signin-btn" id="google-signin-btn">
         <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
         Continue with Google
       </button>
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);text-align:center;">Your portfolio and leaderboard position will sync automatically</div>`;
+      <button class="es-btn ghost signin-browse" onclick="goToMarketTop()">Keep browsing the market</button>`;
     document.getElementById('google-signin-btn').addEventListener('click', signInWithGoogle);
   } else {
     // Show profile editor
@@ -14215,7 +14340,10 @@ async function loadSchedule() {
     const events = sb.events || [];
 
     if (!events.length) {
-      el.innerHTML = `<div style="text-align:center;padding:48px;color:var(--muted);font-family:var(--font-mono);font-size:11px;">No ${isMLB?'MLB':isNFL?'NFL':'NBA'} games scheduled</div>`;
+      el.innerHTML = emptyState(
+        `No ${isMLB?'MLB':isNFL?'NFL':'NBA'} games ${scheduleOffset===0?'today':'this day'}`,
+        'Prices move when players play. Check the next day, or switch to a league that’s in season.',
+        `<button class="es-btn" onclick="scheduleOffset++; loadSchedule()">Next day</button><button class="es-btn ghost" onclick="openLeagueDrawer()">Switch league</button>`);
       return;
     }
 
@@ -14805,7 +14933,7 @@ async function renderFriendsLeaderboard(){
 // Global and Friends leaderboard rows. Falls back to just the display name (at the
 // normal large size) for anyone who hasn't claimed a username yet.
 function _ulbNameBlock(u, isYou){
-  const youTag = isYou ? '<span style="color:var(--green);font-size:9px;">(you)</span>' : '';
+  const youTag = isYou ? '<span class="ulb-you-tag">You</span>' : '';
   // A username is the thing being looked up here, so it can't just get
   // clipped with an ellipsis like a display name can - but wrapping to a
   // second line reads as broken layout. ulb-name-fit marks this line for
@@ -14984,15 +15112,12 @@ async function buildLeaderboardFirebase() {
   if (activeTab === 'challenge' || activeTab === 'coins') { activeTab = 'global'; window._lbTab = 'global'; }
 
   inner.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-      <div style="font-family:var(--font-heading);font-weight:700;font-size:28px;letter-spacing:-0.3px;">
-        Leaderboard
+    <div class="lb-head">
+      <h2 class="lb-title">Leaderboard</h2>
+      <div class="seg ulb-tabs" role="group" aria-label="Leaderboard">
+        <button type="button" class="ulb-tab ${activeTab==='global'?'active':''}" onclick="switchLbTab('global')">Global</button>
+        <button type="button" class="ulb-tab ${activeTab==='friends'?'active':''}" onclick="switchLbTab('friends')">Friends<span class="friends-req-dot" id="friends-req-dot" style="display:${_incomingRequests.length?'inline-block':'none'};"></span></button>
       </div>
-      <button onclick="buildLeaderboardFirebase()" style="background:var(--card);border:1px solid var(--hairline);border-radius:6px;padding:6px 12px;font-family:var(--font-mono);font-size:10px;color:var(--muted);cursor:pointer;">↻ Refresh</button>
-    </div>
-    <div class="ulb-tabs" style="margin-bottom:16px;">
-      <div class="ulb-tab ${activeTab==='global'?'active':''}" onclick="switchLbTab('global')">Global</div>
-      <div class="ulb-tab ${activeTab==='friends'?'active':''}" onclick="switchLbTab('friends')">Friends<span class="friends-req-dot" id="friends-req-dot" style="display:${_incomingRequests.length?'inline-block':'none'};"></span></div>
     </div>
     <div id="lb-tab-content"></div>`;
 
@@ -15283,39 +15408,52 @@ function setLbSortMode(mode, el) {
 async function renderGlobalLeaderboard() {
   const el = document.getElementById('lb-tab-content');
   if (!el) return;
+  const leagueName = currentLeague === 'MLB' ? 'MLB' : currentLeague === 'GOLF' ? 'Golf' : currentLeague === 'NFL' ? 'NFL' : 'NBA';
   el.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
-      <button class="ulb-sort-btn ${_lbSortMode==='balance'?'active':''}" onclick="setLbSortMode('balance',this)">${coinIcon()} Total Coins</button>
-      <button class="ulb-sort-btn ${_lbSortMode==='gain'?'active':''}" onclick="setLbSortMode('gain',this)">% Gain</button>
+    <div class="lb-toolbar">
+      <div class="seg" role="group" aria-label="Rank by">
+        <button type="button" class="ulb-sort-btn ${_lbSortMode==='balance'?'active':''}" onclick="setLbSortMode('balance',this)">Coins</button>
+        <button type="button" class="ulb-sort-btn ${_lbSortMode==='gain'?'active':''}" onclick="setLbSortMode('gain',this)">Return</button>
+      </div>
+      <span class="lb-updated" id="lb-updated"></span>
     </div>
-    <div id="ulb-list"><div class="g10-loading">Loading traders…</div></div>
-    <div style="height:32px"></div>
-    <div class="trending-header" style="padding:0;border-bottom:none;background:transparent;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div class="trending-title">High Volume</div>
-        <button class="league-btn-compact" onclick="openLeagueDrawer()"><span id="league-label-compact">${currentLeague === 'MLB' ? 'MLB' : currentLeague === 'GOLF' ? 'Golf' : currentLeague === 'NFL' ? 'NFL' : 'NBA'}</span><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+    <div id="ulb-me"></div>
+    <div id="ulb-list" class="ulb-list"><div class="g10-loading">Loading traders…</div></div>
+
+    <section class="lb-section">
+      <div class="lb-head">
+        <h2 class="lb-title sm">Market movers</h2>
+        <button class="league-btn-compact" onclick="openLeagueDrawer()"><span id="league-label-compact">${leagueName}</span><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
       </div>
-      <div class="trending-sub">Players with spiking trade volume and price momentum</div>
-      <div class="trending-tabs">
-        <div class="trend-tab ${activeTrendTab==='volume'?'active':''}" id="ttab-volume" onclick="setTrendTab('volume',this)">Volume Spike</div>
-        <div class="trend-tab ${activeTrendTab==='gainers'?'active':''}" id="ttab-gainers" onclick="setTrendTab('gainers',this)">Top Gainers</div>
-        <div class="trend-tab ${activeTrendTab==='losers'?'active':''}" id="ttab-losers" onclick="setTrendTab('losers',this)">Top Losers</div>
-        <div class="trend-tab ${activeTrendTab==='watchlisted'?'active':''}" id="ttab-watchlisted" onclick="setTrendTab('watchlisted',this)" style="display:inline-flex;align-items:center;gap:5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Most Watched</div>
+      <div class="lb-toolbar">
+        <div class="seg trending-tabs" role="group" aria-label="Show">
+          <button type="button" class="trend-tab ${activeTrendTab==='volume'?'active':''}" id="ttab-volume" onclick="setTrendTab('volume',this)">Most traded</button>
+          <button type="button" class="trend-tab ${activeTrendTab==='gainers'?'active':''}" id="ttab-gainers" onclick="setTrendTab('gainers',this)">Gainers</button>
+          <button type="button" class="trend-tab ${activeTrendTab==='losers'?'active':''}" id="ttab-losers" onclick="setTrendTab('losers',this)">Losers</button>
+          <button type="button" class="trend-tab ${activeTrendTab==='watchlisted'?'active':''}" id="ttab-watchlisted" onclick="setTrendTab('watchlisted',this)">Watchlist</button>
+        </div>
+        <div class="seg trend-range" id="trend-range" role="group" aria-label="Period">
+          <button type="button" class="trend-range-btn ${trendRange===1?'active':''}" data-range="1" onclick="setTrendRange(1,this)">1D</button>
+          <button type="button" class="trend-range-btn ${trendRange===7?'active':''}" data-range="7" onclick="setTrendRange(7,this)">1W</button>
+          <button type="button" class="trend-range-btn ${trendRange===30?'active':''}" data-range="30" onclick="setTrendRange(30,this)">1M</button>
+        </div>
       </div>
-      <div class="trend-range" id="trend-range">
-        <button class="trend-range-btn ${trendRange===1?'active':''}" data-range="1" onclick="setTrendRange(1,this)">1D</button>
-        <button class="trend-range-btn ${trendRange===7?'active':''}" data-range="7" onclick="setTrendRange(7,this)">1W</button>
-        <button class="trend-range-btn ${trendRange===30?'active':''}" data-range="30" onclick="setTrendRange(30,this)">1M</button>
-      </div>
-    </div>
-    <div class="trending-grid" id="trending-grid" style="flex:none;overflow:visible;padding:0;"></div>`;
+      <div class="mv-list" id="trending-grid"></div>
+    </section>`;
 
   renderTrending();
 
-  if (!db || !currentUser) {
-    if (db && auth && !currentUser) setTimeout(() => buildLeaderboardFirebase(), 1500);
-    document.getElementById('ulb-list').innerHTML =
-      `<div class="g10-loading" style="cursor:pointer;" onclick="openProfile()">Sign in with Google to join the leaderboard →</div>`;
+  // Standings are public (users/* is world-readable), so guests see the real
+  // board too - with a prompt to get on it rather than an empty page.
+  const meEl = document.getElementById('ulb-me');
+  if (!currentUser && meEl) {
+    meEl.innerHTML = `<div class="ulb-me">
+      <div><div class="ulb-me-title">You're not on the board yet</div><div class="ulb-me-sub">Sign in, claim your free Coins, and start climbing.</div></div>
+      <button class="es-btn" onclick="openProfile()">Sign in</button>
+    </div>`;
+  }
+  if (!db) {
+    document.getElementById('ulb-list').innerHTML = emptyState('Leaderboard unavailable', 'Couldn’t reach the server. Check your connection and try again.', `<button class="es-btn ghost" onclick="buildLeaderboardFirebase()">Try again</button>`);
     return;
   }
   try {
@@ -15327,14 +15465,18 @@ async function renderGlobalLeaderboard() {
     let users = snap.docs.map(d => ({ uid: d.id, ...d.data() })).sort(_lbCompare);
     const seen = new Map();
     users = users.filter(u => { if (seen.has(u.uid)) return false; seen.set(u.uid, true); return true; });
-    const currentInList = users.find(u => u.uid === currentUser.uid);
-    if (!currentInList && userProfile) users = [...users, userProfile].sort(_lbCompare);
-    if (!users.length) { document.getElementById('ulb-list').innerHTML = `<div class="g10-loading">No traders yet - be the first!</div>`; return; }
+    if (currentUser) {
+      const currentInList = users.find(u => u.uid === currentUser.uid);
+      if (!currentInList && userProfile) users = [...users, userProfile].sort(_lbCompare);
+    }
+    if (!users.length) { document.getElementById('ulb-list').innerHTML = emptyState('No traders yet', 'Be the first one on the board.'); return; }
     _globalLbUsers = users;
     _renderGlobalLbRows();
+    const upd = document.getElementById('lb-updated');
+    if (upd) upd.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   } catch(e) {
     console.error('Leaderboard error:', e);
-    document.getElementById('ulb-list').innerHTML = `<div class="g10-loading" style="color:var(--red)">Error: ${e.code || e.message}<br><span style="font-size:8px;opacity:.7;">Check browser console for details</span></div>`;
+    document.getElementById('ulb-list').innerHTML = emptyState('Couldn’t load the leaderboard', 'Something went wrong on our end. Try again in a moment.', `<button class="es-btn ghost" onclick="buildLeaderboardFirebase()">Try again</button>`);
   }
 }
 
@@ -15352,7 +15494,7 @@ function _renderGlobalLbRows(){
     const avaInner = u.photoURL ? `<img src="${u.photoURL}" class="ulb-ava">` : `<div class="ulb-ava" style="background:${u.avatarColor||'#4caf50'}">${(u.displayName||'?')[0].toUpperCase()}</div>`;
     const avatar = `<span onclick="openPublicProfile('${u.uid}')" style="cursor:pointer;">${avaInner}</span>`;
     const status = currentUser ? friendStatusWith(u.uid) : 'none';
-    const friendAction = isYou ? '' : status === 'friends' ? `<span class="ulb-friend-icon solid" title="Friends">✓</span>`
+    const friendAction = (isYou || !currentUser) ? '' : status === 'friends' ? `<span class="ulb-friend-icon solid" title="Friends">✓</span>`
       : status === 'outgoing' ? `<span class="ulb-friend-icon outline" title="Request sent">···</span>`
       : status === 'incoming' ? `<span class="ulb-friend-icon clickable" title="Accept friend request" onclick="acceptFriendRequest('${_friendshipId(currentUser.uid,u.uid)}')">✓</span>`
       : `<span class="ulb-friend-icon clickable" title="Add friend" onclick="sendFriendRequestFromGlobalLb(${i})">+</span>`;
@@ -15361,23 +15503,43 @@ function _renderGlobalLbRows(){
     // a number that has nothing to do with why that row is in that position.
     // Balance mode leads with coins there instead; % (still worth knowing)
     // moves down into the sub-line either way.
-    const rightMetric = _lbSortMode === 'gain'
-      ? `<div class="ulb-ret ${ret>=0?'pos':'neg'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div>`
-      : `<div class="ulb-ret" style="color:var(--gold);">${coinIcon(13)} ${(u.portfolioValue||0).toLocaleString()}</div>`;
-    const subLine = _lbSortMode === 'gain'
-      ? `${coinIcon(9)} ${(u.portfolioValue||0).toLocaleString()}`
-      : `<span style="color:${ret>=0?'var(--green)':'var(--red)'}">${ret>=0?'+':''}${ret.toFixed(1)}%</span>`;
+    const coins = (u.portfolioValue||0).toLocaleString();
+    const retTxt = fmtP(ret);
+    const retCls = pctDir(ret, 'pos', 'neg');
+    // Two numeric columns, the sorted one first and brighter.
+    const cols = _lbSortMode === 'gain'
+      ? `<div class="ulb-ret ${retCls}">${retTxt}</div><div class="ulb-num">${coins}</div>`
+      : `<div class="ulb-ret">${coins}</div><div class="ulb-num ${retCls}">${retTxt}</div>`;
     return `<div class="ulb-card ${isYou?'ulb-you':''}">
       <div class="ulb-rank ${rankCls}">${i+1}</div>${avatar}
       <div class="ulb-info">
         ${_ulbNameBlock(u, isYou)}
-        <div class="ulb-sub">${subLine}</div>
       </div>
-      ${rightMetric}
-      ${friendAction}
+      ${cols}
+      <div class="ulb-act">${friendAction}</div>
     </div>`;
   }).join('');
+  const sortLbl = _lbSortMode === 'gain' ? ['Return', 'Coins'] : ['Coins', 'Return'];
+  el.insertAdjacentHTML('afterbegin', `<div class="ulb-head"><span>#</span><span>Trader</span><span>${sortLbl[0]}</span><span>${sortLbl[1]}</span><span></span></div>`);
   _fitUlbNames(el);
+
+  // Where you stand, above the table - the one number a player opens this tab for.
+  const meEl = document.getElementById('ulb-me');
+  if (meEl && currentUser) {
+    const idx = _globalLbUsers.findIndex(u => u.uid === currentUser.uid);
+    if (idx >= 0) {
+      const me = _globalLbUsers[idx];
+      const ahead = idx > 0 ? _globalLbUsers[idx - 1] : null;
+      const gapTxt = !ahead ? 'You’re in first. Hold the lead.'
+        : _lbSortMode === 'gain'
+          ? `${((ahead.returnPct||0) - (me.returnPct||0)).toFixed(1)} pts behind #${idx}`
+          : `${Math.max(0, Math.round((ahead.portfolioValue||0) - (me.portfolioValue||0))).toLocaleString()} Coins behind #${idx}`;
+      meEl.innerHTML = `<div class="ulb-me">
+        <div class="ulb-me-rank">#${idx + 1}<span> of ${_globalLbUsers.length}</span></div>
+        <div class="ulb-me-sub">${gapTxt}</div>
+      </div>`;
+    }
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -16837,17 +16999,12 @@ window.addEventListener('appinstalled', () => {
       <!-- SLIDE 1: Hook -->
       <div class="ob-slide">
         <div class="ob-logo">Breakout<svg class="brand-mark" viewBox="0 0 26 22" fill="none" aria-hidden="true"><line x1="2" y1="9" x2="24" y2="9" stroke="var(--border2)" stroke-width="1.4" stroke-dasharray="2 2.6"/><path d="M2,19 L6,15 L9,17 L12.5,9 L22,3" stroke="var(--green)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12.5" cy="9" r="1.9" fill="var(--green)"/></svg></div>
-        <div class="ob-tagline" id="ob-tagline">THE STOCK MARKET FOR ATHLETES</div>
+        <div class="ob-tagline" id="ob-tagline">The stock market for athletes</div>
         <div class="ob-ticker"><div class="ob-ticker-track" id="ob-ticker-track"></div></div>
         <div class="ob-body">
           Buy and sell athletes like stocks across <span class="ob-highlight">MLB, NBA, Golf, and NFL</span>.<br>
           Prices move on real games - every hit, bucket, and birdie counts.<br><br>
           Claim free <span class="ob-highlight">Coins</span> every day. Trade against real players. Best portfolio wins.
-        </div>
-        <div class="ob-stat-row">
-          <div class="ob-stat"><div class="ob-stat-val">4</div><div class="ob-stat-lbl">Leagues</div></div>
-          <div class="ob-stat"><div class="ob-stat-val">Live</div><div class="ob-stat-lbl">Prices</div></div>
-          <div class="ob-stat"><div class="ob-stat-val">Free</div><div class="ob-stat-lbl">To play</div></div>
         </div>
       </div>
 
