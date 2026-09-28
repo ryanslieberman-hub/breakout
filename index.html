@@ -1533,9 +1533,8 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .ut-btn{font-size:11px;}
 .rb,.qc{font-variant-numeric:tabular-nums;}
 
-/* Player list: plain rows. The green/red inset outline on every row made
-   the list read as ~300 cards; direction already lives in the % colour. */
-.prow-up,.prow-down{box-shadow:none;}
+/* Player list: the green/red outline stays for players who actually moved
+   (pctDir gives flat rows neither class), so it marks movers, not every row. */
 .prow.active{border-left-color:transparent;background:var(--card2);}
 .pname,.psub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
