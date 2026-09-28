@@ -1859,6 +1859,52 @@ button.pl-row:hover,label.pl-row:hover{background:rgba(255,255,255,.03);}
 /* Guests have no Coins yet - "Coins: 0.00  Total: 0.00" was just noise */
 nav:has(.auth-btn) .nav-stat{display:none !important;}
 
+/* ════════════════════════════════════════════════════════════════════════
+   GAME FEEL - team identity, live ticks, contextual help
+   ════════════════════════════════════════════════════════════════════════ */
+/* Team identity on the player hero: the team's colour on the photo ring,
+   a 2px top rule, and a faint wash from the left - enough to know whose
+   page you're on at a glance without repainting the whole terminal. */
+.hero{--team:var(--green);position:relative;box-shadow:inset 0 2px 0 var(--team);
+  background:linear-gradient(90deg,color-mix(in srgb,var(--team) 9%,transparent),transparent 55%);}
+.hav-img{border-color:var(--team);}
+.hav{box-shadow:0 0 0 2px var(--team);}
+.hm-help{margin:0;padding:0;font-size:12px;}
+
+/* Live ticks: a price that just moved flashes its direction, then settles.
+   Collapsed to nothing by the global prefers-reduced-motion rule. */
+@keyframes tickUp{0%{background:rgba(18,212,126,.28);color:var(--green)}100%{background:transparent}}
+@keyframes tickDn{0%{background:rgba(245,68,95,.28);color:var(--red)}100%{background:transparent}}
+.pprice.tick-up,.hprice.tick-up{animation:tickUp .9s ease-out;border-radius:4px;}
+.pprice.tick-dn,.hprice.tick-dn{animation:tickDn .9s ease-out;border-radius:4px;}
+
+/* Help sheet */
+.help-box{max-width:420px;width:420px;}
+.help-list{border-top:1px solid var(--border);margin-bottom:20px;}
+.help-list > div{padding:11px 0;border-bottom:1px solid var(--border);font-size:14px;line-height:1.5;color:var(--muted);}
+.help-list b{color:var(--text);font-weight:600;}
+
+@media (max-width:768px){
+  /* One scroll, not two: the hero used to scroll inside itself (capped at
+     132px) while the page scrolled around it. Now the hero lays out as a
+     grid - photo and name, then the price straight under the name where
+     apps put it, then the stats - and the column scrolls as one piece. The
+     chart keeps a floor so a live box score can't squeeze it away. */
+  .hero{display:grid;grid-template-columns:40px 1fr;column-gap:10px;row-gap:2px;padding:12px 14px 10px;max-height:none;overflow:visible;}
+  .hinfo{display:contents;max-height:none;overflow:visible;}
+  .hav,.hav-img{grid-column:1;grid-row:1 / span 2;width:40px !important;height:40px !important;align-self:center;}
+  .hname{grid-column:2;grid-row:1;font-size:20px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hsub{grid-column:2;grid-row:2;font-size:12px;}
+  .hright{grid-column:1 / -1;grid-row:3;display:flex;align-items:baseline;gap:10px;margin-top:8px;width:auto;text-align:left;}
+  .hprice{font-size:34px;}
+  .hchg{font-size:13px;}
+  .hstats,.hmarket,#last-night-wrap,#last-night-dnp{grid-column:1 / -1;}
+  .hstats{margin-top:8px;}
+  .etag{float:none;}
+  .chart-pane{min-height:260px;}
+  .help-box{width:100%;max-width:100%;}
+}
+
 /* Native scrollbars, selects and date pickers render light unless the page
    declares it's dark - the white scrollbar on Schedule was this. */
 :root{color-scheme:dark;}
@@ -2062,6 +2108,7 @@ function defaultLeague(now = new Date()) {
             <span id="h-own-wrap" hidden>You own <b id="h-own">—</b></span>
             <span>7-day range <b id="h-lo">—</b>–<b id="h-hi">—</b></span>
             <span>Volume today <b id="h-vol">0</b></span>
+            <button type="button" class="pf-link hm-help" onclick="showPriceHelp()">How prices move</button>
           </div>
           <!-- Last night box score -->
           <div id="last-night-wrap" style="display: none; margin-top: 8px; opacity: 1;">
@@ -2515,6 +2562,47 @@ const COLS=[
   ['#0a1f35','#4da6ff'],['#0a1f14','#12d47e'],['#1f0a0a','#f5445f'],
   ['#1f1a0a','#f2b843'],['#150a1f','#9d6fff'],['#0a1835','#3d9bff'],
 ];
+
+// Team accent colours, keyed by the team names the rosters use (aliases
+// included). Each is the team's own colour that actually reads on this dark
+// UI - where the primary is a near-black navy or wine (Yankees, Cavs, Ravens)
+// the brightest official secondary stands in, so the accent is visible
+// rather than technically correct and invisible.
+const TEAM_COLORS = {
+  // NBA
+  'Atlanta Hawks':'#E03A3E','Boston Celtics':'#1E9E53','Brooklyn Nets':'#C9C9C9','Charlotte Hornets':'#00A0B0',
+  'Chicago Bulls':'#CE1141','Cleveland Cavaliers':'#FDBB30','Cleveland Cavs':'#FDBB30','Dallas Mavericks':'#2C7FD1',
+  'Denver Nuggets':'#FEC524','Detroit Pistons':'#D5213E','Golden State Warriors':'#FFC72C','Houston Rockets':'#CE1141',
+  'Indiana Pacers':'#FDBB30','LA Clippers':'#D5213E','LA Lakers':'#FDB927','Los Angeles Lakers':'#FDB927',
+  'Memphis Grizzlies':'#7D94C4','Miami Heat':'#E0294F','Milwaukee Bucks':'#3A8F4C','Minnesota Timberwolves':'#78BE20',
+  'New Orleans Pelicans':'#C4A76A','New York Knicks':'#F58426','OKC Thunder':'#2A93D5','Oklahoma City Thunder':'#2A93D5',
+  'Orlando Magic':'#2A8FD6','Philadelphia 76ers':'#2F7FD1','Phoenix Suns':'#E56020','Portland Trail Blazers':'#E03A3E',
+  'Sacramento Kings':'#9270C4','San Antonio Spurs':'#C4CED4','Toronto Raptors':'#D5213E','Utah Jazz':'#F9A01B',
+  'Washington Wizards':'#E31837',
+  // MLB
+  'Arizona Diamondbacks':'#C8364A','Athletics':'#EFB21E','Oakland Athletics':'#EFB21E','Atlanta Braves':'#CE1141',
+  'Baltimore Orioles':'#DF4601','Boston Red Sox':'#C8364A','Chicago Cubs':'#3A6FD8','Chicago White Sox':'#C4CED4',
+  'Cincinnati Reds':'#D5213E','Cleveland Guardians':'#E31937','Colorado Rockies':'#8C82C9','Detroit Tigers':'#FA4616',
+  'Houston Astros':'#EB6E1F','Kansas City Royals':'#3D7CC9','LA Angels':'#D5213E','Los Angeles Angels':'#D5213E',
+  'LA Dodgers':'#2F7FD1','Los Angeles Dodgers':'#2F7FD1','Miami Marlins':'#00A3E0','Milwaukee Brewers':'#FFC52F',
+  'Minnesota Twins':'#D31145','NY Mets':'#FF5910','New York Mets':'#FF5910','NY Yankees':'#8FA4C4',
+  'New York Yankees':'#8FA4C4','Philadelphia Phillies':'#E81828','Pittsburgh Pirates':'#FDB827','San Diego Padres':'#FFC425',
+  'San Francisco Giants':'#FD5A1E','Seattle Mariners':'#1A9E9E','St. Louis Cardinals':'#D5213E','Tampa Bay Rays':'#8FBCE6',
+  'Texas Rangers':'#D2263A','Toronto Blue Jays':'#3C7BD4','Washington Nationals':'#D12030',
+  // NFL
+  'Arizona Cardinals':'#C8364A','Atlanta Falcons':'#D0283E','Baltimore Ravens':'#7A63D6','Buffalo Bills':'#2F6FDB',
+  'Carolina Panthers':'#0085CA','Chicago Bears':'#E0591C','Cincinnati Bengals':'#FB4F14','Cleveland Browns':'#FF3C00',
+  'Dallas Cowboys':'#9DB2CF','Denver Broncos':'#FB4F14','Detroit Lions':'#1C8FD1','Green Bay Packers':'#FFB612',
+  'Houston Texans':'#D0283E','Indianapolis Colts':'#3B78C9','Jacksonville Jaguars':'#1A94A6','Kansas City Chiefs':'#E31837',
+  'Las Vegas Raiders':'#A5ACAF','Los Angeles Chargers':'#1C9BE0','Los Angeles Rams':'#FFA300','Miami Dolphins':'#00A3AD',
+  'Minnesota Vikings':'#8A63C9','New England Patriots':'#D5213E','New Orleans Saints':'#D3BC8D','New York Giants':'#3C6DD6',
+  'New York Jets':'#2E8B5E','Philadelphia Eagles':'#2A8C95','Pittsburgh Steelers':'#FFB612','San Francisco 49ers':'#D5213E',
+  'Seattle Seahawks':'#69BE28','Tampa Bay Buccaneers':'#E0282B','Tennessee Titans':'#4B92DB','Washington Commanders':'#FFB612',
+};
+function teamColor(p) { return (p && TEAM_COLORS[p.team]) || null; }
+// Last price painted, so a re-render can tell a real tick from a redraw.
+let _heroLast = { rank: null, price: 0 };
+const _listLast = {};
 
 const RAW=[
   // ── TIER S - Elite superstars ($400-600) ────────────────────────────────
@@ -8740,6 +8828,7 @@ function renderList(){
     return tm&&pm&&sm&&wm;
   });
   const sorted=filtered.slice().sort((a,b)=>(liveP[b.rank]||0)-(liveP[a.rank]||0));
+  _listOrder = sorted.map(p => p.rank);
   const countEl=document.getElementById('player-count');
   if(countEl) countEl.textContent=sorted.length;
   el.innerHTML=sorted.map(p=>{
@@ -8766,7 +8855,7 @@ function renderList(){
     const avatarHtml = _hsUrl
       ? `<div style="position:relative;width:30px;height:30px;flex-shrink:0;">
            <img src="${_hsUrl}" alt=""
-             style="position:absolute;inset:0;width:30px;height:30px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border2);"
+             style="position:absolute;inset:0;width:30px;height:30px;border-radius:50%;object-fit:cover;border:1.5px solid ${teamColor(p) || 'var(--border2)'};"
              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
            <div class="pav" style="background:${bg};color:${fg};display:none;">${p.initials}</div>
          </div>`
@@ -8775,6 +8864,10 @@ function renderList(){
     // button, and a button cannot contain a button. The row is the click
     // target for the mouse and now a tab stop with a spoken name for everyone
     // else; activateRow() handles Enter and Space.
+    // Flash only a real tick for a row already on screen (not first paint).
+    const _prev = _listLast[p.rank];
+    const tickCls = (_prev && Math.abs(price - _prev) >= 0.005) ? (price > _prev ? ' tick-up' : ' tick-dn') : '';
+    _listLast[p.rank] = price;
     const a11yName = `${p.name}${isInj?', out injured':''}, ${p.team}, ${fmt(price)}, ${pct>=0?'up':'down'} ${Math.abs(pct).toFixed(1)} percent`;
     return`<div class="prow ${pctDir(pct,'prow-up','prow-down')}${p.rank===selRank?' active':''}${isInj?' prow-injured':''}" onclick="selectPlayerFromList(${p.rank})" role="button" tabindex="0" aria-label="${a11yName}"${p.rank===selRank?' aria-current="true"':''}>
       ${owned?'<div class="owned-dot"></div>':''}
@@ -8784,7 +8877,7 @@ function renderList(){
         <div class="psub">${p.team} · <span style="color:var(--blue)">${p.pos}</span>${owned?' · <span style="color:var(--green)">'+fmt(ownVal)+'</span>':''}</div>
       </div>
       <div class="pright">
-        <div class="pprice" style="${isInj?'color:var(--red)':''}">${fmt(price)}</div>
+        <div class="pprice${tickCls}" style="${isInj?'color:var(--red)':''}">${fmt(price)}</div>
         <div class="pchg ${pctDir(pct)}">${fmtP(pct)}</div>
       </div>
       <button class="star-btn${isStarred?' starred':''}" onclick="event.stopPropagation();toggleStar(${p.rank},this)" title="Watchlist"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></button>
@@ -8840,6 +8933,9 @@ function updateHero(){
     havEl.style.display='flex';
   }
   document.getElementById('hname').textContent=p.name;
+  // Team identity: the hero picks up this player's team colour (photo ring,
+  // top rule, a faint wash) - falls back to the app green for golfers.
+  document.getElementById('hero-block').style.setProperty('--team', teamColor(p) || 'var(--green)');
   const heroInj = INJURED.has(p.rank);
   const heroQtm = !heroInj && QUESTIONABLE.has(p.rank);
   document.getElementById('hsub').innerHTML=`${p.team} · ${p.pos}${heroInj?' <span class="inj-badge">OUT</span>':heroQtm?' <span class="q-badge">Q</span>':''}`;
@@ -8924,6 +9020,12 @@ function updateHero(){
 
   const pe=document.getElementById('hprice');
   pe.textContent=fmt(price);pe.className='hprice'+(isFlatPct(pct)?' flat':pct<0?' dn':'');
+  // A tick on the SAME player flashes the number - the market visibly moving.
+  // Switching players is not a tick, so no flash then.
+  if (_heroLast.rank === selRank && _heroLast.price && Math.abs(price - _heroLast.price) >= 0.005) {
+    pe.classList.add(price > _heroLast.price ? 'tick-up' : 'tick-dn');
+  }
+  _heroLast = { rank: selRank, price };
 
   const ce=document.getElementById('hchg');
   ce.textContent=fmtP(pct);ce.className='hchg '+pctDir(pct,'up','dn');
@@ -12172,6 +12274,34 @@ setInterval(() => { if (currentUser && db) saveCloudPortfolio(); }, 5 * 60 * 100
 // ═══════════════════════════════════════════
 let _pendingTrade = null;
 
+// Contextual help, one tap from any price: what actually moves it. Same
+// sheet as the trade confirm (bottom sheet on phones, dialog on desktop).
+function showPriceHelp() {
+  if (document.getElementById('help-overlay')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="conf-overlay" id="help-overlay" role="dialog" aria-modal="true" aria-label="How prices move" onclick="if(event.target===this)closePriceHelp()">
+      <div class="conf-box help-box">
+        <div class="sheet-handle"></div>
+        <div class="conf-title">How prices move</div>
+        <div class="help-list">
+          <div><b>Games move prices.</b> After every game, and live while it’s on, a player’s price moves on how they did compared with what was expected from them.</div>
+          <div><b>Trading moves prices too.</b> Buying pushes a price up and selling pushes it down, so the price you pay depends on how many shares you buy at once.</div>
+          <div><b>Injuries move them down.</b> A player ruled out loses value until they’re back.</div>
+          <div><b>Your return</b> is how much you’ve gained on every Coin you’ve received, free claims included.</div>
+        </div>
+        <div class="conf-btns"><button class="conf-confirm buy" onclick="closePriceHelp()">Got it</button></div>
+      </div>
+    </div>`);
+  const overlay = document.getElementById('help-overlay');
+  trapFocus(overlay, closePriceHelp);
+  overlay.querySelector('.conf-confirm')?.focus();
+}
+function closePriceHelp() {
+  const overlay = document.getElementById('help-overlay');
+  if (!overlay) return;
+  closeSheet(overlay, () => { releaseFocus(overlay); overlay.remove(); });
+}
+
 function showTradeConfirm(mode, shares, cost, player) {
   return new Promise(resolve => {
     _pendingTrade = resolve;
@@ -12219,6 +12349,50 @@ document.addEventListener('keydown', (e) => {
   if (!el || el.tagName === 'BUTTON') return;
   e.preventDefault();
   el.click();
+});
+
+// Keyboard shortcuts for people who live in the market view:
+//   /  search      ↑ ↓ (or k j)  previous / next player
+//   b  buy mode    s  sell mode      Esc  close drawers and sheets
+// Never while typing in a field, never with a modifier held, and only when
+// no dialog is open (dialogs already handle their own keys via trapFocus).
+let _listOrder = [];
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) {
+    if (e.key === 'Escape' && t.blur) t.blur();
+    return;
+  }
+  if (e.key === 'Escape') {
+    if (document.getElementById('league-drawer')?.classList.contains('open')) { closeLeagueDrawer(); return; }
+    if (document.getElementById('portfolio-drawer')?.classList.contains('open')) { closePortfolioDrawer(); return; }
+    if (document.getElementById('public-profile-modal')?.classList.contains('open')) { closePublicProfile(); return; }
+    return;
+  }
+  if (document.querySelector('.conf-overlay, #public-profile-modal.open, #league-drawer.open')) return;
+  const onMarket = document.getElementById('view-market')?.classList.contains('active');
+  if (e.key === '/') {
+    e.preventDefault();
+    if (!onMarket) goToMarketTop();
+    const sb = document.querySelector('.lsidebar .search-bar');
+    if (sb) { if (window.innerWidth <= 768) closePlayerDetail?.(); sb.focus(); sb.select(); }
+    return;
+  }
+  if (!onMarket) return;
+  const k = e.key.toLowerCase();
+  if (k === 'b' || k === 's') { e.preventDefault(); setMode(k === 'b' ? 'buy' : 'sell'); return; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || k === 'j' || k === 'k') {
+    if (!_listOrder.length) return;
+    e.preventDefault();
+    const i = _listOrder.indexOf(selRank);
+    const step = (e.key === 'ArrowDown' || k === 'j') ? 1 : -1;
+    const next = _listOrder[Math.max(0, Math.min(_listOrder.length - 1, (i < 0 ? -1 : i) + step))];
+    if (next != null && next !== selRank) {
+      selectPlayerFromList(next);
+      document.querySelector('.prow[aria-current="true"]')?.scrollIntoView({ block: 'nearest' });
+    }
+  }
 });
 
 // A real-money entry cutoff printed as "Aug 3, 8:00 PM" with no timezone
