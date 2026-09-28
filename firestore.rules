@@ -66,7 +66,24 @@ service cloud.firestore {
     //     identity above.
     match /users/{uid} {
       allow read: if true;
-      allow create, update: if request.auth != null && request.auth.uid == uid
+      // Split from update on purpose: `resource` (the doc as it exists before
+      // the write) has no `.data` on a create - there's no prior document to
+      // diff against - so `resource.data.diff(...)` throws during rule
+      // evaluation, and Firestore treats a rules error as a deny. That
+      // silently blocked EVERY brand-new sign-in from ever getting a
+      // users/{uid} doc created (confirmed live 2026-09-25: two known-working
+      // accounts predating this rule, zero new ones since, despite multiple
+      // people signing in) while existing accounts kept working fine since
+      // they only ever hit the update path. A create has no prior state to
+      // protect, so it only needs to check the INCOMING data doesn't set any
+      // of the server-only fields at all, not diff against a document that
+      // doesn't exist yet.
+      allow create: if request.auth != null && request.auth.uid == uid
+        && !request.resource.data.keys().hasAny([
+          'stripeConnectId', 'identityVerified', 'identityVerifiedAt', 'identityVerifiedAdult',
+          'stripeIdentitySessionId', 'geoState', 'geoCountry', 'geoCheckedAt'
+        ]);
+      allow update: if request.auth != null && request.auth.uid == uid
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'stripeConnectId', 'identityVerified', 'identityVerifiedAt', 'identityVerifiedAdult',
           'stripeIdentitySessionId', 'geoState', 'geoCountry', 'geoCheckedAt'
@@ -135,7 +152,11 @@ service cloud.firestore {
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid
         && request.resource.data.kind in ['text', 'trade']
         && request.resource.data.text is string && request.resource.data.text.size() <= 280;
-      allow update: if false;
+      // Emoji reactions: any signed-in user may update only the `reactions` map
+      // (emoji -> list of uids). Same trust level as comments.likes above -
+      // client-trusted, cosmetic engagement, never read by settlement or pricing.
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']);
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 

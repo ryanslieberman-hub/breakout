@@ -5,11 +5,15 @@
 import { SignJWT, importPKCS8 } from 'jose';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const SCOPE = 'https://www.googleapis.com/auth/datastore';
+// One token covers both Firestore REST and FCM send (lib/push.js) - a single
+// space-separated `scope` claim is enough, so both share one JWT exchange and
+// one per-isolate cache instead of running the RS256 sign twice. Mirrors
+// worker-pricing-engine/src/lib/firestore.js's SCOPE for the same reason.
+const SCOPE = 'https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/firebase.messaging';
 
 let cachedToken = null; // { token, expiresAt } - per-isolate cache, best effort
 
-async function getAccessToken(env) {
+export async function getAccessToken(env) {
   if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
     return cachedToken.token;
   }
@@ -76,6 +80,17 @@ export function fromFirestoreFields(fields) {
   const out = {};
   for (const [k, v] of Object.entries(fields || {})) out[k] = fromFirestoreValue(v);
   return out;
+}
+
+// Used to prune a dead FCM token once Google reports it UNREGISTERED (see
+// lib/notify.js) - a 404 here just means it's already gone, not an error.
+export async function firestoreDeleteDoc(env, path) {
+  const token = await getAccessToken(env);
+  const res = await fetch(`${baseUrl(env.FIREBASE_PROJECT_ID)}/${path}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok && res.status !== 404) throw new Error(`Firestore delete failed (${path}): ${await res.text()}`);
 }
 
 // `transactionId` is optional - when passed, the read is pinned to that

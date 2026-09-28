@@ -492,6 +492,15 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .chat-mention{color:var(--green);font-weight:700;}
 .chat-reply-preview{font-family:var(--font-mono);font-size:9.5px;color:var(--muted);padding:5px 8px;margin-top:2px;border-left:2px solid var(--hairline);background:var(--bg);border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .chat-reply-preview b{color:var(--fg);}
+.chat-react-trigger{font-family:var(--font-mono);font-size:9px;color:var(--muted);cursor:pointer;transition:color .12s;}
+.chat-react-trigger:hover{color:var(--green);}
+.chat-reaction-bar{display:none;gap:6px;margin-top:2px;padding:5px 7px;background:var(--bg);border:1px solid var(--hairline);border-radius:8px;width:fit-content;}
+.chat-reaction-bar span{font-size:15px;cursor:pointer;line-height:1;transition:transform .1s;}
+.chat-reaction-bar span:hover{transform:scale(1.25);}
+.chat-reactions{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px;}
+.chat-reaction-pill{display:flex;align-items:center;gap:3px;font-family:var(--font-mono);font-size:10px;color:var(--muted);background:var(--bg);border:1px solid var(--hairline);border-radius:10px;padding:2px 7px;cursor:pointer;transition:border-color .12s,color .12s;}
+.chat-reaction-pill:hover{border-color:var(--green);}
+.chat-reaction-pill.mine{border-color:var(--green);color:var(--green);background:#12d47e14;}
 .comment-name.clickable{cursor:pointer;}
 .comment-name.clickable:hover{text-decoration:underline;}
 .mention-pick{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;transition:background .12s;font-family:var(--font-mono);font-size:11px;}
@@ -1943,6 +1952,19 @@ async function paymentsWorkerFetch(path, options = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
+}
+
+// Best-effort push notification for a chat reply/reaction/mention - see
+// worker-payments' POST /notify/chat. Deliberately fire-and-forget: a failed
+// push (rate-limited, offline, worker hiccup) must never block or error out
+// the chat action that triggered it, so callers don't await this.
+function notifyChatEvent(kind, params) {
+  if (!currentUser) return;
+  paymentsWorkerFetch('/notify/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind, ...params }),
+  }).catch(e => console.warn('Chat notify failed:', e.message));
 }
 
 // Admin status comes from a Firebase custom claim on the user's ID token
@@ -10583,6 +10605,17 @@ function handleOpenPlayerDeepLink(){
   }
 }
 
+// Deep-link from a chat reply/reaction/mention push tap: ?openChat=1. Built
+// by firebase-messaging-sw.js's notificationclick generic data.url fallback
+// (see worker-payments' POST /notify/chat) - unlike the mover alert's
+// ?openPlayer=<rank>, there's no specific message to scroll to yet, so this
+// just lands on the Chat tab itself.
+function handleOpenChatDeepLink(){
+  if (!new URLSearchParams(location.search).has('openChat')) return;
+  history.replaceState(null, '', location.pathname);
+  showView('chat');
+}
+
 function openPlayerDetail(){
   if (!isMobileLayout()) return;
   document.querySelector('.market-layout')?.classList.add('show-detail');
@@ -12700,7 +12733,7 @@ const _g10TabBoot = document.getElementById('ctab-g10');
 if (_g10TabBoot) _g10TabBoot.textContent = currentLeague === 'MLB' ? 'Game Log' : 'Last 10';
 const _obTagline = document.getElementById('ob-tagline');
 if (_obTagline) _obTagline.textContent = currentLeague === 'MLB' ? 'MLB PLAYER STOCK MARKET' : 'NBA PLAYER STOCK MARKET';
-refreshAll().then(() => { try { handleOpenPlayerDeepLink(); } catch(e){} });
+refreshAll().then(() => { try { handleOpenPlayerDeepLink(); } catch(e){} try { handleOpenChatDeepLink(); } catch(e){} });
 // Note: trackerInterval is managed entirely by smartTracker itself
 
 // ── Live badge countdown ──────────────────────────────────────────────────
@@ -13678,6 +13711,7 @@ let _chatItems = [];
 const CHAT_LIMIT = 100;
 let _tradePickerOpen = false;
 let _chatTradeCandidates = [];
+const REACTION_EMOJIS = ['👍','❤️','😂','😮','🔥','💯'];
 
 function startChatListener() {
   if (!db || !window._fbOnSnapshot || !window._fbQuery || !window._fbCollection) return;
@@ -13805,6 +13839,15 @@ function renderChat() {
         : (original.text || '');
       return `<div class="chat-reply-preview">↩ <b>${escHtml(origLabel)}</b>: ${escHtml(snippet.slice(0, 80))}</div>`;
     })() : '';
+    const reactions = m.reactions || {};
+    const activeEmojis = REACTION_EMOJIS.filter(e => (reactions[e]||[]).length > 0);
+    const reactionsHtml = activeEmojis.length ? `<div class="chat-reactions">${activeEmojis.map(e => {
+      const uids = reactions[e] || [];
+      const mine = currentUser && uids.includes(currentUser.uid);
+      return `<span class="chat-reaction-pill${mine?' mine':''}" onclick="toggleChatReaction('${m.id}','${e}')">${e} <b>${uids.length}</b></span>`;
+    }).join('')}</div>` : '';
+    const reactionBarHtml = `<div class="chat-reaction-bar" id="reaction-bar-${m.id}">${REACTION_EMOJIS.map(e =>
+      `<span onclick="toggleChatReaction('${m.id}','${e}')">${e}</span>`).join('')}</div>`;
     return `
       <div class="comment-card ${isOwn?'own':''}">
         <div class="comment-header">
@@ -13817,8 +13860,11 @@ function renderChat() {
         ${tradeCard}
         <div class="comment-actions">
           <span class="comment-reply" onclick="replyToChatMessage(${i})">↩ reply</span>
+          <span class="chat-react-trigger" onclick="toggleReactionBar('${m.id}')">☺+</span>
           ${isOwn ? `<span class="comment-delete" onclick="deleteChatMessage('${m.id}')">delete</span>` : ''}
         </div>
+        ${reactionBarHtml}
+        ${reactionsHtml}
       </div>`;
   }).join('');
   el.scrollTop = el.scrollHeight;
@@ -13886,6 +13932,37 @@ async function deleteChatMessage(msgId) {
   } catch(e) { showToast('Delete failed: ' + (e.code || e.message)); }
 }
 
+// Quick-react popup: only one open at a time, toggled by the smiley trigger
+// next to reply/delete.
+function toggleReactionBar(msgId) {
+  document.querySelectorAll('.chat-reaction-bar').forEach(el => {
+    if (el.id !== 'reaction-bar-' + msgId) el.style.display = 'none';
+  });
+  const bar = document.getElementById('reaction-bar-' + msgId);
+  if (bar) bar.style.display = bar.style.display === 'flex' ? 'none' : 'flex';
+}
+
+// Toggles the current user's reaction on/off for one emoji. Uses arrayUnion/
+// arrayRemove on the specific reactions.<emoji> field path (not a read-modify-
+// write of the whole map) so two people reacting at once can't clobber each
+// other - worst case a stale local guess just makes one tap a no-op.
+async function toggleChatReaction(msgId, emoji) {
+  if (!currentUser || !db) { showToast('Sign in to react'); return; }
+  const bar = document.getElementById('reaction-bar-' + msgId);
+  if (bar) bar.style.display = 'none';
+  const m = _chatItems.find(x => x.id === msgId);
+  const mine = !!(m && (m.reactions?.[emoji] || []).includes(currentUser.uid));
+  try {
+    const ref = window._fbDoc(db, 'globalChat', msgId);
+    await window._fbUpdateDoc(ref, {
+      ['reactions.' + emoji]: mine
+        ? window._fbArrayRemove(currentUser.uid)
+        : window._fbArrayUnion(currentUser.uid),
+    });
+    if (!mine) notifyChatEvent('chat_reaction', { msgId, emoji }); // only on add, not on un-react
+  } catch(e) { showToast('Reaction failed: ' + (e.code || e.message)); }
+}
+
 async function sendChatMessage() {
   if (!currentUser || !db) { showToast('Sign in to chat'); return; }
   const input = document.getElementById('gchat-input');
@@ -13907,7 +13984,7 @@ async function sendChatMessage() {
   input.value = '';
   input.style.height = 'auto';
   try {
-    await window._fbAddDoc(window._fbCollection(db, 'globalChat'), {
+    const docRef = await window._fbAddDoc(window._fbCollection(db, 'globalChat'), {
       uid: currentUser.uid,
       displayName: userProfile?.displayName || currentUser.displayName || 'Trader',
       username: userProfile?.username || null,
@@ -13919,6 +13996,8 @@ async function sendChatMessage() {
       replyTo: replyTo || null,
       createdAt: window._fbServerTimestamp(),
     });
+    if (replyTo) notifyChatEvent('chat_reply', { msgId: docRef.id });
+    mentions.forEach(m => notifyChatEvent('chat_mention', { msgId: docRef.id, mentionedUid: m.uid }));
   } catch(e) {
     showToast('Failed to send: ' + (e.code || e.message));
     input.value = text; // restore on failure
@@ -16686,7 +16765,7 @@ window.addEventListener('appinstalled', () => {
            GoogleAuthProvider, signInWithPopup, signInWithRedirect,
            signOut, getRedirectResult,
            setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
-  import { getFirestore, initializeFirestore, serverTimestamp, doc, getDoc, getDocFromServer, setDoc, updateDoc, collection, getDocs, getDocsFromServer, limit, query, orderBy, where, onSnapshot, addDoc, deleteDoc, deleteField, increment, arrayUnion }  from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+  import { getFirestore, initializeFirestore, serverTimestamp, doc, getDoc, getDocFromServer, setDoc, updateDoc, collection, getDocs, getDocsFromServer, limit, query, orderBy, where, onSnapshot, addDoc, deleteDoc, deleteField, increment, arrayUnion, arrayRemove }  from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
   import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-messaging.js";
 
   const firebaseConfig = {
@@ -16731,6 +16810,7 @@ window.addEventListener('appinstalled', () => {
   window._fbUpdateDoc  = updateDoc;
   window._fbDeleteField = deleteField;
   window._fbArrayUnion = arrayUnion;
+  window._fbArrayRemove = arrayRemove;
   window._fbCollection = collection;
   window._fbGetDocs    = getDocs;
   window._fbGetDocsFromServer = getDocsFromServer;

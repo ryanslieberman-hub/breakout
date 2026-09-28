@@ -10,6 +10,7 @@ import {
 } from './lib/firestore.js';
 import { stripeClient, verifyStripeWebhookSignature } from './lib/stripe.js';
 import { replayTrades, portfolioValue, START_VALUE } from './lib/tradeReplay.js';
+import { notifyUid } from './lib/notify.js';
 
 function corsHeaders(env) {
   return {
@@ -1318,6 +1319,79 @@ async function handleNewsSearch(request, env) {
   return json({ articles }, 200, env);
 }
 
+// ── POST /notify/chat ──
+// Fires a push for a reply/reaction/mention on globalChat (main-nav Chat
+// tab). Deliberately trusts almost nothing the client sends - the client
+// only supplies IDs (msgId, emoji, mentionedUid), and every notification's
+// recipient/title/body is re-derived here from the real Firestore doc. A
+// client that could instead hand over an arbitrary target uid + freeform
+// text would turn this into an open push-spam/phishing endpoint - see the
+// per-kind checks below, each of which re-confirms the claimed event
+// actually happened before sending anything.
+const CHAT_NOTIFY_KINDS = ['chat_reply', 'chat_reaction', 'chat_mention'];
+// Mirrors index.html's REACTION_EMOJIS - kept in sync manually, same
+// reasoning as RESTRICTED_STATES/leagueForRank above. Only used to reject a
+// bogus `emoji` value before it can ride into a push notification's title.
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '🔥', '💯'];
+const CHAT_PREVIEW_LEN = 100;
+
+async function handleNotifyChat(request, env) {
+  const user = await requireUser(request, env);
+  await checkRateLimit(env, 'CHAT_NOTIFY_RATE_LIMITER', user.uid);
+  const body = await request.json().catch(() => ({}));
+  const { kind, msgId, emoji, mentionedUid } = body || {};
+  if (!CHAT_NOTIFY_KINDS.includes(kind)) throw new HttpError(400, 'Invalid kind');
+  if (!msgId || typeof msgId !== 'string') throw new HttpError(400, 'Missing msgId');
+
+  const msg = await firestoreGetDoc(env, `globalChat/${msgId}`);
+  if (!msg) throw new HttpError(404, 'Message not found');
+
+  const notifData = { kind, msgId, url: '/?openChat=1' };
+
+  if (kind === 'chat_reply') {
+    // msgId is the NEW reply message the caller just posted - its author
+    // must be the caller, and its replyTo must point at a real message.
+    if (msg.uid !== user.uid) throw new HttpError(403, 'Not your message');
+    if (!msg.replyTo) throw new HttpError(400, 'Message has no replyTo');
+    const original = await firestoreGetDoc(env, `globalChat/${msg.replyTo}`);
+    if (!original) throw new HttpError(404, 'Original message not found');
+    if (original.uid === user.uid) return json({ skipped: 'self' }, 200, env);
+    const actorLabel = msg.username ? '@' + msg.username : (msg.displayName || 'Someone');
+    await notifyUid(env, original.uid, {
+      title: `${actorLabel} replied to you`,
+      body: (msg.text || '').slice(0, CHAT_PREVIEW_LEN) || 'Tap to view',
+    }, notifData);
+  } else if (kind === 'chat_reaction') {
+    if (!emoji || !REACTION_EMOJIS.includes(emoji)) throw new HttpError(400, 'Invalid emoji');
+    if (msg.uid === user.uid) return json({ skipped: 'self' }, 200, env);
+    // Confirm the caller's uid is actually recorded against this emoji on
+    // this message - without this a client could claim a reaction it never
+    // made and spam the author's push with fabricated reactions.
+    const reactedUids = (msg.reactions && msg.reactions[emoji]) || [];
+    if (!reactedUids.includes(user.uid)) throw new HttpError(403, 'Reaction not found on this message');
+    const actorDoc = (await firestoreGetDoc(env, `users/${user.uid}`)) || {};
+    const actorLabel = actorDoc.username ? '@' + actorDoc.username : (actorDoc.displayName || 'Someone');
+    await notifyUid(env, msg.uid, {
+      title: `${actorLabel} reacted ${emoji}`,
+      body: (msg.text || '').slice(0, CHAT_PREVIEW_LEN) || 'to your message',
+    }, notifData);
+  } else if (kind === 'chat_mention') {
+    // msgId is the message the caller just posted - its author must be the
+    // caller, and mentionedUid must actually appear in its own mentions list.
+    if (msg.uid !== user.uid) throw new HttpError(403, 'Not your message');
+    if (!mentionedUid || typeof mentionedUid !== 'string') throw new HttpError(400, 'Missing mentionedUid');
+    if (mentionedUid === user.uid) return json({ skipped: 'self' }, 200, env);
+    const mentioned = (msg.mentions || []).some(m => m.uid === mentionedUid);
+    if (!mentioned) throw new HttpError(403, 'uid not mentioned in this message');
+    const actorLabel = msg.username ? '@' + msg.username : (msg.displayName || 'Someone');
+    await notifyUid(env, mentionedUid, {
+      title: `${actorLabel} mentioned you`,
+      body: (msg.text || '').slice(0, CHAT_PREVIEW_LEN) || 'in chat',
+    }, notifData);
+  }
+  return json({ ok: true }, 200, env);
+}
+
 // ── Redemption retry sweep (Cron Trigger, hourly, alongside runSettlementSweep) ──
 export async function runRedemptionRetrySweep(env) {
   const allFailed = await firestoreQuery(env, 'coinRedemptions', [{ field: 'status', op: 'EQUAL', value: 'failed' }]);
@@ -1397,6 +1471,9 @@ export default {
       }
       if (request.method === 'POST' && url.pathname === '/news') {
         return await handleNewsSearch(request, env);
+      }
+      if (request.method === 'POST' && url.pathname === '/notify/chat') {
+        return await handleNotifyChat(request, env);
       }
       if (request.method === 'GET' && /^\/challenges\/[^/]+\/standings$/.test(url.pathname)) {
         await requireUser(request, env); // any signed-in user, not admin-only - this moves no money
