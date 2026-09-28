@@ -15690,13 +15690,13 @@ function _renderGlobalLbRows(){
     if (idx >= 0) {
       const me = _globalLbUsers[idx];
       const ahead = idx > 0 ? _globalLbUsers[idx - 1] : null;
-      const gapTxt = !ahead ? 'You’re in first. Hold the lead.'
+      const gapTxt = !ahead ? ''
         : _lbSortMode === 'gain'
           ? `${((ahead.returnPct||0) - (me.returnPct||0)).toFixed(1)} pts behind #${idx}`
           : `${Math.max(0, Math.round((ahead.portfolioValue||0) - (me.portfolioValue||0))).toLocaleString()} Coins behind #${idx}`;
       meEl.innerHTML = `<div class="ulb-me">
         <div class="ulb-me-rank">#${idx + 1}<span> of ${_globalLbUsers.length}</span></div>
-        <div class="ulb-me-sub">${gapTxt}</div>
+        ${gapTxt ? `<div class="ulb-me-sub">${gapTxt}</div>` : ''}
       </div>`;
     }
   }
