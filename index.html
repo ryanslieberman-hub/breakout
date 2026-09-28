@@ -4,19 +4,19 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Breakout: The Market for Sports Conviction</title>
-<meta name="description" content="Buy and sell athletes like stocks. Prices move with real game performance. Start with 100K coins and build the best portfolio.">
+<meta name="description" content="Buy and sell athletes like stocks. Prices move with real game performance. Claim free Coins every day and build the best portfolio.">
 <meta name="theme-color" content="#04070e">
 
 <!-- Open Graph (Facebook, Discord, iMessage previews) -->
 <meta property="og:title" content="Breakout: The Market for Sports Conviction">
-<meta property="og:description" content="Buy and sell athletes like stocks. Prices update live with real ESPN box scores. Start with 100K coins and climb the leaderboard.">
+<meta property="og:description" content="Buy and sell athletes like stocks. Prices update live with real box scores. Claim free Coins every day and climb the leaderboard.">
 <meta property="og:type" content="website">
-<meta property="og:image" content="https://via.placeholder.com/1200x630/04070e/12d47e?text=Breakout">
+<meta property="og:image" content="https://square-block-4d1b.ryanslieberman.workers.dev/icon-512.png">
 
 <!-- Twitter Card -->
-<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Breakout: The Market for Sports Conviction">
-<meta name="twitter:description" content="Buy and sell athletes like stocks. Real ESPN data. 100K coins to start.">
+<meta name="twitter:description" content="Buy and sell athletes like stocks. Prices move with real games. Free Coins every day.">
 
 <!-- Favicon (inline SVG as data URI) -->
 <link rel="icon" href="data:image/svg+xml,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; viewBox=&#39;0 0 32 32&#39;&gt;&lt;rect width=&#39;32&#39; height=&#39;32&#39; rx=&#39;6&#39; fill=&#39;%2304070e&#39;/&gt;&lt;line x1=&#39;5&#39; y1=&#39;16&#39; x2=&#39;27&#39; y2=&#39;16&#39; stroke=&#39;%232a2f3a&#39; stroke-width=&#39;1.8&#39; stroke-dasharray=&#39;2.6 3.2&#39;/&gt;&lt;path d=&#39;M5 26 L10 20 L14 23 L18 16 L27 6&#39; fill=&#39;none&#39; stroke=&#39;%2312d47e&#39; stroke-width=&#39;2.6&#39; stroke-linecap=&#39;round&#39; stroke-linejoin=&#39;round&#39;/&gt;&lt;circle cx=&#39;18&#39; cy=&#39;16&#39; r=&#39;2.3&#39; fill=&#39;%2312d47e&#39;/&gt;&lt;/svg&gt;">
@@ -1565,6 +1565,23 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .signin-browse{width:100%;}
 .ob-tagline{font-family:var(--font-body);font-size:14px;letter-spacing:0;}
 .ob-body{font-size:15px;line-height:1.6;}
+.ob-rule{border-left:none;padding-left:2px;}
+.ob-rule-title{font-size:14px;}
+.ob-rule-desc{font-family:var(--font-body);font-size:13px;}
+.ob-sample{border-top:1px solid var(--border);margin:4px 0 16px;}
+.ob-slide .signin-perks{margin-bottom:14px;}
+.ob-sample .mv-price{width:auto;margin-left:8px;}
+.ob-btn{font-family:var(--font-body);}
+.ob-btn.primary{background:var(--green);box-shadow:none;}
+.ob-sample .mv-pct{width:58px;}
+/* "Browse as guest" is the escape hatch, not a peer of Next - a text link */
+.ob-skip{border:none !important;background:none;padding:9px 4px;color:var(--muted);}
+.ob-skip:hover{color:var(--text);}
+@media (max-width:480px){
+  .ob-footer{padding:14px 18px;gap:10px;}
+  .ob-footer > div:last-child{gap:6px !important;}
+  #ob-back{display:none !important;}
+}
 .ob-btn,.ob-skip{font-family:var(--font-body);font-size:13px;font-weight:600;letter-spacing:0;white-space:nowrap;}
 .ob-btn{padding:10px 20px;}
 .ob-skip{padding:9px 14px;}
@@ -1771,6 +1788,88 @@ button.pl-row:hover,label.pl-row:hover{background:rgba(255,255,255,.03);}
 
 .dtable.trades td:nth-child(2),.dtable.trades th:nth-child(2){text-align:left;}
 
+/* ════════════════════════════════════════════════════════════════════════
+   FINAL SWEEP - trade bar, last-game line, game log, news, drawers, top bar
+   ════════════════════════════════════════════════════════════════════════ */
+/* Trade bar: one segmented Buy/Sell, one quiet amount group, a solid action.
+   The gradient + coloured glow on the button was the loudest thing on the
+   page and the least informative. */
+.mtabs{display:inline-flex;gap:2px;padding:3px;background:var(--card);border:1px solid var(--hairline);border-radius:9px;}
+.mt{border:none !important;border-radius:7px !important;padding:7px 14px;font-weight:600;font-size:13px;}
+.mt.buy.active{background:rgba(18,212,126,.14);color:var(--green);}
+.mt.sell.active{background:rgba(245,68,95,.14);color:var(--red);}
+.unit-toggle{border:none;background:var(--card);border-radius:7px;padding:2px;gap:2px;}
+.ut-btn{border-radius:5px;padding:2px 8px;}
+.ut-btn+.ut-btn{border-left:none;}
+.ut-btn.active{background:var(--card2);color:var(--text);}
+.sinp{font-size:16px;font-weight:500;}
+.qc{background:transparent;padding:4px 8px;font-family:var(--font-mono);}
+.qc:hover{background:var(--card);}
+.pvv{font-weight:500;}
+.pvv.gold{color:var(--text);font-weight:600;}
+.xbtn{font-family:var(--font-body);font-size:15px;letter-spacing:0;font-weight:700;border-radius:10px;padding:11px 22px;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis;}
+.xbtn.buy{background:var(--green);color:#03130a;box-shadow:none;}
+.xbtn.sell{background:var(--red);color:#fff;box-shadow:none;}
+.xbtn:hover{filter:brightness(1.06);transform:none;}
+.xbtn:active{transform:scale(.98);box-shadow:none;}
+
+/* Last game: one line of figures instead of a row of boxed tiles */
+.ln-stat{flex-direction:row;align-items:baseline;gap:4px;padding:0;background:none;border:none;border-radius:0;margin:0 14px 2px 0;}
+.ln-v{font-family:var(--font-mono);font-size:15px;font-weight:500;}
+.ln-v.bad{color:var(--muted);}
+.ln-l{font-family:var(--font-body);font-size:12px;letter-spacing:0;text-transform:none;}
+
+/* Game log + loading lines */
+.g10-loading,.news-loading{font-family:var(--font-body);font-size:13px;}
+.g10-cap{font-size:12px;color:var(--muted);margin:6px 0 4px;}
+.g10-more{font-size:12px;color:var(--muted);text-align:center;padding:12px 0;}
+.g10-table{font-size:12px;}
+.g10-table th{font-family:var(--font-body);font-size:11px;font-weight:600;padding:6px;}
+.g10-table td{padding:7px 6px;}
+.g10-bar{border-radius:3px 3px 0 0;}
+
+/* News */
+.news-headline{font-size:14px;}
+.news-summary{font-family:var(--font-body);font-size:13px;line-height:1.5;}
+.news-sentiment{font-family:var(--font-body);font-size:11px;font-weight:600;}
+
+/* Drawers (league + portfolio): the old navy palette, now the app's own */
+#league-drawer,#portfolio-drawer{background:var(--surface);border-right:1px solid var(--border);width:260px;}
+#league-drawer.open,#portfolio-drawer.open{left:0;}
+.drawer-header{border-bottom:1px solid var(--border);font-family:var(--font-heading);font-size:17px;font-weight:700;color:var(--text);text-transform:none;letter-spacing:0;}
+.league-option,.portfolio-option{border-bottom:1px solid var(--border);font-family:var(--font-body);position:relative;}
+.league-option:hover,.portfolio-option:hover{background:rgba(255,255,255,.03);}
+.league-option.active,.portfolio-option.active{background:rgba(18,212,126,.06);border-left:none;}
+.league-option.active::after,.portfolio-option.active::after{content:'';position:absolute;right:18px;top:50%;width:6px;height:11px;margin-top:-7px;border:solid var(--green);border-width:0 2px 2px 0;transform:rotate(45deg);}
+.lo-icon{background:var(--card2);border-color:var(--border2);border-radius:10px;}
+.lo-sub,.po-sub{font-size:12px;}
+#league-btn{background:var(--card);border:1px solid var(--border2);border-radius:8px;font-family:var(--font-body);font-weight:600;font-size:13px;}
+#league-btn:hover{background:var(--card2);}
+
+/* Top bar */
+.logo .brand-mark{filter:none;}
+.ob-logo .brand-mark{filter:none;}
+.movers-scroll.ticking{animation-duration:70s;}
+.live-badge{font-family:var(--font-body);font-size:12px;font-weight:600;padding:3px 9px;}
+.auth-btn{background:var(--green);color:#03130a;font-family:var(--font-body);font-size:13px;font-weight:700;border-radius:8px;padding:7px 14px;}
+.auth-btn:hover{opacity:1;filter:brightness(1.06);}
+.avatar-pill span{font-family:var(--font-body);font-size:13px;}
+.avatar-pill .av-pnl{font-family:var(--font-mono);font-size:12px;}
+.nav-claim-btn{font-family:var(--font-body);font-size:13px;}
+.claim-banner{font-family:var(--font-body);font-size:13px;font-weight:600;letter-spacing:0;}
+/* Guests have no Coins yet - "Coins: 0.00  Total: 0.00" was just noise */
+nav:has(.auth-btn) .nav-stat{display:none !important;}
+
+/* Native scrollbars, selects and date pickers render light unless the page
+   declares it's dark - the white scrollbar on Schedule was this. */
+:root{color-scheme:dark;}
+
+/* Schedule chips: no tier circles (tiers aren't shown anywhere else now) */
+.sched-player-tier{display:none;}
+.sched-player-chip{padding:5px 10px;}
+.sched-player-name{font-family:var(--font-body);font-size:12px;}
+.sched-team-record,.sched-status{font-family:var(--font-body);font-size:12px;letter-spacing:0;text-transform:none;}
+
 /* Trade confirm: a receipt, not a paragraph */
 .conf-box{font-family:var(--font-body);}
 .conf-title{font-size:20px;margin-bottom:14px;}
@@ -1782,6 +1881,19 @@ button.pl-row:hover,label.pl-row:hover{background:rgba(255,255,255,.03);}
 .conf-cancel{background:transparent;border:1px solid var(--border2) !important;color:var(--text);}
 
 @media (max-width:768px){
+  /* Phone header: brand mark + league on the left, your Coins and avatar
+     (or Sign in) on the right - was a lone league pill and empty space. */
+  nav{gap:8px;}
+  .logo .brand-mark{display:inline-block;width:22px;height:19px;margin:0 2px 0 0;}
+  .nav-right{display:flex !important;gap:8px;margin-left:auto;}
+  .nav-right #nav-claim-btn,.nav-right #last-updated,.nav-right .nav-stat:has(#nav-total),
+  .nav-right #live-badge-nav,.nav-right #nav-settings-btn{display:none !important;}
+  .nav-right .nav-stat:has(#nav-cash){font-size:13px;color:var(--muted);}
+  .avatar-pill{padding:3px;}
+  .avatar-pill span{display:none;}
+  .auth-btn{min-height:38px;}
+  .xbtn{max-width:none;}
+  .trade-bar > div:has(#xbtn){flex:1 1 100%;}
   /* iOS zooms the page into any focused field under 16px */
   .chat-input,#chat-input,.search-bar,.profile-input{font-size:16px;}
   .pchart-val{font-size:30px;}
@@ -1811,12 +1923,19 @@ button.pl-row:hover,label.pl-row:hover{background:rgba(255,255,255,.03);}
 // first one currently in season, so a new user never opens onto a flat,
 // offseason market. Windows are approximate regular-season dates (month is
 // 0-based); golf runs nearly year-round and is the fallback.
-function defaultLeague(now = new Date()) {
+const LEAGUE_SEASONS = {
+  NBA: [921, 520],  // Oct 21 - Jun 20
+  MLB: [225, 830],  // Mar 25 - Sep 30
+  NFL: [805, 112],  // Sep 5 - Feb 12
+};
+function leagueInSeason(lg, now = new Date()) {
+  if (lg === 'GOLF') return true;
+  const w = LEAGUE_SEASONS[lg]; if (!w) return false;
   const md = now.getMonth() * 100 + now.getDate();
-  if (md >= 921 || md <= 520) return 'NBA';  // Oct 21 - Jun 20
-  if (md >= 225 && md <= 830) return 'MLB';  // Mar 25 - Sep 30
-  if (md >= 805 || md <= 112) return 'NFL';  // Sep 5 - Feb 12
-  return 'GOLF';
+  return w[0] <= w[1] ? (md >= w[0] && md <= w[1]) : (md >= w[0] || md <= w[1]);
+}
+function defaultLeague(now = new Date()) {
+  return ['NBA', 'MLB', 'NFL'].find(lg => leagueInSeason(lg, now)) || 'GOLF';
 }
 // Runs before anything renders - set correct league label immediately
 (function(){
@@ -1867,9 +1986,7 @@ function defaultLeague(now = new Date()) {
     </span>
     <button class="nbtn" id="nav-settings-btn" onclick="openSettings()" title="Settings" style="display:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Settings</button>
     <div id="auth-bar" style="display:flex;align-items:center;gap:6px;">
-      <button class="auth-btn" id="auth-btn" onclick="handleAuthBtn()">
-        <svg width="14" height="14" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.86-7-7.93s3.06-7.44 7-7.93v15.86zm2 0V4.07c3.94.49 7 3.86 7 7.93s-3.06 7.44-7 7.93z"></path></svg>
-        Sign In
+      <button class="auth-btn" id="auth-btn" onclick="handleAuthBtn()">Sign in
       </button></div>
   </div>
 </nav>
@@ -1906,14 +2023,6 @@ function defaultLeague(now = new Date()) {
           <button onclick="toggleWatchlist(this)" id="wl-btn" style="background:none;border:none;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);padding:0;transition:color .15s;display:inline-flex;align-items:center;gap:4px;" title="Show watchlist"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Watchlist</button>
         </div>
         <input class="search-bar" placeholder="Search player or team…" oninput="filterList(this.value)">
-        <div class="tfilters tier-filters">
-          <button type="button" class="tf active" onclick="setTier(&#39;all&#39;,this)">All</button>
-          <button type="button" class="tf" onclick="setTier(&#39;S&#39;,this)" style="color:var(--t1)">S</button>
-          <button type="button" class="tf" onclick="setTier(&#39;A&#39;,this)" style="color:var(--t2)">A</button>
-          <button type="button" class="tf" onclick="setTier(&#39;B&#39;,this)" style="color:var(--t3)">B</button>
-          <button type="button" class="tf" onclick="setTier(&#39;C&#39;,this)" style="color:var(--t4)">C</button>
-          <button type="button" class="tf" onclick="setTier(&#39;D&#39;,this)" style="color:var(--t5)">D</button>
-        </div>
         <div class="tfilters pos-filters" id="pos-filter-row">
           <button type="button" class="tf active" id="pf-all" onclick="setPos(&#39;all&#39;,this)">All</button>
           <button type="button" class="tf" id="pf-1" onclick="setPos(getPosLabels()[0],this)">PG</button>
@@ -1958,7 +2067,7 @@ function defaultLeague(now = new Date()) {
           <!-- Last night box score -->
           <div id="last-night-wrap" style="display: none; margin-top: 8px; opacity: 1;">
             <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px;">
-              <span id="ln-header">Last Night</span> · <span id="ln-game">26pts 8reb 11ast · Last Night</span>
+              <span id="ln-header">Last game</span><span id="ln-game"></span>
             </div>
             <div id="ln-chip-row" style="display:flex;gap:0;flex-wrap:wrap;">
               <div class="ln-stat"><div class="ln-v great" id="ln-pts">26</div><div class="ln-l" id="ln-lbl-pts">PTS</div></div>
@@ -2053,8 +2162,8 @@ function defaultLeague(now = new Date()) {
           <div class="pv"><div class="pvl">You Hold</div><div class="pvv" id="pv-hold">0</div></div>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="xbtn buy" id="xbtn" onclick="executeTrade()" style="flex:1">BUY</button>
-          <button id="sell-all-btn" onclick="sellAll()" style="display:none;flex-shrink:0;background:linear-gradient(180deg,#f7566f,#dd3350);color:#fff;border:none;border-radius:8px;padding:0 16px;font-family:var(--font-mono);font-size:12px;font-weight:700;cursor:pointer;letter-spacing:0.05em;box-shadow:inset 0 1px 0 rgba(255,255,255,.18);">SELL ALL</button>
+          <button class="xbtn buy" id="xbtn" onclick="executeTrade()" style="flex:1">Buy</button>
+          <button id="sell-all-btn" class="es-btn ghost danger" onclick="sellAll()" style="display:none;flex-shrink:0;">Sell all</button>
         </div>
       </div>
     </div>
@@ -3756,26 +3865,9 @@ function openLeagueDrawer() {
   // you loaded the page already on MLB (restored from localStorage), the selector still
   // claimed NBA. The player counts were hardcoded too ("250 players") and had gone
   // stale as the rosters grew.
-  try {
-    updateLeagueDrawerUI();
-    const counts = {
-      NBA:  (typeof nbaPlayers  !== 'undefined' ? nbaPlayers.length  : 0),
-      MLB:  (typeof mlbPlayers  !== 'undefined' ? mlbPlayers.length  : 0),
-      GOLF: (typeof golfPlayers !== 'undefined' ? golfPlayers.length : 0),
-      NFL:  (typeof nflPlayers  !== 'undefined' ? nflPlayers.length  : 0),
-    };
-    const subs = {
-      NBA:  n => n + ' players · Live prices',
-      MLB:  n => n + ' players · Season in progress',
-      GOLF: n => n + ' golfers · Live prices',
-      NFL:  n => n + ' players · Season in progress',
-    };
-    document.querySelectorAll('.league-option[data-league]').forEach(el => {
-      const lg = el.dataset.league;
-      const sub = el.querySelector('.lo-sub');
-      if (sub && counts[lg] && subs[lg]) sub.textContent = subs[lg](counts[lg]);
-    });
-  } catch(e){}
+  // updateLeagueDrawerUI also writes each league's real player count and
+  // whether it's in season.
+  try { updateLeagueDrawerUI(); } catch(e){}
   document.getElementById('league-drawer').classList.add('open');
   document.getElementById('league-drawer-overlay').style.display = 'block';
 }
@@ -3797,6 +3889,13 @@ function updateLeagueDrawerUI() {
   if (lblCompact) lblCompact.textContent = label;
   const lblCompactSched = document.getElementById('league-label-compact-sched');
   if (lblCompactSched) lblCompactSched.textContent = label;
+  // Real counts and real season status - these used to be hard-coded, so NBA
+  // said "Live prices" all summer.
+  const counts = { NBA: nbaPlayers.length, MLB: mlbPlayers.length, GOLF: golfPlayers.length, NFL: nflPlayers.length };
+  document.querySelectorAll('.league-option[data-league]').forEach(el => {
+    const lg = el.dataset.league, sub = el.querySelector('.lo-sub');
+    if (sub && counts[lg] != null) sub.textContent = `${counts[lg]} ${lg === 'GOLF' ? 'golfers' : 'players'} · ${leagueInSeason(lg) ? 'In season' : 'Offseason'}`;
+  });
 }
 
 
@@ -4783,11 +4882,11 @@ function _showUpdateBanner(){
   if (document.getElementById('update-banner')) return;
   const banner = document.createElement('div');
   banner.id = 'update-banner';
-  banner.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#0b1320;border:1px solid #12d47e44;border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:9999;font-family:var(--font-mono);font-size:11px;box-shadow:0 4px 24px #000a;max-width:320px;width:90%;cursor:pointer;';
+  banner.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--card2);border:1px solid var(--border2);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:9999;font-family:var(--font-body);font-size:13px;box-shadow:0 4px 24px #000a;max-width:320px;width:90%;cursor:pointer;';
   banner.innerHTML = `
     <div style="flex:1">
-      <div style="color:#ddeeff;font-weight:600;margin-bottom:2px">Update available</div>
-      <div style="color:#4a6280">Tap to refresh and get the latest fixes</div>
+      <div style="color:var(--text);font-weight:600;margin-bottom:2px">Update available</div>
+      <div style="color:var(--muted)">Tap to refresh and get the latest fixes</div>
     </div>`;
   banner.onclick = () => window.location.reload();
   document.body.appendChild(banner);
@@ -8247,7 +8346,7 @@ async function loadNews(playerName){
   content.innerHTML=`<div class="news-loading"><div class="news-spinner"></div>Fetching latest news for ${escHtml(playerName)}…</div>`;
 
   if (!currentUser) {
-    content.innerHTML=`<div class="news-loading" style="color:var(--muted);">Sign in to see news.</div>`;
+    content.innerHTML=emptyState('News is for members', 'Sign in to see the latest headlines and injury updates for every player.', `<button class="es-btn es-sm" onclick="openProfile()">Sign in</button>`);
     return;
   }
 
@@ -8295,7 +8394,7 @@ async function loadNews(playerName){
 async function executeTrade(){
   // Require login
   if(!currentUser){
-    showToast('\u{1F464} Sign in to trade');
+    showToast('Sign in to trade');
     setTimeout(()=>openProfile(), 800);
     return;
   }
@@ -8322,7 +8421,7 @@ async function executeTrade(){
     if(r.cost>cash){
       const btn=document.getElementById('xbtn');
       btn.classList.add('shake');setTimeout(()=>btn.classList.remove('shake'),500);
-      showToast('Insufficient cash');return;
+      showToast('Not enough Coins for that many shares');return;
     }
     if(isLiveNow){
       const ok = await showTradeConfirm('buy', shares, r.cost, players.find(x=>x.rank===selRank).name);
@@ -8514,7 +8613,7 @@ function settleTrade(id){
     logs.unshift({type:'buy',shares,amount:ammResult.cost,name,price:ammResult.newPrice});
     pushTradeToFeed(rank, 'buy', shares, ammResult.newPrice, name, pid);
     flashHero(true);
-    showToast(`\u2705 BUY executed: ${shares} × ${name}`);
+    showToast(`Bought ${fmtShares(shares)} ${+shares===1?'share':'shares'} of ${name}`);
   } else {
     // shares already removed on queue - credit the FRESH proceeds, not the
     // queue-time estimate.
@@ -8530,7 +8629,7 @@ function settleTrade(id){
     logs.unshift({type:'sell',shares,amount:ammResult.returned,name,price:ammResult.newPrice});
     pushTradeToFeed(rank, 'sell', shares, ammResult.newPrice, name, pid);
     flashHero(false);
-    showToast(`\u2705 SELL executed: ${shares} × ${name}`);
+    showToast(`Sold ${fmtShares(shares)} ${+shares===1?'share':'shares'} of ${name}`);
   }
 
   pushPortHx();
@@ -8911,9 +9010,11 @@ function updateHero(){
         // (pitchers don't use them), and since these are shared DOM elements
         // reused across every player card, viewing a pitcher then a hitter
         // left a hitter's real H/AB/HR/AB data rendered but invisible.
+        // HR is already the first chip and AB is inside H/AB, so the 3p/min
+        // rows (which repeated both) stay hidden for hitters.
         document.getElementById('ln-row-fg').style.display  = '';
-        document.getElementById('ln-row-3p').style.display  = '';
-        document.getElementById('ln-row-min').style.display = '';
+        document.getElementById('ln-row-3p').style.display  = 'none';
+        document.getElementById('ln-row-min').style.display = 'none';
         document.getElementById('ln-fg').textContent  = ln.fg;    // H/AB
         document.getElementById('ln-lbl-fg').textContent = 'H/AB';
         document.getElementById('ln-3p').textContent  = ln.fg3;   // HR line
@@ -9075,27 +9176,30 @@ function updateHero(){
     const _within24h = isLive || (typeof ln.ts === 'number'
       ? (Date.now() - ln.ts < 24 * 3600 * 1000)
       : (ln.date === today || ln.date === yesterday));
-    const dateSuffix = ln._multiGame ? ' · Last 24 Hrs' : (_within24h ? '' : (ln.date ? ` · ${ln.date}` : ''));
-    const headerLabel = ln.golf ? 'Latest Round' : 'Game Log';
+    const dateSuffix = ln._multiGame ? ' · Last 24 hours' : (_within24h ? '' : (ln.date ? ` · ${_g10Date(ln.date)}` : ''));
+    const headerLabel = ln.golf ? 'Latest round' : 'Last game';
+    // The stat chips below already spell the line out - the header only adds
+    // when it was (and whether it's still going), not a second copy of it.
+    const whenTxt = `${isLive ? ' · Live' : ''}${dateSuffix}`;
     const lnHeader = document.getElementById('ln-header');
     if (lnHeader) lnHeader.textContent = headerLabel;
     if (ln.golf) {
       const tp = ln.toPar == null ? null : Math.round(ln.toPar);
       const tpStr = tp == null ? '—' : tp === 0 ? 'E' : tp > 0 ? `+${tp}` : `${tp}`;
-      document.getElementById('ln-game').textContent = `${tpStr} to par${dateSuffix}`;
+      document.getElementById('ln-game').textContent = ` · ${tpStr} to par${dateSuffix}`;
     } else if (ln.mlbRole === 'SP' || ln.mlbRole === 'RP') {
-      document.getElementById('ln-game').textContent = `${ln.pts}K ${(ln.min||0)}IP ${ln.reb}ER${dateSuffix}`;
+      document.getElementById('ln-game').textContent = whenTxt;
     } else if (ln.mlbRole === 'H') {
-      document.getElementById('ln-game').textContent = `${ln.pts}HR ${ln.reb}RBI ${ln.ast}H${dateSuffix}`;
+      document.getElementById('ln-game').textContent = whenTxt;
     } else if (ln.nfl) {
       const role = p.role;
       const line = role === 'QB' ? `${Math.round(ln.py||0)} pass yd, ${(ln.ptd||0).toFixed(0)} TD, ${(ln.ints||0).toFixed(0)} INT`
         : role === 'RB' ? `${Math.round(ln.ry||0)} rush yd, ${((ln.rtd||0)+(ln.rectd||0)).toFixed(0)} TD, ${(ln.rec||0).toFixed(0)} rec`
         : (role === 'WR' || role === 'TE') ? `${(ln.rec||0).toFixed(0)} rec, ${Math.round(ln.recy||0)} yd, ${(ln.rectd||0).toFixed(0)} TD`
         : `${(ln.tkl||0).toFixed(0)} tkl, ${(ln.sack||0).toFixed(1)} sack, ${(ln.defint||0).toFixed(0)} INT`;
-      document.getElementById('ln-game').textContent = `${line}${dateSuffix}`;
+      document.getElementById('ln-game').textContent = ` · ${line}${dateSuffix}`;
     } else {
-      document.getElementById('ln-game').textContent = `${ln.pts}pts ${ln.reb}reb ${ln.ast}ast${dateSuffix}`;
+      document.getElementById('ln-game').textContent = whenTxt;
     }
     // Dim if older than yesterday - never dim a live in-progress entry
     const isStale = ln.date && ln.date < yesterday && !ln.live;
@@ -9104,6 +9208,10 @@ function updateHero(){
 }
 
 function updatePreview(){
+  // The action names the player - "Buy Ohtani", not a bare "BUY".
+  const xb=document.getElementById('xbtn');
+  const _pp=players.find(x=>x.rank===selRank);
+  if(xb) xb.textContent=(tradeMode==='buy'?'Buy':'Sell')+(_pp?' '+playerLastName(_pp.name):'');
   const shares=resolveTradeShares(selRank,tradeMode,document.getElementById('sinp').value);
   const price=activePrice(selRank);
   document.getElementById('pv-price').textContent=fmt(price);
@@ -10964,7 +11072,7 @@ function setMode(m){
   document.getElementById('mt-buy').className='mt buy'+(m==='buy'?' active':'');
   document.getElementById('mt-sell').className='mt sell'+(m==='sell'?' active':'');
   const btn=document.getElementById('xbtn');
-  btn.className='xbtn '+m;btn.textContent=m==='buy'?'BUY':'SELL';
+  btn.className='xbtn '+m;
   updatePreview();
 }
 
@@ -11051,12 +11159,6 @@ function updateRangePcts(rank){
 
 function filterList(v){searchQ=v.toLowerCase();renderList();}
 
-function setTier(t,el){
-  tierF=t;
-  document.querySelectorAll('.tier-filters .tf').forEach(e=>e.classList.remove('active'));
-  el.classList.add('active');
-  renderList();
-}
 // Position filter labels by league
 function getPosLabels() {
   if (currentLeague === 'MLB') return ['SP','RP','H','OF','C'];
@@ -13029,15 +13131,16 @@ setInterval(() => {
   const dot   = document.getElementById('live-dot');
   const txt   = document.getElementById('live-badge-txt');
   if (!badge || !txt) return;
-  const secsLeft = Math.max(0, Math.round((_nextRefresh - Date.now()) / 1000));
+  // Players need to know one thing: are prices moving right now. The polling
+  // countdown ("refresh 58s") was plumbing, so the badge only exists while
+  // games are live.
   if (isGameLive) {
+    badge.style.display = '';
     badge.className = 'live-badge is-live';
     dot.style.background = 'var(--green)';
-    txt.textContent = `LIVE · ${secsLeft}s`;
+    txt.textContent = 'Live';
   } else {
-    badge.className = 'live-badge';
-    dot.style.background = 'var(--muted)';
-    txt.textContent = `refresh ${secsLeft}s`;
+    badge.style.display = 'none';
   }
 }, 1000);
 
@@ -13100,7 +13203,7 @@ function initFirebase() {
     localStorage.removeItem('ax_auth_redirect_pending');
     if (e?.code && e.code !== 'auth/no-auth-event') {
       console.warn('[auth redirect]', e.code, e.message);
-      showToast('Sign-in issue: ' + e.code);
+      showToast('Sign-in didn’t finish. Try again.');
     }
   });
 
@@ -13210,7 +13313,7 @@ async function handleAuthChange(user) {
       startClaimBadgePolling();
     } catch(e) {
       console.error('Firestore error:', e.code, e.message);
-      showToast('️ Could not save to leaderboard: ' + (e.code || e.message));
+      showToast('Couldn’t update your leaderboard spot. It’ll retry on its own.');
     }
 
     // Refresh leaderboard after write committed
@@ -13258,7 +13361,7 @@ async function loadCloudPortfolio() {
       autoRepairPrices('cloud-load');
       renderAll();
       updateMovers();
-      showToast('Portfolio loaded from cloud️');
+      showToast('Portfolio synced');
     }
   } catch(e) { console.error('Load portfolio failed:', e); }
 }
@@ -13307,7 +13410,7 @@ async function saveCloudPortfolio(silent = false, portfolioId = activePortfolioI
       }, { merge: true });
       updateAuthUI(); // refresh pill P&L
     }
-    if (!silent) showToast('Portfolio saved to cloud');
+    if (!silent) showToast('Portfolio synced');
   } catch(e) { if (!silent) showToast('Save failed: ' + e.message); }
 }
 
@@ -13352,9 +13455,7 @@ function updateAuthUI() {
       </div>`;
   } else {
     bar.innerHTML = `
-      <button class="auth-btn" id="auth-btn" onclick="handleAuthBtn()">
-        <svg width="14" height="14" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.86-7-7.93s3.06-7.44 7-7.93v15.86zm2 0V4.07c3.94.49 7 3.86 7 7.93s-3.06 7.44-7 7.93z"/></svg>
-        Sign In
+      <button class="auth-btn" id="auth-btn" onclick="handleAuthBtn()">Sign in
       </button>`;
   }
 }
@@ -13612,7 +13713,7 @@ async function toggleHoldingsPublic(checked){
     userProfile = { ...userProfile, showHoldingsPublicly: checked };
     showToast(checked ? 'Your holdings are now public' : 'Your holdings are private again');
   } catch(e) {
-    showToast('Could not update: ' + (e.code || e.message));
+    showToast('Couldn’t save that change. Try again.');
     renderProfileView(); // revert the checkbox visually on failure
   }
 }
@@ -13818,7 +13919,7 @@ async function signInWithGoogle() {
       await window._fbSignInWithRedirect(auth, provider);
     } catch(e2) {
       localStorage.removeItem('ax_auth_redirect_pending');
-      showToast('Sign-in failed: ' + (e2.code || e2.message || 'unknown'));
+      showToast('Sign-in didn’t finish. Try again.');
     }
   }
 }
@@ -13840,7 +13941,7 @@ const PUSH_VAPID_KEY = "BPF-6WBT2WmPKW21Oz6CSJarnUa4nIUkPFYqdb-qWfh3qJ8rRysCe20d
 // the backend can send them pushes. Call this from an "Enable notifications" button.
 async function enablePushNotifications() {
   try {
-    if (!window._fbMessaging) { showToast('Push not supported on this browser'); return; }
+    if (!window._fbMessaging) { showToast('This browser doesn’t support notifications'); return; }
     if (!currentUser)         { showToast('Sign in first to enable notifications'); return; }
 
     // iOS only allows push when the app was added to the Home Screen (standalone PWA).
@@ -13886,7 +13987,7 @@ async function enablePushNotifications() {
     localStorage.setItem('ax_push_token', token);
 
     console.log('[push] token stored:', token.slice(0, 12) + '…');
-    showToast('Notifications enabled ✓');
+    showToast('Notifications on');
 
     // Foreground messages (app open) - show a toast instead of a system notification.
     // Pushes are sent data-only (see worker-pricing-engine/src/lib/push.js) so
@@ -13898,7 +13999,7 @@ async function enablePushNotifications() {
     });
   } catch(e) {
     console.error('[push] enable failed', e);
-    showToast('Notification setup failed: ' + (e.code || e.message));
+    showToast('Couldn’t turn on notifications. Check your browser settings.');
   }
 }
 window.enablePushNotifications = enablePushNotifications;
@@ -14176,12 +14277,12 @@ function replyToChatMessage(i){
     bar.id = 'gchat-reply-bar';
     bar.style.cssText = "display:flex;align-items:center;gap:8px;padding:5px 10px;margin-bottom:6px;"
       + "background:var(--card);border-left:2px solid var(--green);border-radius:4px;"
-      + "font-family:var(--font-mono);font-size:10px;color:var(--muted);";
+      + "font-family:var(--font-body);font-size:12px;color:var(--muted);";
     const area = document.getElementById('gchat-input-area');
     area.insertBefore(bar, area.firstChild);
   }
   const who = m.username ? '@' + m.username : (m.displayName || 'Trader');
-  bar.innerHTML = `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">↩ replying to <b style="color:var(--fg)">${escHtml(who)}</b></span>`
+  bar.innerHTML = `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Replying to <b style="color:var(--fg)">${escHtml(who)}</b></span>`
     + `<span onclick="cancelChatReply()" style="cursor:pointer;padding:0 4px;display:inline-flex;align-items:center;" title="Cancel reply" aria-label="Cancel reply"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span>`;
   bar.style.display = 'flex';
   input.focus();
@@ -14199,7 +14300,7 @@ async function deleteChatMessage(msgId) {
   if (!confirm('Delete this message?')) return;
   try {
     await window._fbDeleteDoc(window._fbDoc(db, 'globalChat', msgId));
-  } catch(e) { showToast('Delete failed: ' + (e.code || e.message)); }
+  } catch(e) { showToast('Couldn’t delete that. Try again.'); }
 }
 
 // Quick-react popup: only one open at a time, toggled by the smiley trigger
@@ -14230,7 +14331,7 @@ async function toggleChatReaction(msgId, emoji) {
         : window._fbArrayUnion(currentUser.uid),
     });
     if (!mine) notifyChatEvent('chat_reaction', { msgId, emoji }); // only on add, not on un-react
-  } catch(e) { showToast('Reaction failed: ' + (e.code || e.message)); }
+  } catch(e) { showToast('Couldn’t add that reaction. Try again.'); }
 }
 
 async function sendChatMessage() {
@@ -14242,7 +14343,7 @@ async function sendChatMessage() {
   _mentionCandidates = [];
   const text = input.value.trim();
   if (!text) return;
-  if (text.length > 280) { showToast('Keep it under 280 chars'); return; }
+  if (text.length > 280) { showToast('Keep it under 280 characters'); return; }
 
   // Only keep mentions whose "@Name" text is still actually present - guards
   // against a stale queued mention surviving manual edits to the composed text.
@@ -14269,7 +14370,7 @@ async function sendChatMessage() {
     if (replyTo) notifyChatEvent('chat_reply', { msgId: docRef.id });
     mentions.forEach(m => notifyChatEvent('chat_mention', { msgId: docRef.id, mentionedUid: m.uid }));
   } catch(e) {
-    showToast('Failed to send: ' + (e.code || e.message));
+    showToast('Message didn’t send. Check your connection and try again.');
     input.value = text; // restore on failure
     if (replyTo) { _chatReplyTo = replyTo; } // put the reply context back so it isn't silently lost
   }
@@ -14319,7 +14420,7 @@ async function postTradeToChat(idx) {
       createdAt: window._fbServerTimestamp(),
     });
   } catch(e) {
-    showToast('Failed to share trade: ' + (e.code || e.message));
+    showToast('Couldn’t share that trade. Try again.');
   }
 }
 
@@ -14664,11 +14765,11 @@ function startReply(commentId) {
     bar.id = 'reply-bar';
     bar.style.cssText = "display:flex;align-items:center;gap:8px;padding:5px 10px;margin-bottom:6px;"
       + "background:var(--card);border-left:2px solid var(--green);border-radius:4px;"
-      + "font-family:var(--font-mono);font-size:10px;color:var(--muted);";
+      + "font-family:var(--font-body);font-size:12px;color:var(--muted);";
     const area = document.getElementById('chat-input-area');
     area.parentNode.insertBefore(bar, area);
   }
-  bar.innerHTML = `<span style="flex:1;">↩ replying to <b style="color:var(--fg)">${who}</b></span>`
+  bar.innerHTML = `<span style="flex:1;">Replying to <b style="color:var(--fg)">${who}</b></span>`
     + `<span onclick="cancelReply()" style="cursor:pointer;padding:0 4px;display:inline-flex;align-items:center;" title="Cancel reply" aria-label="Cancel reply"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span>`;
   bar.style.display = 'flex';
   const input = document.getElementById('chat-input');
@@ -14728,7 +14829,7 @@ async function postComment() {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
   if (!text) return;
-  if (text.length > 200) { showToast('Keep it under 200 chars'); return; }
+  if (text.length > 200) { showToast('Keep it under 200 characters'); return; }
 
   input.value = '';
   input.style.height = 'auto';
@@ -14749,7 +14850,7 @@ async function postComment() {
       replyTo: replyTo || null,     // null = top-level take
     });
   } catch(e) {
-    showToast('Failed to post: ' + (e.code || e.message));
+    showToast('Couldn’t post that. Try again in a moment.');
     input.value = text; // restore on failure
     if (replyTo) startReply(replyTo);   // put them back in reply mode
   }
@@ -14777,7 +14878,7 @@ async function deleteComment(commentId, rank) {
   if (!confirm('Delete this comment?')) return;
   try {
     await window._fbDeleteDoc(window._fbDoc(db, 'comments', commentId));
-  } catch(e) { showToast('Delete failed: ' + (e.code || e.message)); }
+  } catch(e) { showToast('Couldn’t delete that. Try again.'); }
 }
 
 // ═══════════════════════════════════════════
@@ -14811,7 +14912,7 @@ async function claimUsername(rawInput){
       createdAt: window._fbServerTimestamp(),
     });
   } catch(e) {
-    showToast(e.code === 'permission-denied' ? 'That username is taken' : 'Could not claim username: ' + (e.code || e.message));
+    showToast(e.code === 'permission-denied' ? 'That username is taken' : 'Couldn’t save that username. Try again.');
     return false;
   }
   // Release the old reservation, best-effort - failing here just leaves an orphaned
@@ -15420,7 +15521,7 @@ function renderClaimUI() {
       // nav - a "⏱" prefix is enough to make it unambiguously a countdown at a
       // glance without needing the full width "Next claim:" would cost in this
       // already-tight nav bar.
-      btn.textContent = '⏱ ' + clock;
+      btn.textContent = 'Next claim ' + clock;
       btn.className = 'nav-claim-btn claim-cooldown';
       btn.title = 'Next free claim in ' + clock;
     }
@@ -15432,11 +15533,11 @@ function renderClaimUI() {
   if (banner) {
     banner.style.display = 'flex';
     if (_claimEligible) {
-      banner.textContent = '🪙 Free Coins ready - tap to claim';
+      banner.textContent = 'Free Coins are ready. Tap to claim.';
       banner.className = 'claim-banner claim-available';
     } else {
       const clock = fmtCountdownClock(_claimNextEligibleAt - Date.now());
-      banner.textContent = '⏱ Next free Coins in ' + clock;
+      banner.textContent = 'Next free Coins in ' + clock;
       banner.className = 'claim-banner claim-cooldown';
     }
   }
@@ -15735,7 +15836,7 @@ async function submitCreateChallenge() {
   const entryFee = Math.max(0, Math.round(Number(document.getElementById('wc-entry-fee').value) || 0));
   if (!name || !joinDeadline || !endDate) { showToast('Please fill in all required fields'); return; }
   if (new Date(endDate) <= new Date(joinDeadline)) { showToast('End date must be after join deadline'); return; }
-  if (!db) { showToast('Firebase not ready'); return; }
+  if (!db) { showToast('Still connecting. Try again in a second.'); return; }
   try {
     const challengeId = 'challenge_' + Date.now();
     // participants is intentionally omitted here - firestore.rules blocks
@@ -16515,6 +16616,41 @@ async function sendChallengeChat(challengeId) {
 // ═══════════════════════════════════════════
 const g10Cache = {}; // rank → game log data
 
+// Every box score is its own request, and the loops below used to open every
+// game on each day's slate, one at a time, until they hit this player's -
+// easily 100+ serial fetches, which read as a log stuck on "5/10". The
+// player's team's games now go first, and once the player has turned up in a
+// team-matched game, other teams' games are skipped. A team name ESPN spells
+// differently (or a traded player) never sets `matched`, so those fall back to
+// the full scan instead of finding nothing.
+function _g10Events(events, teamName, st){
+  const tn = String(teamName || '').toLowerCase().trim();
+  const isHit = ev => (ev.competitions?.[0]?.competitors || []).some(c => {
+    const t = c.team || {};
+    const nm = String(t.name || '').toLowerCase();
+    return [t.displayName, t.shortDisplayName, t.abbreviation].some(s => s && s.toLowerCase() === tn)
+      || (nm && tn.endsWith(' ' + nm));
+  });
+  const hits = [], rest = [];
+  events.forEach(ev => (isHit(ev) ? hits : rest).push(ev));
+  hits.forEach(ev => { ev._g10Hit = true; });
+  return st.matched ? hits : [...hits, ...rest];
+}
+// "2026-09-27" -> "Sep 27". Built from parts so it stays on the local calendar
+// day (new Date('2026-09-27') parses as UTC midnight and can land a day early).
+function _g10Date(d){
+  const [y, m, dd] = String(d || '').split('-').map(Number);
+  if (!y || !m || !dd) return d || '';
+  return new Date(y, m - 1, dd).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+// While the log fills in, show the games found so far - not a counter - and
+// never paint into the pane once the user has moved on to another player.
+function _g10Progress(el, rank, games){
+  if (selRank !== rank || !games.length) return;
+  renderG10(rank, games);
+  el.insertAdjacentHTML('beforeend', '<div class="g10-more">Loading older games…</div>');
+}
+
 async function loadLast10(rank) {
   const el = document.getElementById('g10-content');
   if (g10Cache[rank]) { renderG10(rank, g10Cache[rank]); return; }
@@ -16538,7 +16674,7 @@ async function loadLast10(rank) {
     // MLB game log
     const espnId = String(MLB_ESPN_IDS_STATIC[rank] || '');
     try {
-      const games = [];
+      const games = []; const g10st = { matched: false };
       for (let ago = 1; ago <= 30 && games.length < 10; ago++) {
         const d = new Date(); d.setDate(d.getDate() - ago);
         const yyyy = d.getFullYear();
@@ -16551,7 +16687,7 @@ async function loadLast10(rank) {
         catch(__) { continue; }
 
         const events = (sbData.events || []).filter(e => e.status?.type?.completed);
-        for (const ev of events) {
+        for (const ev of _g10Events(events, p.team, g10st)) {
           if (games.length >= 10) break;
           let bs;
           try { bs = await espnFetch(`https://site.web.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=${ev.id}`); }
@@ -16605,10 +16741,10 @@ async function loadLast10(rank) {
               }
             }
           }
-          if (found) games.push(found);
+          if (found) { games.push(found); if (ev._g10Hit) g10st.matched = true; }
         }
         if (games.length > 0 && games.length < 10) {
-          el.innerHTML = `<div class="g10-loading">Found ${games.length}/10 games… going further back</div>`;
+          _g10Progress(el, rank, games);
         }
       }
       if (!games.length) {
@@ -16619,7 +16755,7 @@ async function loadLast10(rank) {
         return;
       }
       g10Cache[rank] = games;
-      renderG10(rank, games);
+      if (selRank === rank) renderG10(rank, games);
     } catch(e) {
       el.innerHTML = `<div class="g10-loading">Couldn't load game log.</div>`;
     }
@@ -16633,7 +16769,7 @@ async function loadLast10(rank) {
     // only, no summary fetch) on any day with nothing scheduled at all.
     _buildNflIndex();
     try {
-      const games = [];
+      const games = []; const g10st = { matched: false };
       for (let ago = 1; ago <= 200 && games.length < 10; ago++) {
         const d = new Date(); d.setDate(d.getDate() - ago);
         const yyyy = d.getFullYear();
@@ -16647,7 +16783,7 @@ async function loadLast10(rank) {
         const events = (sbData?.events || []).filter(e => e.status?.type?.completed);
         if (!events.length) continue;
 
-        for (const ev of events) {
+        for (const ev of _g10Events(events, p.team, g10st)) {
           if (games.length >= 10) break;
           let sum;
           try { sum = await espnFetch(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${ev.id}`); }
@@ -16684,14 +16820,15 @@ async function loadLast10(rank) {
             result: `${wl} ${myTeam?.score||''}-${oppTeam?.score||''}`,
             nfl: true, role: p.role, ...line,
           });
+          if (ev._g10Hit) g10st.matched = true;
         }
         if (games.length > 0 && games.length < 10) {
-          el.innerHTML = `<div class="g10-loading">Found ${games.length}/10 games… going further back</div>`;
+          _g10Progress(el, rank, games);
         }
       }
       if (!games.length) { el.innerHTML = '<div class="g10-loading">No recent game data found for this player.</div>'; return; }
       g10Cache[rank] = games;
-      renderG10(rank, games);
+      if (selRank === rank) renderG10(rank, games);
     } catch(e) {
       el.innerHTML = `<div class="g10-loading">Couldn't load game log.</div>`;
     }
@@ -16701,7 +16838,7 @@ async function loadLast10(rank) {
   // NBA game log (original logic)
   const espnId = String(ESPN_IDS[rank] || '');
   try {
-    const games = [];
+    const games = []; const g10st = { matched: false };
     for (let ago = 1; ago <= 40 && games.length < 10; ago++) {
       const d = new Date(); d.setDate(d.getDate() - ago);
       const yyyy = d.getFullYear();
@@ -16714,7 +16851,7 @@ async function loadLast10(rank) {
       catch(__) { continue; }
 
       const events = (sbData.events || []).filter(e => e.status?.type?.completed);
-      for (const ev of events) {
+      for (const ev of _g10Events(events, p.team, g10st)) {
         if (games.length >= 10) break;
         let bs;
         try { bs = await espnFetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=${ev.id}`); }
@@ -16752,15 +16889,15 @@ async function loadLast10(rank) {
             };
           }
         }
-        if (found) games.push(found);
+        if (found) { games.push(found); if (ev._g10Hit) g10st.matched = true; }
       }
       if (games.length > 0 && games.length < 10) {
-        el.innerHTML = `<div class="g10-loading">Found ${games.length}/10 games… going further back</div>`;
+        _g10Progress(el, rank, games);
       }
     }
     if (!games.length) { el.innerHTML = '<div class="g10-loading">No recent game data found for this player.</div>'; return; }
     g10Cache[rank] = games;
-    renderG10(rank, games);
+    if (selRank === rank) renderG10(rank, games);
   } catch(e) {
     el.innerHTML = `<div class="g10-loading">Error: ${e.message}</div>`;
   }
@@ -16779,7 +16916,7 @@ function renderG10(rank, games) {
     const maxIP = Math.max(...ips, 1);
     const sparkHTML = ips.map(v => {
       const h = Math.max(4, Math.round((v / maxIP) * 28));
-      const col = v >= (p.ipp||5.5) * 1.1 ? '#12d47e' : v >= (p.ipp||5.5) * 0.7 ? '#7c83fd' : '#f5445f';
+      const col = v >= (p.ipp||5.5) * 1.1 ? '#12d47e' : v >= (p.ipp||5.5) * 0.7 ? '#6b7684' : '#f5445f';
       return `<div class="g10-bar" style="height:${h}px;background:${col};flex:1;"></div>`;
     }).join('');
     const rows = games.map(g => {
@@ -16790,7 +16927,7 @@ function renderG10(rank, games) {
       const wl = g.result || '';
       const wCol = wl.startsWith('W') ? 'g10-great' : wl.startsWith('L') ? 'g10-bad' : '';
       return `<tr>
-        <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td>
+        <td>${_g10Date(g.date)}</td><td style="color:var(--fg)">${g.opp}</td>
         <td class="${wCol}">${g.result}</td>
         <td style="text-align:right">${g.ip}</td>
         <td style="text-align:right">${g.k}</td>
@@ -16801,7 +16938,7 @@ function renderG10(rank, games) {
       </tr>`;
     }).join('');
     el.innerHTML = `
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">IP last ${games.length} starts (green = deep/clean, red = short/rough)</div>
+      <div class="g10-cap">IP in the last ${games.length} ${games.length===1?'start':'starts'} · green = deep and clean, red = short or rough</div>
       <div class="g10-sparkline">${sparkHTML}</div>
       <table class="g10-table">
         <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
@@ -16817,7 +16954,7 @@ function renderG10(rank, games) {
     const maxH = Math.max(...hits, 1);
     const sparkHTML = hits.map(v => {
       const h = Math.max(4, Math.round((v / maxH) * 28));
-      const col = v >= 2 ? '#12d47e' : v === 1 ? '#7c83fd' : '#f5445f';
+      const col = v >= 2 ? '#12d47e' : v === 1 ? '#6b7684' : '#f5445f';
       return `<div class="g10-bar" style="height:${h}px;background:${col};flex:1;"></div>`;
     }).join('');
     const rows = games.map(g => {
@@ -16829,7 +16966,7 @@ function renderG10(rank, games) {
       const wl = g.result || '';
       const wCol = wl.startsWith('W') ? 'g10-great' : wl.startsWith('L') ? 'g10-bad' : '';
       return `<tr>
-        <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td>
+        <td>${_g10Date(g.date)}</td><td style="color:var(--fg)">${g.opp}</td>
         <td class="${wCol}">${g.result}</td>
         <td class="${hC}" style="text-align:right">${g.h}/${g.ab}</td>
         <td style="text-align:right;color:var(--muted)">${avg}</td>
@@ -16840,7 +16977,7 @@ function renderG10(rank, games) {
       </tr>`;
     }).join('');
     el.innerHTML = `
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Hits last ${games.length} games (green ≥ 2H, red = 0-fer)</div>
+      <div class="g10-cap">Hits in the last ${games.length} ${games.length===1?'game':'games'} · green = 2+ hits, red = hitless</div>
       <div class="g10-sparkline">${sparkHTML}</div>
       <table class="g10-table">
         <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
@@ -16859,7 +16996,7 @@ function renderG10(rank, games) {
       const max = Math.max(...vals, 1);
       return vals.map(v => {
         const h = Math.max(4, Math.round((v / max) * 28));
-        const col = v >= ref ? '#12d47e' : v >= ref * 0.6 ? '#7c83fd' : '#f5445f';
+        const col = v >= ref ? '#12d47e' : v >= ref * 0.6 ? '#6b7684' : '#f5445f';
         return `<div class="g10-bar" style="height:${h}px;background:${col};flex:1;"></div>`;
       }).join('');
     };
@@ -16867,7 +17004,7 @@ function renderG10(rank, games) {
     if (p.role === 'QB') {
       const sparkHTML = bars(games.map(g => g.py||0), p.py||200);
       const rows = games.map(g => `<tr>
-        <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
+        <td>${_g10Date(g.date)}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
         <td style="text-align:right">${Math.round(g.py||0)}</td>
         <td style="text-align:right;color:${(g.ptd||0)>0?'var(--green)':'inherit'}">${(g.ptd||0).toFixed(0)}</td>
         <td style="text-align:right;color:${(g.ints||0)>0?'var(--red)':'var(--muted)'}">${(g.ints||0).toFixed(0)}</td>
@@ -16875,7 +17012,7 @@ function renderG10(rank, games) {
         <td style="text-align:right;color:${(g.fuml||0)>0?'var(--red)':'var(--muted)'}">${(g.fuml||0).toFixed(0)}</td>
       </tr>`).join('');
       el.innerHTML = `
-        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Pass yards last ${games.length} games</div>
+        <div class="g10-cap">Pass yards in the last ${games.length} ${games.length===1?'game':'games'}</div>
         <div class="g10-sparkline">${sparkHTML}</div>
         <table class="g10-table">
           <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
@@ -16889,7 +17026,7 @@ function renderG10(rank, games) {
       const rows = games.map(g => {
         const td = (g.rtd||0) + (g.rectd||0);
         return `<tr>
-        <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
+        <td>${_g10Date(g.date)}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
         <td style="text-align:right">${(g.car||0).toFixed(0)}</td>
         <td style="text-align:right">${Math.round(g.ry||0)}</td>
         <td style="text-align:right;color:${td>0?'var(--green)':'inherit'}">${td.toFixed(0)}</td>
@@ -16899,7 +17036,7 @@ function renderG10(rank, games) {
       </tr>`;
       }).join('');
       el.innerHTML = `
-        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Rush yards last ${games.length} games</div>
+        <div class="g10-cap">Rush yards in the last ${games.length} ${games.length===1?'game':'games'}</div>
         <div class="g10-sparkline">${sparkHTML}</div>
         <table class="g10-table">
           <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
@@ -16911,7 +17048,7 @@ function renderG10(rank, games) {
     if (p.role === 'WR' || p.role === 'TE') {
       const sparkHTML = bars(games.map(g => g.recy||0), p.recy||50);
       const rows = games.map(g => `<tr>
-        <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
+        <td>${_g10Date(g.date)}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
         <td style="text-align:right">${(g.rec||0).toFixed(0)}</td>
         <td style="text-align:right;color:var(--muted)">${(g.tgt||0).toFixed(0)}</td>
         <td style="text-align:right">${Math.round(g.recy||0)}</td>
@@ -16919,7 +17056,7 @@ function renderG10(rank, games) {
         <td style="text-align:right;color:${(g.fuml||0)>0?'var(--red)':'var(--muted)'}">${(g.fuml||0).toFixed(0)}</td>
       </tr>`).join('');
       el.innerHTML = `
-        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Receiving yards last ${games.length} games</div>
+        <div class="g10-cap">Receiving yards in the last ${games.length} ${games.length===1?'game':'games'}</div>
         <div class="g10-sparkline">${sparkHTML}</div>
         <table class="g10-table">
           <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
@@ -16931,13 +17068,13 @@ function renderG10(rank, games) {
     if (p.role === 'K') {
       const sparkHTML = bars(games.map(g => (g.fgm||0)*3 + (g.xpm||0)), p.fgm ? p.fgm*3 + (p.xpm||2) : 9);
       const rows = games.map(g => `<tr>
-        <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
+        <td>${_g10Date(g.date)}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
         <td style="text-align:right;color:${(g.fgm||0)>0?'var(--green)':'inherit'}">${(g.fgm||0).toFixed(0)}/${(g.fga||0).toFixed(0)}</td>
         <td style="text-align:right;color:var(--muted)">${(g.xpm||0).toFixed(0)}/${(g.xpa||0).toFixed(0)}</td>
         <td style="text-align:right">${((g.fgm||0)*3 + (g.xpm||0)).toFixed(0)}</td>
       </tr>`).join('');
       el.innerHTML = `
-        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Kicking points last ${games.length} games</div>
+        <div class="g10-cap">Kicking points in the last ${games.length} ${games.length===1?'game':'games'}</div>
         <div class="g10-sparkline">${sparkHTML}</div>
         <table class="g10-table">
           <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
@@ -16949,14 +17086,14 @@ function renderG10(rank, games) {
     // DEF
     const sparkHTML = bars(games.map(g => g.tkl||0), p.tkl||4);
     const rows = games.map(g => `<tr>
-      <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
+      <td>${_g10Date(g.date)}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wlClass(g)}">${g.result}</td>
       <td style="text-align:right">${(g.tkl||0).toFixed(0)}</td>
       <td style="text-align:right;color:${(g.sack||0)>0?'var(--green)':'inherit'}">${(g.sack||0).toFixed(1)}</td>
       <td style="text-align:right;color:${(g.defint||0)>0?'var(--green)':'var(--muted)'}">${(g.defint||0).toFixed(0)}</td>
       <td style="text-align:right;color:${(g.ffum||0)>0?'var(--green)':'var(--muted)'}">${(g.ffum||0).toFixed(0)}</td>
     </tr>`).join('');
     el.innerHTML = `
-      <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-bottom:4px;">Tackles last ${games.length} games</div>
+      <div class="g10-cap">Tackles in the last ${games.length} ${games.length===1?'game':'games'}</div>
       <div class="g10-sparkline">${sparkHTML}</div>
       <table class="g10-table">
         <thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
@@ -16971,7 +17108,7 @@ function renderG10(rank, games) {
   const maxPts = Math.max(...pts, 1);
   const sparkHTML = pts.map(v => {
     const h = Math.max(4, Math.round((v / maxPts) * 28));
-    const col = v >= p.ppg * 1.2 ? '#12d47e' : v >= p.ppg * 0.8 ? '#7c83fd' : '#f5445f';
+    const col = v >= p.ppg * 1.2 ? '#12d47e' : v >= p.ppg * 0.8 ? '#6b7684' : '#f5445f';
     return `<div class="g10-bar" style="height:${h}px;background:${col};flex:1;"></div>`;
   }).join('');
   const rows = games.map(g => {
@@ -16986,7 +17123,7 @@ function renderG10(rank, games) {
     const wl = g.result || '';
     const wCol = wl.startsWith('W') ? 'g10-great' : wl.startsWith('L') ? 'g10-bad' : '';
     return `<tr>
-      <td>${g.date}</td><td style="color:var(--fg)">${g.opp}</td>
+      <td>${_g10Date(g.date)}</td><td style="color:var(--fg)">${g.opp}</td>
       <td class="${wCol}">${g.result}</td>
       <td class="${ptsC}" style="text-align:right">${g.pts}</td>
       <td class="${rebC}" style="text-align:right">${g.reb}</td>
@@ -17035,16 +17172,15 @@ function showInstallBanner() {
   if (document.getElementById('pwa-banner')) return;
   const banner = document.createElement('div');
   banner.id = 'pwa-banner';
-  banner.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#0b1320;border:1px solid #12d47e44;border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:9999;font-family:var(--font-mono);font-size:11px;box-shadow:0 4px 24px #000a;max-width:320px;width:90%';
+  banner.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--card2);border:1px solid var(--border2);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;z-index:9999;font-family:var(--font-body);font-size:13px;box-shadow:0 4px 24px #000a;max-width:320px;width:90%';
   banner.innerHTML = `
-    <span style="font-size:22px"></span>
     <div style="flex:1">
-      <div style="color:#ddeeff;font-weight:600;margin-bottom:2px">Add Breakout to Home Screen</div>
-      <div style="color:#4a6280">Trade faster with the app</div>
+      <div style="color:var(--text);font-weight:600;margin-bottom:2px">Add Breakout to Home Screen</div>
+      <div style="color:var(--muted)">Trade faster with the app</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:6px">
-      <button onclick="installPWA()" style="background:#12d47e;color:#000;border:none;border-radius:6px;padding:6px 12px;font-family:var(--font-mono);font-size:10px;font-weight:600;cursor:pointer">Install</button>
-      <button onclick="this.closest('#pwa-banner').remove()" style="background:transparent;color:#4a6280;border:none;font-family:var(--font-mono);font-size:10px;cursor:pointer">Not now</button>
+      <button class="es-btn es-sm" onclick="installPWA()">Install</button>
+      <button onclick="this.closest('#pwa-banner').remove()" style="background:transparent;color:var(--muted);border:none;font-size:12px;cursor:pointer">Not now</button>
     </div>`;
   document.body.appendChild(banner);
 }
@@ -17171,23 +17307,19 @@ window.addEventListener('appinstalled', () => {
       <!-- SLIDE 2: How prices move - fast -->
       <div class="ob-slide">
         <div class="ob-title">Prices move on <span>real stats</span></div>
-        <div class="ob-body">During and after every game, prices update automatically based on performance vs expectations.</div>
+        <div class="ob-body">During and after every game, each price moves on how the player did compared with what was expected.</div>
         <div class="ob-rules">
           <div class="ob-rule" style="--rule-color:var(--green)">
             <span class="ob-rule-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg></span>
-            <div><div class="ob-rule-title">Big game, price spikes</div><div class="ob-rule-desc">Buy before the game. Sell after the spike.</div></div>
+            <div><div class="ob-rule-title">Big game, price jumps</div><div class="ob-rule-desc">Buy before the game, sell after the spike.</div></div>
           </div>
           <div class="ob-rule" style="--rule-color:var(--red)">
             <span class="ob-rule-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg></span>
-            <div><div class="ob-rule-title">Bad night, buy the dip</div><div class="ob-rule-desc">Stars bounce back. Dips are entry points.</div></div>
+            <div><div class="ob-rule-title">Quiet night, price dips</div><div class="ob-rule-desc">Stars bounce back, so a dip can be a good time to buy.</div></div>
           </div>
           <div class="ob-rule" style="--rule-color:var(--gold)">
             <span class="ob-rule-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>
-            <div><div class="ob-rule-title">Injuries move the price before the news does</div><div class="ob-rule-desc">Ruled out players decay fast. Stay ahead of it.</div></div>
-          </div>
-          <div class="ob-rule" style="--rule-color:var(--purple)">
-            <span class="ob-rule-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></span>
-            <div><div class="ob-rule-title">D-tier rookies are cheap</div><div class="ob-rule-desc">One hot streak is all it takes.</div></div>
+            <div><div class="ob-rule-title">Ruled out, price slides</div><div class="ob-rule-desc">Injured players lose value until they’re back on the field.</div></div>
           </div>
         </div>
       </div>
@@ -17195,45 +17327,22 @@ window.addEventListener('appinstalled', () => {
       <!-- SLIDE 3: What the app actually looks like, before they land in it cold -->
       <div class="ob-slide">
         <div class="ob-title">This is what <span>you'll see</span></div>
-        <div class="ob-body">Every player is a live price. Tap one, watch the chart, buy in.</div>
-        <div style="background:var(--card);border:1px solid var(--hairline);border-radius:12px;overflow:hidden;margin-bottom:16px;">
-          <div class="prow" style="cursor:default;">
-            <div class="pav" style="background:#0a1835;color:#3d9bff;">JT</div>
-            <div class="pinfo">
-              <div class="pname">Jayson Tatum</div>
-              <div class="psub">Boston Celtics · <span style="color:var(--blue)">SF</span></div>
-            </div>
-            <div class="pright">
-              <div class="pprice">463.66</div>
-              <div class="pchg up">+5.8%</div>
-            </div>
-          </div>
-          <div class="prow" style="cursor:default;border-top:1px solid var(--border);">
-            <div class="pav" style="background:#1f0a0a;color:#f5445f;">AE</div>
-            <div class="pinfo">
-              <div class="pname">Anthony Edwards</div>
-              <div class="psub">Minnesota T-Wolves · <span style="color:var(--blue)">SG</span></div>
-            </div>
-            <div class="pright">
-              <div class="pprice" style="color:var(--red)">467.64</div>
-              <div class="pchg down">-3.2%</div>
-            </div>
-          </div>
-        </div>
-        <div class="ob-body" style="font-size:11px;">Tap a player, pick a share count, and you're in.</div>
+        <div class="ob-body">Every player has a live price. These are real ones, right now.</div>
+        <div class="ob-sample" id="ob-sample"></div>
+        <div class="ob-body" style="font-size:13px;color:var(--muted);">Tap a player, pick how many shares, and you’re in.</div>
       </div>
 
       <!-- SLIDE 4: CTA - sign in -->
       <div class="ob-slide">
         <div class="ob-title">Back your <span>conviction</span>.</div>
         <div class="ob-body">
-          Sign in to save your portfolio and climb the leaderboard against everyone else.
+          Sign in to start trading. Your portfolio saves to your account.
         </div>
-        <div style="background:var(--card);border:1px solid var(--green);border-radius:10px;padding:16px 18px;margin-bottom:16px;">
-          <div style="font-family:var(--font-display);font-size:14px;letter-spacing:.5px;color:var(--green);margin-bottom:4px;">Everyone starts even</div>
-          <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);line-height:1.6;">Same 100,000 coins to start. No head start - just who calls it right.</div>
-        </div>
-        <div class="ob-body" style="font-size:11px;margin-bottom:16px;">One click. No account to create, no card to add.</div>
+        <ul class="signin-perks">
+          <li><b>Free Coins every day</b> to trade with, no purchase needed</li>
+          <li><b>A spot on the leaderboard</b> against everyone else playing</li>
+        </ul>
+        <div class="ob-body" style="font-size:13px;margin-bottom:16px;color:var(--muted);">One tap with Google. No card, nothing to fill out.</div>
         <button class="google-signin-btn" id="ob-google-signin-btn" style="margin-top:0;">
           <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path></svg>
           Sign in with Google
@@ -17273,17 +17382,16 @@ function obGoTo(n) {
     document.getElementById('ob-dot-' + i).classList.toggle('active', i === n);
   }
   document.getElementById('ob-back').style.display = n > 0 ? 'inline-block' : 'none';
-  document.getElementById('ob-next').textContent = n === OB_TOTAL - 1 ? 'Start Trading' : 'Next →';
+  // Last slide already has the Google button, so its footer action is the
+  // guest path rather than a second, vaguer sign-in prompt.
+  document.getElementById('ob-next').textContent = n === OB_TOTAL - 1 ? 'Browse first' : 'Next →';
+  document.getElementById('ob-next').classList.toggle('secondary', n === OB_TOTAL - 1);
   document.getElementById('ob-skip').style.display = n === OB_TOTAL - 1 ? 'none' : 'inline';
 }
 
 function obNext() {
   if (obSlide < OB_TOTAL - 1) obGoTo(obSlide + 1);
-  else {
-    closeOnboarding();
-    // Nudge sign-in on last slide if not signed in
-    setTimeout(() => { if (!currentUser) openProfile(); }, 400);
-  }
+  else closeOnboarding();
 }
 
 function obBack() {
@@ -17308,7 +17416,34 @@ window._updateGate = function(user) {
   try { dismissed = !!sessionStorage.getItem('ax_gate_x'); } catch(e){}
   if (user || dismissed) { overlay.style.display = 'none'; return; }
   window._fillGateTicker();
+  window._fillObSample();
   overlay.style.display = 'flex';
+};
+
+// Slide 3's example rows: real players from the league on screen - today's
+// biggest gainer and biggest loser among the 25 priciest - instead of two
+// hard-coded NBA rows that showed even in the middle of baseball season.
+window._fillObSample = function() {
+  try {
+    const box = document.getElementById('ob-sample');
+    if (!box || box.dataset.filled || typeof players === 'undefined' || !players.length) return;
+    const priceOf = p => (typeof liveP !== 'undefined' && liveP[p.rank]) || p.statPrice || 0;
+    const pctOf = p => { try { return getTodayPct(p.rank) || 0; } catch(e) { return 0; } };
+    const pool = [...players].sort((a, b) => priceOf(b) - priceOf(a)).slice(0, 25);
+    const up = [...pool].sort((a, b) => pctOf(b) - pctOf(a))[0];
+    const dn = [...pool].sort((a, b) => pctOf(a) - pctOf(b))[0];
+    const picks = [up, dn].filter((p, i, arr) => p && arr.indexOf(p) === i);
+    box.innerHTML = picks.map(p => {
+      const hs = headshotUrl(p.rank), pct = pctOf(p);
+      return `<div class="mv-row" style="cursor:default;">
+        <div class="mv-av">${hs ? `<img src="${hs}" alt="">` : `<div class="mv-init" style="background:${p.cols[0]};color:${p.cols[1]};">${p.initials}</div>`}</div>
+        <div class="mv-info"><div class="mv-name">${p.name}</div><div class="mv-sub">${p.team} · ${p.pos}</div></div>
+        <div class="mv-price">${fmt(priceOf(p))}</div>
+        <div class="mv-pct ${pctDir(pct)}">${fmtP(pct)}</div>
+      </div>`;
+    }).join('');
+    box.dataset.filled = '1';
+  } catch(e) {}
 };
 
 // Populate the slide-1 ticker tape from real player data (top prices in the
@@ -17377,7 +17512,7 @@ window._fillGateTicker = function() {
   try {
     const track = document.getElementById('ob-ticker-track');
     if (!track || track.dataset.filled) return;
-    const src = (typeof leaguePlayers !== 'undefined' && leaguePlayers.length) ? leaguePlayers
+    const src = (typeof players !== 'undefined' && players.length) ? players
               : (typeof mlbPlayers !== 'undefined' && mlbPlayers.length) ? mlbPlayers : [];
     if (!src.length) return;
     const priceOf = p => { try { return (typeof liveP !== 'undefined' && liveP[p.rank]) || p.statPrice || 0; } catch(e){ return p.statPrice || 0; } };
@@ -17485,10 +17620,10 @@ window.addEventListener('DOMContentLoaded', function() {
 <!-- LEAGUE DRAWER -->
 <div id="league-drawer">
   <div class="drawer-header">
-    <span>Select League</span>
+    <span>Choose a league</span>
     <button class="drawer-close" onclick="closeLeagueDrawer()" aria-label="Close" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
   </div>
-  <div class="drawer-section-label">Active Season</div>
+  <div class="drawer-section-label">Leagues</div>
   <div class="league-option active" data-league="NBA" onclick="switchLeague(&#39;NBA&#39;)">
     <div class="lo-icon"><img src="assets/leagues/nba.png" alt="NBA" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="lo-fallback">NBA</span></div>
     <div class="lo-info">
