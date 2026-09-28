@@ -2122,7 +2122,7 @@ function defaultLeague(now = new Date()) {
           <div class="hmarket">
             <span id="h-own-wrap" hidden>You own <b id="h-own">—</b></span>
             <span>7-day range <b id="h-lo">—</b>–<b id="h-hi">—</b></span>
-            <span>Volume today <b id="h-vol">0</b></span>
+            <span>Traded (24h) <b id="h-vol">0</b></span>
             <button type="button" class="pf-link hm-help" onclick="showPriceHelp()">How prices move</button>
           </div>
           <!-- Last night box score -->
@@ -9029,7 +9029,13 @@ function updateHero(){
   }
   document.getElementById('h-own-wrap').hidden = !(ownShares > 0);
   document.getElementById('h-own').textContent = ownShares > 0 ? `${fmtShares(ownShares)} shares` : '—';
-  document.getElementById('h-vol').textContent=(volume[selRank]||0).toLocaleString();
+  // Everyone's shares in the last 24h (public trades log), not this device's.
+  const _v24 = _tradeVol[1];
+  document.getElementById('h-vol').textContent = _v24 ? fmtShareCount(_v24.byRank[selRank]?.shares || 0) : '—';
+  if (!_v24 || Date.now() - _v24.at >= 60000) {
+    const _r = selRank;
+    loadTradeVolume(1).then(v => { const el = document.getElementById('h-vol'); if (v && el && selRank === _r) el.textContent = fmtShareCount(v[_r]?.shares || 0); });
+  }
   document.getElementById('h-hi').textContent=fmt(hi7);
   document.getElementById('h-lo').textContent=fmt(lo7);
 
@@ -9848,6 +9854,9 @@ async function pushTradeToFeed(rank, type, shares, price, playerName, portfolioI
       portfolioId: portfolioId === 'regular' ? null : portfolioId,
       ts: Date.now(),
     });
+    // Your own trade should show in "Most traded" and "Traded (24h)" now,
+    // not after the one-minute cache runs out.
+    Object.keys(_tradeVol).forEach(k => { _tradeVol[k].at = 0; });
   } catch(e) {}
 }
 
@@ -11776,61 +11785,119 @@ function setTrendRange(days, el){
   renderTrending();
 }
 
+// Shares traded by EVERYONE, from the public trades log - the old `volume`
+// map only ever counted this device's own trades this session, so "Most
+// traded" was really "what you traded" and empty for almost everyone.
+// Cached per range for a minute; one indexed range query on ts, no composite
+// index needed. Capped so a long window can't pull an unbounded collection.
+// `var`, not const: updateHero can run during boot before this line executes.
+var _tradeVol = {};              // days -> { at, byRank: { rank: { shares, trades, traders } } }
+var _tradeVolLoading = {};
+async function loadTradeVolume(days) {
+  const hit = _tradeVol[days];
+  if (hit && Date.now() - hit.at < 60000) return hit.byRank;
+  if (_tradeVolLoading[days] || !db || !window._fbWhere) return hit?.byRank || null;
+  _tradeVolLoading[days] = true;
+  try {
+    const cutoff = Date.now() - days * 86400000;
+    const snap = await window._fbGetDocs(window._fbQuery(
+      window._fbCollection(db, 'trades'),
+      window._fbWhere('ts', '>=', cutoff),
+      window._fbOrderBy('ts', 'desc'),
+      window._fbLimit(3000)
+    ));
+    const byRank = {};
+    snap.docs.forEach(d => {
+      const t = d.data();
+      if (!(t.shares > 0) || !t.rank) return;
+      const r = byRank[t.rank] || (byRank[t.rank] = { shares: 0, trades: 0, uids: new Set() });
+      r.shares += t.shares; r.trades += 1; if (t.uid) r.uids.add(t.uid);
+    });
+    Object.values(byRank).forEach(r => { r.traders = r.uids.size; delete r.uids; });
+    _tradeVol[days] = { at: Date.now(), byRank };
+    return byRank;
+  } catch (e) {
+    console.warn('[volume] trades query failed:', e.message);
+    return hit?.byRank || null;
+  } finally {
+    _tradeVolLoading[days] = false;
+  }
+}
+function fmtShareCount(n) {
+  if (n >= 10000) return (n / 1000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + 'K';
+  return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
 function renderTrending(){
   const grid = document.getElementById('trending-grid');
   if(!grid) return;
 
   const isMobile = window.innerWidth <= 768;
   const limit = isMobile ? 10 : 30;
+  const rangeLbl = trendRange === 1 ? '1D' : trendRange === 7 ? '1W' : '1M';
+  const rangeWords = trendRange === 1 ? 'in the last 24 hours' : trendRange === 7 ? 'this week' : 'this month';
+
+  // Trade volume for the selected range; fetch (then re-render) when missing
+  // or stale. Other tabs still render immediately without it.
+  const cached = _tradeVol[trendRange];
+  if (!cached || Date.now() - cached.at >= 60000) {
+    const wanted = trendRange, tab = activeTrendTab;
+    loadTradeVolume(wanted).then(v => { if (v && trendRange === wanted && activeTrendTab === tab) renderTrending(); });
+  }
+  const volMap = cached?.byRank || {};
+  const volOf = rank => volMap[rank]?.shares || 0;
+  const row = p => ({ ...p, vol: volOf(p.rank), pct: ENGINE.pct(p.rank, trendRange) });
 
   let sorted = [];
-
   if(activeTrendTab === 'volume'){
-    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: ENGINE.pct(p.rank, trendRange)}))
-      .sort((a,b)=>b.vol - a.vol).slice(0,limit);
+    if (!cached) { grid.innerHTML = '<div class="g10-loading">Loading trades…</div>'; return; }
+    sorted = players.map(row).filter(p => p.vol > 0).sort((a,b)=>b.vol - a.vol).slice(0,limit);
+    if (!sorted.length) {
+      grid.innerHTML = emptyState(`No trades ${rangeWords}`, 'Be the first: pick a player in the Market and buy in.', `<button class="es-btn es-sm" onclick="goToMarketTop()">Go to Market</button>`);
+      return;
+    }
   } else if(activeTrendTab === 'gainers'){
-    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: ENGINE.pct(p.rank, trendRange)}))
-      .sort((a,b)=>b.pct - a.pct).slice(0,limit);
+    sorted = players.map(row).sort((a,b)=>b.pct - a.pct).slice(0,limit);
   } else if(activeTrendTab === 'losers'){
-    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: ENGINE.pct(p.rank, trendRange)}))
-      .sort((a,b)=>a.pct - b.pct).slice(0,limit);
+    sorted = players.map(row).sort((a,b)=>a.pct - b.pct).slice(0,limit);
   } else if(activeTrendTab === 'watchlisted'){
-    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: ENGINE.pct(p.rank, trendRange)}))
-      .filter(p=>watchlist.has(p.rank))
-      .sort((a,b)=>Math.abs(b.pct) - Math.abs(a.pct));
+    sorted = players.map(row).filter(p=>watchlist.has(p.rank)).sort((a,b)=>Math.abs(b.pct) - Math.abs(a.pct));
     if(!sorted.length){
       grid.innerHTML = emptyState('Your watchlist is empty', 'Tap the star next to any player in the Market to follow them here.');
       return;
     }
   }
 
+  const isVol = activeTrendTab === 'volume';
   const maxVol = Math.max(1, ...sorted.map(p=>p.vol||0));
-  const rangeLbl = trendRange === 1 ? '1D' : trendRange === 7 ? '1W' : '1M';
 
-  // Same list grammar as the standings above: hairline-divided rows, numbers
-  // in right-aligned columns. Volume shows as a thin meter under the name so
-  // "most traded" is visible at a glance without another number column.
-  grid.innerHTML = `<div class="ulb-head mv-head"><span>#</span><span>Player</span><span>Price</span><span>${rangeLbl}</span></div>` + sorted.map((p, i)=>{
+  // Most traded leads with shares traded (the thing it ranks by); the other
+  // tabs lead with price. The move for the range is always the last column.
+  grid.innerHTML = `<div class="ulb-head mv-head"><span>#</span><span>Player</span><span>${isVol ? 'Shares' : 'Price'}</span><span>${rangeLbl}</span></div>` + sorted.map((p, i)=>{
     const rank = i+1;
     const rankClass = rank===1?'gold':rank===2?'silver':rank===3?'bronze':'';
     const price = liveP[p.rank];
     const pct = (p.pct !== undefined) ? p.pct : getTodayPct(p.rank);
-    const vol = volume[p.rank]||0;
+    const vol = p.vol || 0;
+    const v = volMap[p.rank];
     const volPct = Math.round((vol/maxVol)*100);
     const hs = headshotUrl(p.rank);
     // Photo first, initials revealed only if it fails - same as the market list.
     const imgHtml = hs
       ? `<div class="mv-av"><img src="${hs}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="mv-init" style="background:${p.cols[0]};color:${p.cols[1]};display:none;">${p.initials}</div></div>`
       : `<div class="mv-av"><div class="mv-init" style="background:${p.cols[0]};color:${p.cols[1]};">${p.initials}</div></div>`;
+    const sub = isVol && v
+      ? `${p.team} · ${fmt(price)} · ${v.trades} ${v.trades === 1 ? 'trade' : 'trades'}${v.traders > 1 ? ` by ${v.traders} players` : ''}`
+      : `${p.team} · ${p.pos}${vol ? ` · ${fmtShareCount(vol)} shares traded` : ''}`;
     return `<div class="mv-row" role="button" tabindex="0" onclick="goToTrendingPlayer(${p.rank})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goToTrendingPlayer(${p.rank});}">
       <div class="ulb-rank ${rankClass}">${rank}</div>
       ${imgHtml}
       <div class="mv-info">
         <div class="mv-name">${p.name}</div>
-        <div class="mv-sub">${p.team} · ${p.pos}${vol ? ` · ${vol.toLocaleString()} traded` : ''}</div>
-        ${activeTrendTab === 'volume' && vol ? `<div class="mv-vol"><span style="width:${volPct}%"></span></div>` : ''}
+        <div class="mv-sub">${sub}</div>
+        ${isVol && vol ? `<div class="mv-vol"><span style="width:${volPct}%"></span></div>` : ''}
       </div>
-      <div class="mv-price">${fmt(price)}</div>
+      <div class="mv-price">${isVol ? fmtShareCount(vol) : fmt(price)}</div>
       <div class="mv-pct ${pctDir(pct)}">${fmtP(pct)}</div>
     </div>`;
   }).join('');
