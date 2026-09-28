@@ -2425,6 +2425,30 @@ function computeCoinsReturnPct(val, totalGranted = _coinsTotalGranted) {
   const baseline = userProfile?.coinsBaseline || 0;
   return Math.round((((val - baseline) - totalGranted) / totalGranted) * 1000) / 10;
 }
+// The leaderboard fields for the Coins portfolio. returnPct is left out
+// (not written as null) while totalGranted hasn't loaded yet - a trade in the
+// first seconds after opening the app used to blank the player's % and drop
+// them to the bottom of the board until the next save.
+function coinsStandingFields(val) {
+  const out = { portfolioValue: Math.round(val) };
+  const ret = computeCoinsReturnPct(val);
+  if (ret != null) out.returnPct = ret;
+  return out;
+}
+// Public-profile holdings. The Coins wallet (portfolios/{uid}/wallets/gold)
+// is owner-only by rule, so the public profile used to read the top-level
+// portfolios/{uid} doc instead - the frozen legacy Practice portfolio, with
+// positions the player no longer has. When they've opted in, mirror just
+// rank + shares of the Coins holdings onto that top-level doc (readable by
+// others only while showHoldingsPublicly is on). An array, not a map, so a
+// merge write replaces it wholesale and sold positions actually disappear.
+function syncPublicHoldings() {
+  if (!currentUser || !db || activePortfolioId !== 'gold') return;
+  const list = userProfile?.showHoldingsPublicly
+    ? Object.entries(holdings).filter(([, h]) => h && h.shares > 0).map(([rank, h]) => ({ rank: +rank, shares: h.shares }))
+    : [];
+  window._fbSetDoc(window._fbDoc(db, 'portfolios', currentUser.uid), { publicHoldings: list }, { merge: true }).catch(() => {});
+}
 async function refreshCoinsTotalGranted() {
   if (!currentUser) return;
   try {
@@ -9932,10 +9956,8 @@ function syncPricesToFirestore() {
       // portfolioId==='gold' gate on this same field).
       if (currentUser && window._fbSetDoc && window._fbDoc && activePortfolioId === 'gold') {
         const val = portVal();
-        window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), {
-          portfolioValue: Math.round(val),
-          returnPct: computeCoinsReturnPct(val),
-        }, { merge: true }).catch(() => {});
+        window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), coinsStandingFields(val), { merge: true }).catch(() => {});
+        syncPublicHoldings();
       }
 
     } catch(e) {}
@@ -11747,7 +11769,15 @@ function buildPortfolio(){
       <div><span>Coins to spend</span><b>${fmt(cash)}</b></div>
       <div><span>In players</span><b>${fmt(total-cash)}</b></div>
       <div><span>Today</span><b class="${figCls(todayPp)}">${fmtS(todayPnl)} <small>${fmtP(todayPp)}</small></b></div>
-      ${isWallet ? '' : `<div><span>All-time</span><b class="${figCls(pp)}">${fmtS(pnl)} <small>${fmtP(pp)}</small></b></div>`}
+      ${(() => {
+        // Coins all-time: gain against every Coin received (free claims and
+        // purchases), matching the leaderboard's returnPct exactly.
+        if (!isWallet) return `<div><span>All-time</span><b class="${figCls(pp)}">${fmtS(pnl)} <small>${fmtP(pp)}</small></b></div>`;
+        const cr = computeCoinsReturnPct(total);
+        if (cr == null) return '';
+        const cGain = (total - (userProfile?.coinsBaseline || 0)) - _coinsTotalGranted;
+        return `<div><span>All-time</span><b class="${figCls(cr)}">${fmtS(cGain)} <small>${fmtP(cr)}</small></b></div>`;
+      })()}
     </div>`;
 
   const held=Object.entries(holdings).filter(([,h])=>h.shares>0);
@@ -13309,7 +13339,7 @@ async function handleAuthChange(user) {
       // object gets written straight back to Firestore two lines down.
       if (!userProfile.customPhoto) userProfile.photoURL = user.photoURL || null;
       userProfile.portfolioValue = Math.round(val);
-      userProfile.returnPct = ret;
+      if (ret != null) userProfile.returnPct = ret;
       await window._fbSetDoc(ref, userProfile);
       console.log('Profile synced:', userProfile.displayName, 'returnPct:', ret);
 
@@ -13411,9 +13441,9 @@ async function saveCloudPortfolio(silent = false, portfolioId = activePortfolioI
         displayName: userProfile.displayName,
         photoURL: userProfile.photoURL || null,
         avatarColor: userProfile.avatarColor,
-        portfolioValue: Math.round(val),
-        returnPct: computeCoinsReturnPct(val),
+        ...coinsStandingFields(val),
       }, { merge: true });
+      syncPublicHoldings();
       updateAuthUI(); // refresh pill P&L
     }
     if (!silent) showToast('Portfolio synced');
@@ -13515,7 +13545,10 @@ function renderProfileView() {
     const pnlPct = pnl / START_VALUE * 100;
     const chev = `<svg class="pl-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
     const isWallet = isWalletContext(activePortfolioId);
-    const retCls = isFlatPct(pnlPct) ? 'flat' : pnlPct > 0 ? 'up' : 'down';
+    // Coins: the same formula the leaderboard ranks on (gain vs every Coin
+    // ever received), so this number and your leaderboard % always agree.
+    const shownRet = isWallet ? computeCoinsReturnPct(total) : pnlPct;
+    const retCls = shownRet == null || isFlatPct(shownRet) ? 'flat' : shownRet > 0 ? 'up' : 'down';
     // Identity up top, then the numbers that matter, then grouped rows - the
     // settings-list shape players already know, instead of a wall of
     // equal-weight stat cards.
@@ -13541,7 +13574,7 @@ function renderProfileView() {
       <div class="port-stats pf-stats">
         <div><span>Portfolio value</span><b>${fmt(total)}</b></div>
         <div><span>Coins to spend</span><b>${fmt(cash)}</b></div>
-        ${isWallet ? '' : `<div><span>All-time return</span><b class="${retCls}">${fmtP(pnlPct)}</b></div>`}
+        ${shownRet == null ? '' : `<div><span>All-time return</span><b class="${retCls}">${fmtP(shownRet)}</b></div>`}
       </div>
 
       <div class="pl-group-lbl">Standing</div>
@@ -13660,10 +13693,12 @@ async function openPublicProfile(uid){
     if (u.showHoldingsPublicly) {
       try {
         const pSnap = await window._fbGetDoc(window._fbDoc(db, 'portfolios', uid));
-        const holdingsMap = pSnap.exists() ? (pSnap.data().holdings || {}) : {};
-        const rows = Object.entries(holdingsMap)
-          .filter(([,h]) => h && h.shares > 0)
-          .map(([rank,h]) => ({ rank: +rank, shares: h.shares, player: _lookupPlayer(rank) }))
+        // publicHoldings is the Coins portfolio mirror (see syncPublicHoldings);
+        // the doc's own `holdings` is the retired Practice portfolio.
+        const pub = pSnap.exists() ? pSnap.data().publicHoldings : undefined;
+        const rows = (Array.isArray(pub) ? pub : [])
+          .filter(h => h && h.shares > 0)
+          .map(h => ({ rank: +h.rank, shares: h.shares, player: _lookupPlayer(h.rank) }))
           .filter(r => r.player)
           .sort((a,b) => (liveP[b.rank]*b.shares) - (liveP[a.rank]*a.shares));
         holdingsHtml = rows.length
@@ -13672,7 +13707,7 @@ async function openPublicProfile(uid){
               <div class="ulb-info"><div class="ulb-name">${escHtml(r.player.name)}</div><div class="ulb-sub">${fmtShares(r.shares)} shares</div></div>
               <div class="ulb-ret">${fmt(liveP[r.rank]*r.shares)}</div>
             </div>`).join('')
-          : `<div class="pp-note">No open positions right now.</div>`;
+          : `<div class="pp-note">${Array.isArray(pub) ? 'No open positions right now.' : 'Holdings will show after this trader’s next trade.'}</div>`;
       } catch(e) {
         holdingsHtml = `<div class="pp-note">Couldn’t load holdings. Try again in a moment.</div>`;
       }
@@ -13717,6 +13752,7 @@ async function toggleHoldingsPublic(checked){
   try {
     await window._fbSetDoc(window._fbDoc(db, 'users', currentUser.uid), { showHoldingsPublicly: checked }, { merge: true });
     userProfile = { ...userProfile, showHoldingsPublicly: checked };
+    syncPublicHoldings();
     showToast(checked ? 'Your holdings are now public' : 'Your holdings are private again');
   } catch(e) {
     showToast('Couldn’t save that change. Try again.');
@@ -15459,7 +15495,12 @@ async function claimDailyFree() {
       const { coins } = result.granted;
       showToast(coins ? `Claimed ${coins.toLocaleString()} Coins!` : 'Claimed!');
       if (coins) {
-        refreshCoinsTotalGranted(); // keep the % gain leaderboard baseline in sync
+        // Count the grant BEFORE the balance bump below is saved - otherwise
+        // the save computes returnPct with the new Coins but the old
+        // totalGranted, and the claim shows up as a trading gain on the
+        // leaderboard until the next save. The refresh then confirms it.
+        _coinsTotalGranted += coins;
+        refreshCoinsTotalGranted();
         // The server already bumped portfolios/{uid}/wallets/gold.cash directly
         // (worker-payments' handleCoinsClaim) so the claim is spendable - but the
         // client's bare `cash` global has no idea that happened, so the balance
