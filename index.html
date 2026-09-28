@@ -54,6 +54,8 @@
   --font-display: 'Fira Code', monospace;
   --font-body: 'Fira Sans', sans-serif;
   --font-mono: 'Fira Code', monospace;
+  /* Headings and names: sans, one color. Mono stays for numbers only. */
+  --font-heading: 'Fira Sans', sans-serif;
   /* Hairline token - Stage 3: structural borders point here. Set very dim so cards
      separate by surface contrast and spacing, with the outline only a faint whisper
      rather than a hard cage. Semantic borders (green buy, tier colors) keep their own
@@ -61,6 +63,9 @@
   --hairline: #ffffff0a;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
+/* Form controls don't inherit font-family by default - without this every
+   button/input that doesn't name a font falls back to the OS Arial. */
+button,input,select,textarea{font-family:inherit;}
 /* Kills the default grey/blue flash Safari and Chrome draw on every tap -
    the single most reliable "this is a webpage" tell on a touch device.
    Doesn't touch keyboard focus: :focus-visible below is untouched by it,
@@ -157,6 +162,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .mover-price{color:var(--muted);}
 .mover-pct.up{color:var(--green);}
 .mover-pct.down{color:var(--red);}
+.mover-pct.flat,.pchg.flat,.hchg.flat,.rb-pct.flat,.tcard-pct.flat{color:var(--muted);}
 
 /* ── VIEWS ── */
 .view{display:none;flex:1;overflow:hidden;}
@@ -173,7 +179,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .search-bar{width:100%;background:var(--card);border:1px solid var(--hairline);color:var(--text);font-family:var(--font-body);font-size:11px;padding:6px 10px;outline:none;border-radius:6px;}
 .search-bar::placeholder{color:var(--muted);}
 .search-bar:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(18,212,126,.1);}
-.tier-row{display:flex;gap:3px;margin-top:6px;}
+.tfilters{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px;}
 .tf{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border:1px solid var(--hairline);background:transparent;color:var(--muted);cursor:pointer;border-radius:6px;transition:all .12s;}
 .tf.active{border-color:var(--gold);color:var(--gold);background:rgba(242,184,67,.06);}
 .plist{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
@@ -187,7 +193,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .star-btn.starred svg{fill:currentColor;}
 .conf-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;display:flex;align-items:center;justify-content:center;}
 .conf-box{background:var(--card);border:1px solid var(--hairline);border-radius:12px;padding:28px;width:320px;max-width:90vw;font-family:var(--font-mono);}
-.conf-title{font-family:var(--font-display);font-size:24px;letter-spacing:1px;margin-bottom:8px;}
+.conf-title{font-family:var(--font-heading);font-weight:700;font-size:24px;letter-spacing:-0.3px;margin-bottom:8px;}
 .conf-detail{font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:20px;}
 .conf-btns{display:flex;gap:10px;}
 .conf-btns button{flex:1;padding:10px;border-radius:6px;border:none;font-family:var(--font-mono);font-size:12px;cursor:pointer;transition:opacity .15s;}
@@ -230,7 +236,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .hero{padding:12px 22px 10px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:16px;flex-shrink:0;}
 .hav{width:48px;height:48px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:18px;border:2px solid var(--border2);box-shadow:0 2px 10px -4px rgba(0,0,0,.5);}
 .hinfo{flex:1;min-width:0;}
-.hname{font-family:var(--font-display);font-size:26px;letter-spacing:-0.3px;font-weight:600;line-height:1;}
+.hname{font-family:var(--font-heading);font-size:26px;letter-spacing:-0.3px;font-weight:600;line-height:1;}
 .hsub{font-family:var(--font-mono);font-size:9px;color:var(--muted);margin-top:2px;letter-spacing:1px;}
 .hstats{display:flex;gap:14px;margin-top:6px;flex-wrap:wrap;}
 .hs{display:flex;flex-direction:column;gap:1px;}
@@ -239,18 +245,10 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .hright{text-align:right;flex-shrink:0;}
 .hprice{font-family:var(--font-display);font-size:40px;line-height:1;color:var(--green);transition:color .3s;}
 .hprice.dn{color:var(--red);}
+.hprice.flat{color:var(--text);}
 .hchg{font-family:var(--font-mono);font-size:10px;}
 .hchg.up{color:var(--green);}
 .hchg.dn{color:var(--red);}
-.buzz-row{display:flex;align-items:center;gap:5px;margin-top:4px;justify-content:flex-end;}
-.blbl{font-family:var(--font-mono);font-size:8px;color:var(--muted);}
-.bbar{width:60px;height:2px;background:var(--border);border-radius:6px;overflow:hidden;}
-.bfill{height:100%;border-radius:6px;transition:width .4s;}
-.bfill.low{background:var(--muted);}
-.bfill.mid{background:var(--gold);}
-.bfill.high{background:var(--t3);}
-.bfill.hot{background:var(--red);}
-.bnum{font-family:var(--font-mono);font-size:8px;color:var(--muted);}
 .etag{font-family:var(--font-mono);font-size:8px;padding:2px 7px;border-radius:6px;margin-top:3px;display:none;float:right;clear:both;animation:tagIn .3s ease;}
 @keyframes tagIn{from{opacity:0;transform:translateY(3px)}to{opacity:1}}
 
@@ -333,7 +331,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .port-view{flex:1;overflow-y:auto;overflow-x:hidden;padding:28px 32px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
 .port-view::-webkit-scrollbar{width:4px;}
 .port-view::-webkit-scrollbar-thumb{background:var(--border2);}
-.ptitle{font-family:var(--font-display);font-size:36px;letter-spacing:-0.5px;font-weight:700;margin-bottom:4px;}
+.ptitle{font-family:var(--font-heading);font-size:28px;letter-spacing:-0.3px;font-weight:700;margin-bottom:4px;}
 .psub-txt{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:24px;}
 .pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px;}
 .pcard{background:var(--card);border:1px solid var(--hairline);padding:16px 18px;border-radius:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.03);}
@@ -359,7 +357,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .hcard{background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .12s;}
 .hcard:active{border-color:var(--border2);}
 .hcard-row1{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;}
-.hcard-name{font-family:var(--font-display);font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.hcard-name{font-family:var(--font-heading);font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .hcard-sell{flex-shrink:0;padding:4px 10px;background:#ff335518;border:1px solid #ff335544;border-radius:6px;color:var(--red);font-family:var(--font-mono);font-size:10px;font-weight:600;cursor:pointer;}
 .hcard-row2{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;}
 .hcard-sub{font-family:var(--font-mono);font-size:10px;color:var(--muted);}
@@ -396,7 +394,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .sched-game.final{opacity:0.75;}
 .sched-teams{display:flex;align-items:center;justify-content:space-between;gap:8px;}
 .sched-team{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;}
-.sched-team-name{font-family:var(--font-display);font-size:18px;letter-spacing:1px;}
+.sched-team-name{font-family:var(--font-heading);font-weight:700;font-size:18px;letter-spacing:-0.3px;}
 .sched-team-record{font-family:var(--font-mono);font-size:9px;color:var(--muted);}
 .sched-score{font-family:var(--font-display);font-size:28px;letter-spacing:-0.3px;font-weight:600;text-align:center;min-width:80px;}
 .sched-score.live{color:var(--green);}
@@ -425,7 +423,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:center;justify-content:center;}
 .modal-overlay.open{display:flex;}
 .modal{background:var(--card);border:1px solid var(--hairline);padding:28px;width:480px;max-width:90vw;border-radius:14px;box-shadow:0 24px 60px -20px rgba(0,0,0,.6);}
-.modal-title{font-family:var(--font-display);font-size:24px;letter-spacing:2px;margin-bottom:4px;}
+.modal-title{font-family:var(--font-heading);font-weight:700;font-size:24px;letter-spacing:-0.3px;margin-bottom:4px;}
 .modal-sub{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:20px;line-height:1.6;}
 .modal-field{margin-bottom:16px;}
 .modal-label{font-family:var(--font-mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:block;}
@@ -675,7 +673,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .wc-payout-status.warn{color:var(--gold);}
 .wc-outcome-next{margin-top:16px;font-family:var(--font-body);font-size:var(--fs-body);color:var(--muted);line-height:1.6;}
 .wc-banner-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
-.wc-title{font-family:var(--font-display);font-size:22px;letter-spacing:1px;color:var(--green);}
+.wc-title{font-family:var(--font-heading);font-weight:700;font-size:22px;letter-spacing:-0.3px;color:var(--green);}
 .wc-badge{font-family:var(--font-mono);font-size:9px;padding:3px 8px;border-radius:4px;font-weight:700;}
 .wc-badge.live{background:#1a3a1a;color:var(--green);border:1px solid var(--green);}
 .wc-badge.ended{background:#2a1a0a;color:var(--gold);border:1px solid var(--gold);}
@@ -690,7 +688,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .wc-join-btn:disabled{background:var(--border2);color:var(--muted);cursor:default;}
 .wc-join-btn.joined{background:#1a3a1a;color:var(--green);border:1px solid var(--green);}
 .wc-results-wrap{margin-top:20px;}
-.wc-results-title{font-family:var(--font-display);font-size:20px;letter-spacing:1px;margin-bottom:12px;}
+.wc-results-title{font-family:var(--font-heading);font-weight:700;font-size:20px;letter-spacing:-0.3px;margin-bottom:12px;}
 .wc-podium{display:flex;gap:10px;margin-bottom:16px;}
 .wc-podium-card{flex:1;background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:14px 10px;text-align:center;}
 .wc-podium-card.first{border-color:var(--gold);background:#1a1500;}
@@ -710,7 +708,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 
 /* ── Challenge Chat ── */
 .wc-chat-wrap{margin-top:24px;}
-.wc-chat-title{font-family:var(--font-display);font-size:20px;letter-spacing:1px;margin-bottom:10px;}
+.wc-chat-title{font-family:var(--font-heading);font-weight:700;font-size:20px;letter-spacing:-0.3px;margin-bottom:10px;}
 .wc-chat-msgs{background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:10px 12px;min-height:80px;max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
 .wc-msg{display:flex;gap:8px;align-items:flex-start;}
 .wc-msg-ava{width:24px;height:24px;border-radius:50%;flex-shrink:0;background:var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;overflow:hidden;}
@@ -729,7 +727,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .wc-create-modal{position:fixed;inset:0;background:#000b;z-index:1100;display:none;align-items:center;justify-content:center;padding:20px;}
 .wc-create-modal.open{display:flex;}
 .wc-create-box{background:var(--surface);border:1px solid var(--hairline);border-radius:14px;padding:28px;width:100%;max-width:440px;}
-.wc-create-title{font-family:var(--font-display);font-size:24px;letter-spacing:1px;margin:0 0 18px;font-weight:400;}
+.wc-create-title{font-family:var(--font-heading);font-size:24px;letter-spacing:-0.3px;margin:0 0 18px;font-weight:700;}
 .wc-field{margin-bottom:14px;}
 .wc-label{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:5px;}
 .wc-input{width:100%;background:var(--bg);border:1px solid var(--hairline);border-radius:6px;padding:9px 12px;color:var(--fg);font-family:var(--font-mono);font-size:12px;box-sizing:border-box;}
@@ -741,7 +739,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 
 /* ── Profile page ── */
 .profile-view{flex:1;overflow-y:auto;padding:28px 32px;max-width:480px;margin:0 auto;width:100%;box-sizing:border-box;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
-.profile-title{font-family:var(--font-display);font-size:30px;letter-spacing:1px;margin-bottom:20px;}
+.profile-title{font-family:var(--font-heading);font-weight:700;font-size:26px;letter-spacing:-0.3px;margin-bottom:20px;}
 .profile-ava-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:20px;}
 .profile-ava{width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--card);border:2px solid var(--border2);}
 .profile-ava-edit{position:absolute;bottom:-2px;right:-2px;width:26px;height:26px;border-radius:50%;background:var(--green);color:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid var(--bg);transition:transform .12s;}
@@ -765,7 +763,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .profile-btn.danger{background:#1a0a0a;color:var(--red);border:1px solid var(--red);}
 .google-signin-btn{width:100%;padding:11px;background:#fff;color:#333;border:none;border-radius:8px;font-family:var(--font-body);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px;}
 .google-signin-btn:hover{background:#f0f0f0;}
-.signin-title{font-family:var(--font-display);font-size:28px;letter-spacing:1px;margin-bottom:6px;}
+.signin-title{font-family:var(--font-heading);font-weight:700;font-size:26px;letter-spacing:-0.3px;margin-bottom:6px;}
 .signin-sub{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:20px;}
 
 /* ── Onboarding Modal ── */
@@ -785,8 +783,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .ob-tk-c.up{color:var(--green);}
 .ob-tk-c.dn{color:var(--red);}
 @keyframes obTick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.ob-title{font-family:var(--font-display);font-size:30px;letter-spacing:2px;margin-bottom:8px;}
-.ob-title span{color:var(--green);}
+.ob-title{font-family:var(--font-heading);font-weight:700;font-size:26px;letter-spacing:-0.3px;margin-bottom:8px;}
 .ob-body{font-family:var(--font-body);font-size:14px;color:#aabbcc;line-height:1.7;margin-bottom:24px;}
 .ob-rules{display:flex;flex-direction:column;margin-bottom:24px;border-top:1px solid var(--hairline);}
 .ob-rule{display:flex;align-items:flex-start;gap:12px;padding:11px 4px 11px 14px;border-bottom:1px solid var(--hairline);border-left:2px solid var(--rule-color);}
@@ -825,8 +822,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 
 /* ── TRENDING / HIGH VOLUME (embedded in the Leaderboard tab) ── */
 .trending-header{padding:20px 28px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface);}
-.trending-title{font-family:var(--font-display);font-size:30px;letter-spacing:2px;margin-bottom:2px;}
-.trending-title span{color:var(--red);}
+.trending-title{font-family:var(--font-heading);font-weight:700;font-size:26px;letter-spacing:-0.3px;margin-bottom:2px;}
 .trending-sub{font-family:var(--font-mono);font-size:9px;color:var(--muted);letter-spacing:1px;}
 /* Smaller, secondary league switcher for the Leaderboard tab - #league-btn itself
    only shows on Market now, so this is the only way to change league without
@@ -1289,8 +1285,6 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .modal-hint{font-size:var(--fs-micro);}
 .drawer-section-label{font-size:var(--fs-micro);}
 .trend-tab{font-size:11px;}
-.blbl{font-size:var(--fs-micro);}
-.bnum{font-size:var(--fs-micro);}
 .ob-stat-lbl{font-size:var(--fs-micro);}
 .etag{font-size:var(--fs-micro);}
 
@@ -1512,9 +1506,20 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 </head>
 <body>
 <script>
+// League a first-time visitor lands on (nothing saved in ax_league yet): the
+// first one currently in season, so a new user never opens onto a flat,
+// offseason market. Windows are approximate regular-season dates (month is
+// 0-based); golf runs nearly year-round and is the fallback.
+function defaultLeague(now = new Date()) {
+  const md = now.getMonth() * 100 + now.getDate();
+  if (md >= 921 || md <= 520) return 'NBA';  // Oct 21 - Jun 20
+  if (md >= 225 && md <= 830) return 'MLB';  // Mar 25 - Sep 30
+  if (md >= 805 || md <= 112) return 'NFL';  // Sep 5 - Feb 12
+  return 'GOLF';
+}
 // Runs before anything renders - set correct league label immediately
 (function(){
-  const lg = localStorage.getItem('ax_league') || 'NBA';
+  const lg = localStorage.getItem('ax_league') || defaultLeague();
   document.addEventListener('DOMContentLoaded', function() {
     const lgText = lg === 'MLB' ? 'MLB' : lg === 'GOLF' ? 'Golf' : lg === 'NFL' ? 'NFL' : 'NBA';
     const lbl = document.getElementById('league-label');
@@ -1601,21 +1606,21 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         </div>
         <input class="search-bar" placeholder="Search player or team…" oninput="filterList(this.value)">
         <div class="tfilters tier-filters">
-          <div class="tf active" onclick="setTier(&#39;all&#39;,this)">All</div>
-          <div class="tf" onclick="setTier(&#39;S&#39;,this)" style="color:var(--t1)">S</div>
-          <div class="tf" onclick="setTier(&#39;A&#39;,this)" style="color:var(--t2)">A</div>
-          <div class="tf" onclick="setTier(&#39;B&#39;,this)" style="color:var(--t3)">B</div>
-          <div class="tf" onclick="setTier(&#39;C&#39;,this)" style="color:var(--t4)">C</div>
-          <div class="tf" onclick="setTier(&#39;D&#39;,this)" style="color:var(--t5)">D</div>
+          <button type="button" class="tf active" onclick="setTier(&#39;all&#39;,this)">All</button>
+          <button type="button" class="tf" onclick="setTier(&#39;S&#39;,this)" style="color:var(--t1)">S</button>
+          <button type="button" class="tf" onclick="setTier(&#39;A&#39;,this)" style="color:var(--t2)">A</button>
+          <button type="button" class="tf" onclick="setTier(&#39;B&#39;,this)" style="color:var(--t3)">B</button>
+          <button type="button" class="tf" onclick="setTier(&#39;C&#39;,this)" style="color:var(--t4)">C</button>
+          <button type="button" class="tf" onclick="setTier(&#39;D&#39;,this)" style="color:var(--t5)">D</button>
         </div>
-        <div class="tfilters pos-filters" style="margin-top:6px;" id="pos-filter-row">
-          <div class="tf active" id="pf-all" onclick="setPos(&#39;all&#39;,this)">All</div>
-          <div class="tf" id="pf-1" onclick="setPos(getPosLabels()[0],this)">PG</div>
-          <div class="tf" id="pf-2" onclick="setPos(getPosLabels()[1],this)">SG</div>
-          <div class="tf" id="pf-3" onclick="setPos(getPosLabels()[2],this)">SF</div>
-          <div class="tf" id="pf-4" onclick="setPos(getPosLabels()[3],this)">PF</div>
-          <div class="tf" id="pf-5" onclick="setPos(getPosLabels()[4],this)">C</div>
-          <div class="tf" id="pf-6" onclick="setPos(getPosLabels()[5],this)" style="display:none;"></div>
+        <div class="tfilters pos-filters" id="pos-filter-row">
+          <button type="button" class="tf active" id="pf-all" onclick="setPos(&#39;all&#39;,this)">All</button>
+          <button type="button" class="tf" id="pf-1" onclick="setPos(getPosLabels()[0],this)">PG</button>
+          <button type="button" class="tf" id="pf-2" onclick="setPos(getPosLabels()[1],this)">SG</button>
+          <button type="button" class="tf" id="pf-3" onclick="setPos(getPosLabels()[2],this)">SF</button>
+          <button type="button" class="tf" id="pf-4" onclick="setPos(getPosLabels()[3],this)">PF</button>
+          <button type="button" class="tf" id="pf-5" onclick="setPos(getPosLabels()[4],this)">C</button>
+          <button type="button" class="tf" id="pf-6" onclick="setPos(getPosLabels()[5],this)" style="display:none;"></button>
         </div>
       </div>
       <div class="plist" id="plist"></div>
@@ -1665,16 +1670,11 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
               <div class="ln-stat" id="ln-row-tov"><div class="ln-v bad" id="ln-tov">4</div><div class="ln-l" id="ln-lbl-tov">TOV</div></div>
             </div>
           </div>
-          <div id="last-night-dnp" style="display: block; margin-top: 8px; font-family: &quot;DM Mono&quot;; font-size: 9px; color: var(--muted);">Did not play last night</div>
+          <div id="last-night-dnp" style="display: block; margin-top: 8px; font-family: var(--font-mono); font-size: 9px; color: var(--muted);">Did not play last night</div>
         </div>
         <div class="hright">
           <div class="hprice" id="hprice">—</div>
-          <div class="hchg up" id="hchg">+0.0%</div>
-          <div class="buzz-row">
-            <span class="blbl">BUZZ</span>
-            <div class="bbar"><div class="bfill high" id="bfill" style="width: 55%;"></div></div>
-            <span class="bnum" id="bnum">55</span>
-          </div>
+          <div class="hchg flat" id="hchg">0.0%</div>
           <div class="etag" id="etag"></div>
         </div>
       </div>
@@ -1746,7 +1746,6 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
         <div class="prev-row">
           <div class="pv"><div class="pvl">Price</div><div class="pvv" id="pv-price">—</div></div>
           <div class="pv"><div class="pvl">Avg/Share</div><div class="pvv" id="pv-avg">—</div></div>
-          <div class="pv"><div class="pvl">Impact</div><div class="pvv up" id="pv-impact">+0.0%</div></div>
           <div class="pv"><div class="pvl" id="pv-total-lbl">Total</div><div class="pvv gold" id="pv-total">—</div></div>
           <div class="pv"><div class="pvl">You Hold</div><div class="pvv" id="pv-hold">0</div></div>
         </div>
@@ -1860,8 +1859,8 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 
 <div id="view-schedule" class="view" style="display:none;flex-direction:column;overflow-y:auto;padding:24px 20px;max-width:640px;margin:0 auto;width:100%;box-sizing:border-box;">
   <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">
-    <div style="font-family:var(--font-display);font-size:36px;letter-spacing:2px;">
-      Nightly <span style="color:var(--gold)">Schedule</span>
+    <div style="font-family:var(--font-heading);font-weight:700;font-size:28px;letter-spacing:-0.3px;">
+      Schedule
     </div>
     <button class="league-btn-compact" onclick="openLeagueDrawer()"><span id="league-label-compact-sched">NBA</span><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
   </div>
@@ -1878,7 +1877,7 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 <!-- CHAT VIEW -->
 <div id="view-chat" class="view" style="display:none;flex-direction:column;overflow:hidden;max-width:640px;margin:0 auto;width:100%;box-sizing:border-box;">
   <div style="padding:20px 20px 12px;border-bottom:1px solid var(--border2);flex-shrink:0;">
-    <div style="font-family:var(--font-display);font-size:22px;letter-spacing:1px;">Chat</div>
+    <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;letter-spacing:-0.3px;">Chat</div>
     <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px;">Talk trades, talk games · <span style="color:var(--green);">● live</span></div>
   </div>
   <div id="gchat-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;">
@@ -3376,7 +3375,7 @@ const nflPlayers = NFL_RAW.map(p => ({
 
 // ── LEAGUE STATE ─────────────────────────────────────────────────────────────
 // Declared here - after both nbaPlayers and mlbPlayers are fully initialized
-var currentLeague = localStorage.getItem('ax_league') || 'NBA';
+var currentLeague = localStorage.getItem('ax_league') || defaultLeague();
 // `players` is the active list - mutable, swapped on league change
 const players = currentLeague === 'MLB' ? [...mlbPlayers]
               : currentLeague === 'GOLF' ? [...golfPlayers]
@@ -5759,7 +5758,6 @@ function syncPool(pool){pool.k=pool.x*pool.y;}
 // ═══════════════════════════════════════════
 function sr(s){let x=Math.sin(s*9301+49297)*233280;return x-Math.floor(x);}
 function dmod(s){return(s-50)/200;}
-function dcls(s){return s>=75?'hot':s>=55?'high':s>=35?'mid':'low';}
 // Coins is the app's only currency now (not real money) - plain number, no
 // $ and no symbol at all. This runs on nearly every price/value in the app
 // (holdings, prices, trade confirmations, leaderboard rows...), so a coin
@@ -5772,7 +5770,11 @@ function fmtS(n){return(n>=0?'+':'-')+fmt(n);}
 // whole share) - rounds to 3 decimals and drops trailing zeros, so a whole-
 // share trade still reads as "10", not "10.000".
 function fmtShares(n){return(Math.round((n||0)*1000)/1000).toString();}
-function fmtP(n){return(n>=0?'+':'')+n.toFixed(1)+'%';}
+// A move that rounds to 0.0% is no move: shown unsigned and in the flat
+// class, never as a green "+0.0%" gain.
+function isFlatPct(n){return !(Math.abs(n)>=0.05);}
+function fmtP(n){return isFlatPct(n)?'0.0%':(n>0?'+':'')+n.toFixed(1)+'%';}
+function pctDir(n,up='up',down='down'){return isFlatPct(n)?'flat':n>0?up:down;}
 // The brand mark, generated rather than hand-copied so the nav logo, the
 // onboarding logo, and a real mover's HOT/COLD tag are provably the same
 // glyph: a price line clearing a resistance level ('up') or falling through
@@ -8327,16 +8329,16 @@ function renderList(){
     // target for the mouse and now a tab stop with a spoken name for everyone
     // else; activateRow() handles Enter and Space.
     const a11yName = `${p.name}${isInj?', out injured':''}, ${p.team}, ${fmt(price)}, ${pct>=0?'up':'down'} ${Math.abs(pct).toFixed(1)} percent`;
-    return`<div class="prow ${pct>=0?'prow-up':'prow-down'}${p.rank===selRank?' active':''}${isInj?' prow-injured':''}" onclick="selectPlayerFromList(${p.rank})" role="button" tabindex="0" aria-label="${a11yName}"${p.rank===selRank?' aria-current="true"':''}>
+    return`<div class="prow ${pctDir(pct,'prow-up','prow-down')}${p.rank===selRank?' active':''}${isInj?' prow-injured':''}" onclick="selectPlayerFromList(${p.rank})" role="button" tabindex="0" aria-label="${a11yName}"${p.rank===selRank?' aria-current="true"':''}>
       ${owned?'<div class="owned-dot"></div>':''}
       ${avatarHtml}
       <div class="pinfo">
         <div class="pname">${p.name}${isInj?' <span class="inj-badge">OUT</span>':''}${isQtm?' <span class="q-badge">Q</span>':''}${isHot?' <span style="display:inline-flex;align-items:center;gap:2px;font-size:8px;color:var(--green);letter-spacing:0">'+breakoutMark('up')+'HOT</span>':''}${isCold?' <span style="display:inline-flex;align-items:center;gap:2px;font-size:8px;color:var(--blue);letter-spacing:0">'+breakoutMark('down')+'COLD</span>':''}</div>
-        <div class="psub">${p.team} · <span style="color:var(--blue)">${p.pos}</span> · T${p.tier}${owned?' · <span style="color:var(--green)">'+fmt(ownVal)+'</span>':''}</div>
+        <div class="psub">${p.team} · <span style="color:var(--blue)">${p.pos}</span>${owned?' · <span style="color:var(--green)">'+fmt(ownVal)+'</span>':''}</div>
       </div>
       <div class="pright">
         <div class="pprice" style="${isInj?'color:var(--red)':''}">${fmt(price)}</div>
-        <div class="pchg ${pct>=0?'up':'down'}">${fmtP(pct)}</div>
+        <div class="pchg ${pctDir(pct)}">${fmtP(pct)}</div>
       </div>
       <button class="star-btn${isStarred?' starred':''}" onclick="event.stopPropagation();toggleStar(${p.rank},this)" title="Watchlist"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></button>
     </div>`;
@@ -8360,7 +8362,6 @@ function updateHero(){
   // Header % reflects the SELECTED range so it matches the active range button and
   // the chart's line (not a separate "today" number that reads as contradictory).
   const pct=_rangePct(selRank, chartRange);
-  const ds=Math.round(dem[selRank]);
   const mcap=price*getPool(p.tier);
   const ownShares=holdings[selRank]?.shares||0;
   const ownPct=((ownShares/getPool(p.tier))*100).toFixed(4);
@@ -8470,17 +8471,13 @@ function updateHero(){
   document.getElementById('h-lo').textContent=fmt(lo7);
 
   const pe=document.getElementById('hprice');
-  pe.textContent=fmt(price);pe.className='hprice'+(pct<0?' dn':'');
+  pe.textContent=fmt(price);pe.className='hprice'+(isFlatPct(pct)?' flat':pct<0?' dn':'');
 
   const ce=document.getElementById('hchg');
-  ce.textContent=fmtP(pct);ce.className='hchg '+(pct>=0?'up':'dn');
+  ce.textContent=fmtP(pct);ce.className='hchg '+pctDir(pct,'up','dn');
   // Compute the range badges right here, from the SAME liveP snapshot, so the header %
   // and the range buttons can never show different numbers for the selected range.
   updateRangePcts(selRank);
-
-  document.getElementById('bfill').style.width=ds+'%';
-  document.getElementById('bfill').className='bfill '+dcls(ds);
-  document.getElementById('bnum').textContent=ds;
 
   updatePreview();
   document.getElementById('pv-hold').textContent=fmtShares(ownShares);
@@ -8803,18 +8800,12 @@ function updatePreview(){
   if(tradeMode==='buy'){
     const r=shares>0?ammBuy(selRank,shares):null;
     document.getElementById('pv-avg').textContent=r?fmt(r.avgPrice):'—';
-    const ie=document.getElementById('pv-impact');
-    ie.textContent=r?fmtP(r.impact):'—';
-    ie.className='pvv '+(r?(r.impact>=0?'up':'dn'):'');
     document.getElementById('pv-total').textContent = !r ? '—' : (tradeUnit==='coins' ? fmtShares(shares) : fmt(r.cost));
   }else{
     const held=holdings[selRank]?.shares||0;
     const sell=Math.min(shares,held);
     const r=sell>0?ammSell(selRank,sell):null;
     document.getElementById('pv-avg').textContent=r?fmt(r.avgPrice):'—';
-    const ie=document.getElementById('pv-impact');
-    ie.textContent=r?fmtP(r.impact):'—';
-    ie.className='pvv dn';
     document.getElementById('pv-total').textContent = !r ? '—' : (tradeUnit==='coins' ? fmtShares(sell) : fmt(r.returned));
   }
 }
@@ -9920,7 +9911,7 @@ function updateMovers(){
     <div class="mover-item" onclick="selectPlayerFromList(${p.rank})" style="cursor:pointer">
       <span class="mover-name">${playerLastName(p.name)}</span>
       <span class="mover-price">${fmt(liveP[p.rank])}</span>
-      <span class="mover-pct ${p.pct>=0?'up':'down'}">${fmtP(p.pct)}</span>
+      <span class="mover-pct ${pctDir(p.pct)}">${fmtP(p.pct)}</span>
     </div>`).join('');
 
   const scrollEl = document.getElementById('movers-scroll');
@@ -10150,7 +10141,7 @@ function drawMain(hoverX){
 
   // ── NEED AT LEAST 2 POINTS ────────────────────────────────────────────────
   if (hx.length < 2) {
-    ctx.strokeStyle='#1b3050'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+    ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
     ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke(); return;
   }
 
@@ -10169,12 +10160,13 @@ function drawMain(hoverX){
   const firstPrice = hx[0].price;
   const lastPrice  = hx[hx.length-1].price;
   const isUp = lastPrice >= firstPrice;
-  const col = isUp ? '#12d47e' : '#f5445f';
+  const isFlat = firstPrice > 0 && isFlatPct((lastPrice - firstPrice) / firstPrice * 100);
+  const col = isFlat ? '#7d8794' : isUp ? '#12d47e' : '#f5445f';
 
   // grid - whisper-dim so the price line owns the frame
   ctx.strokeStyle='rgba(255,255,255,0.045)';ctx.lineWidth=1;
   for(let i=0;i<=4;i++){const y=pad.t+(i/4)*(H-pad.t-pad.b);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();}
-  ctx.fillStyle='#4a6280';ctx.font=`9px 'IBM Plex Mono'`;ctx.textAlign='left';
+  ctx.fillStyle='#7d8794';ctx.font=`10px 'Fira Code'`;ctx.textAlign='left';
   // No emoji/currency symbol here - canvas text width math elsewhere in this
   // function (the tooltip below) depends on predictable monospace glyph
   // widths, which an emoji prefix would throw off. Plain number instead.
@@ -10186,7 +10178,7 @@ function drawMain(hoverX){
   function dayToTime(d){ const dt=new Date(EPOCH+d*86400000); const h=dt.getHours(),m=dt.getMinutes(); return (h%12||12)+':'+(m<10?'0':'')+m+(h<12?'am':'pm'); }
   const showTime = (daySpan < 2); // 1D shows time, multi-day shows date
   const labelCount = Math.min(5, hx.length);
-  ctx.fillStyle='#2a4a70'; ctx.font=`8px 'IBM Plex Mono'`; ctx.textAlign='center';
+  ctx.fillStyle='#7d8794'; ctx.font=`10px 'Fira Code'`; ctx.textAlign='center';
   for (let i = 0; i < labelCount; i++) {
     // Pick the point whose day is closest to the evenly-spaced time target
     const targetDay = dayMin + (i / (labelCount - 1)) * daySpan;
@@ -10203,15 +10195,19 @@ function drawMain(hoverX){
     ctx.strokeStyle='#f2b843';ctx.lineWidth=1;ctx.setLineDash([3,5]);
     ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle='#f2b843';ctx.font=`8px 'IBM Plex Mono'`;ctx.textAlign='left';
+    ctx.fillStyle='#f2b843';ctx.font=`10px 'Fira Code'`;ctx.textAlign='left';
     ctx.fillText('avg $'+avgBuy.toFixed(2),pad.l+3,y-3);
   }
 
   // Smoothed price path: horizontal-control beziers round each corner without ever
   // overshooting vertically (control points reuse the endpoint Ys), so a step in the
   // data reads as a clean S-curve, not a right angle - and never a fake price.
-  const tracePath = () => {
-    ctx.moveTo(px(0), py(hx[0].price));
+  // continueSubpath: the area fill has already drawn up the left edge, so it
+  // must lineTo the first point - a moveTo there would start a new subpath and
+  // the fill would close into a diagonal wedge instead of the area under the line.
+  const tracePath = (continueSubpath) => {
+    if (continueSubpath) ctx.lineTo(px(0), py(hx[0].price));
+    else ctx.moveTo(px(0), py(hx[0].price));
     for (let i = 1; i < hx.length; i++) {
       const x0 = px(i-1), y0 = py(hx[i-1].price);
       const x1 = px(i),   y1 = py(hx[i].price);
@@ -10233,17 +10229,14 @@ function drawMain(hoverX){
   grad.addColorStop(0,col+'3a');grad.addColorStop(0.55,col+'14');grad.addColorStop(1,col+'00');
   ctx.fillStyle=grad;ctx.setLineDash([]);
   ctx.beginPath();ctx.moveTo(px(0),H-pad.b);
-  ctx.lineTo(px(0),py(hx[0].price));
-  tracePath();
+  tracePath(true);
   ctx.lineTo(px(hx.length-1),H-pad.b);ctx.closePath();ctx.fill();
 
-  // line - drawn with a soft glow so it reads lit, not flat
-  ctx.shadowColor=col;ctx.shadowBlur=9;
+  // line - crisp, no glow: the area wash beneath already separates it
   ctx.strokeStyle=col;ctx.lineWidth=2;ctx.lineJoin='round';ctx.lineCap='round';
   ctx.beginPath();
   tracePath();
   ctx.stroke();
-  ctx.shadowBlur=0;
 
   // Find nearest data point to hover position
   const hx_ = hoverX ?? _chartHover;
@@ -10278,11 +10271,11 @@ function drawMain(hoverX){
     const pctStr=(pct>=0?'+':'')+pct.toFixed(2)+'%';
     const dateStr = daySpan < 2 ? dayToTime(hx[hovIdx].day) : dayToDate(hx[hovIdx].day);
     const label=price.toFixed(2)+'  '+pctStr+'  '+dateStr;
-    ctx.font=`bold 11px 'IBM Plex Mono'`;
+    ctx.font=`600 11px 'Fira Code'`;
     const tw=ctx.measureText(label).width;
     const tp=8, th=20, tx=Math.min(Math.max(hpx-tw/2-tp,pad.l), W-pad.r-tw-tp*2);
     const ty=pad.t+4;
-    ctx.fillStyle='rgba(10,20,35,0.88)';
+    ctx.fillStyle='rgba(23,27,34,0.94)';
     ctx.beginPath();
     if(ctx.roundRect) ctx.roundRect(tx,ty,tw+tp*2,th,3);
     else ctx.rect(tx,ty,tw+tp*2,th);
@@ -10294,9 +10287,7 @@ function drawMain(hoverX){
     const ex=px(hx.length-1), ey=py(prices[prices.length-1]);
     ctx.fillStyle=col+'14';ctx.beginPath();ctx.arc(ex,ey,11,0,Math.PI*2);ctx.fill();
     ctx.fillStyle=col+'3a';ctx.beginPath();ctx.arc(ex,ey,6.5,0,Math.PI*2);ctx.fill();
-    ctx.shadowColor=col;ctx.shadowBlur=8;
     ctx.fillStyle=col;ctx.beginPath();ctx.arc(ex,ey,3.5,0,Math.PI*2);ctx.fill();
-    ctx.shadowBlur=0;
     ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ex,ey,1.4,0,Math.PI*2);ctx.fill();
   }
 }
@@ -10737,8 +10728,8 @@ function updateRangePcts(rank){
     const el = document.getElementById('rb-pct-'+(days===0?'0':days));
     if (!el) return;
     const pct = _rangePct(rank, days);
-    el.textContent = (pct>=0?'+':'')+pct.toFixed(1)+'%';
-    el.className = 'rb-pct '+(pct>=0?'up':'down');
+    el.textContent = fmtP(pct);
+    el.className = 'rb-pct '+pctDir(pct);
   });
 }
 
@@ -11227,9 +11218,6 @@ function renderTrending(){
   } else if(activeTrendTab === 'losers'){
     sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: ENGINE.pct(p.rank, trendRange)}))
       .sort((a,b)=>a.pct - b.pct).slice(0,limit);
-  } else if(activeTrendTab === 'buzz'){
-    sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: ENGINE.pct(p.rank, trendRange), buzzScore: dem[p.rank]||0}))
-      .sort((a,b)=>b.buzzScore - a.buzzScore).slice(0,limit);
   } else if(activeTrendTab === 'watchlisted'){
     sorted = [...players].map(p=>({...p, vol: volume[p.rank]||0, pct: ENGINE.pct(p.rank, trendRange)}))
       .filter(p=>watchlist.has(p.rank))
@@ -11248,7 +11236,6 @@ function renderTrending(){
     const rankClass = rank===1?'gold':rank===2?'silver':rank===3?'bronze':'';
     const price = liveP[p.rank];
     const pct = (p.pct !== undefined) ? p.pct : getTodayPct(p.rank);
-    const buzz = Math.round(dem[p.rank]||0);
     const vol = volume[p.rank]||0;
     const volPct = Math.round((vol/maxVol)*100);
     const isUp = pct >= 0;
@@ -11264,7 +11251,6 @@ function renderTrending(){
          </div>`
       : `<div class="tcard-av" style="background:${p.cols[0]};color:${p.cols[1]};width:${avSize}px;height:${avSize}px;">${p.initials}</div>`;
     const flameLabel = pct >= 5 ? '' : pct >= 3 ? '' : pct <= -5 ? '' : pct <= -3 ? '' : '';
-    const tierColor = {S:'var(--t1)',A:'var(--t2)',B:'var(--t3)',C:'var(--t4)',D:'var(--t5)'}[p.tier]||'var(--muted)';
 
     if(isMobile){
       // Mobile: single clean row - rank | photo | name+team | price+pct
@@ -11272,12 +11258,12 @@ function renderTrending(){
         <div class="tcard-rank ${rankClass}" style="width:18px;font-size:16px;">${rank}</div>
         ${imgHtml}
         <div class="tcard-info" style="flex:1;min-width:0;">
-          <div style="font-family:var(--font-display);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name} <span style="font-size:11px;">${flameLabel}</span></div>
-          <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);margin-top:1px;">${p.team} · <span style="color:${tierColor}">${p.tier}</span></div>
+          <div style="font-family:var(--font-heading);font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name} <span style="font-size:11px;">${flameLabel}</span></div>
+          <div style="font-family:var(--font-mono);font-size:8px;color:var(--muted);margin-top:1px;">${p.team} · <span style="color:var(--blue)">${p.pos}</span></div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
           <div style="font-family:var(--font-display);font-size:17px;line-height:1;">${fmt(price)}</div>
-          <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${isUp?'var(--green)':'var(--red)'};">${fmtP(pct)}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:${isFlatPct(pct)?'var(--muted)':isUp?'var(--green)':'var(--red)'};">${fmtP(pct)}</div>
         </div>
         <div class="tcard-vol-bar" style="width:${volPct}%"></div>
       </div>`;
@@ -11288,16 +11274,15 @@ function renderTrending(){
       ${imgHtml}
       <div class="tcard-info">
         <div class="tcard-name">${p.name} <span class="flame-badge">${flameLabel}</span></div>
-        <div class="tcard-sub">${p.team} · <span style="color:var(--blue)">${p.pos}</span> · <span style="color:${tierColor}">T${p.tier}</span></div>
+        <div class="tcard-sub">${p.team} · <span style="color:var(--blue)">${p.pos}</span></div>
         <div class="tcard-metrics">
-          <div class="tcard-metric"><div class="tcard-mval" style="color:var(--gold)">${buzz}</div><div class="tcard-mlbl">Buzz</div></div>
           <div class="tcard-metric"><div class="tcard-mval">${vol.toLocaleString()}</div><div class="tcard-mlbl">Vol</div></div>
           <div class="tcard-metric"><div class="tcard-mval">${seasonStat(p).val}</div><div class="tcard-mlbl">${seasonStat(p).label}</div></div>
         </div>
       </div>
       <div class="tcard-right">
         <div class="tcard-price">${fmt(price)}</div>
-        <div class="tcard-pct ${isUp?'up':'dn'}">${fmtP(pct)}</div>
+        <div class="tcard-pct ${pctDir(pct,'up','dn')}">${fmtP(pct)}</div>
       </div>
       <div class="tcard-vol-bar" style="width:${volPct}%"></div>
     </div>`;
@@ -11341,7 +11326,7 @@ function buildPortfolio(){
 
   const portLabel = contextDisplayName(activePortfolioId);
   let html=`
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;"><div class="ptitle">Your <span style="color:var(--green)">Portfolio</span></div>${isWallet ? '' : `<button onclick="sharePortfolio()" style="margin-top:8px;padding:7px 14px;background:#12d47e18;border:1px solid #12d47e44;border-radius:6px;color:var(--green);font-family:var(--font-mono);font-size:11px;cursor:pointer">Share</button>`}</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;"><div class="ptitle">Portfolio</div>${isWallet ? '' : `<button onclick="sharePortfolio()" style="margin-top:8px;padding:7px 14px;background:#12d47e18;border:1px solid #12d47e44;border-radius:6px;color:var(--green);font-family:var(--font-mono);font-size:11px;cursor:pointer">Share</button>`}</div>
     <button class="league-btn-compact" onclick="openPortfolioDrawer()" style="margin-bottom:10px;"><span>${escHtml(portLabel)}</span><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
     <div class="psub-txt">Holdings, performance, and trade history</div>
     <div class="pgrid">
@@ -12451,7 +12436,7 @@ async function refreshAll() {
   // Ensure the active players list + all league UI match the saved league on every
   // load/refresh - otherwise the sidebar can fall back to the NBA default rows.
   {
-    const savedLeague = localStorage.getItem('ax_league') || 'NBA';
+    const savedLeague = localStorage.getItem('ax_league') || defaultLeague();
     currentLeague = savedLeague;
     players.length = 0;
     getLeaguePlayers().forEach(p => players.push(p));
@@ -13121,7 +13106,7 @@ function renderProfileView() {
   if (!currentUser) {
     // Show sign-in screen
     inner.innerHTML = `
-      <div class="signin-title">Join <span style="color:var(--green)">Breakout</span></div>
+      <div class="signin-title">Join Breakout</div>
       <div class="signin-sub">Sign in to save your portfolio, compete on the leaderboard, and track your returns across devices.</div>
       <button class="google-signin-btn" id="google-signin-btn">
         <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
@@ -13136,7 +13121,7 @@ function renderProfileView() {
     const pnl = total - START_VALUE;
     const pnlPct = pnl / START_VALUE * 100;
     inner.innerHTML = `
-      <div class="profile-title">Your <span style="color:var(--green)">Profile</span></div>
+      <div class="profile-title">Profile</div>
       <div class="profile-ava-wrap">
         <div style="position:relative;">
           ${p.photoURL
@@ -15000,8 +14985,8 @@ async function buildLeaderboardFirebase() {
 
   inner.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-      <div style="font-family:var(--font-display);font-size:36px;letter-spacing:2px;">
-        Trader <span style="color:var(--gold)">Leaderboard</span>
+      <div style="font-family:var(--font-heading);font-weight:700;font-size:28px;letter-spacing:-0.3px;">
+        Leaderboard
       </div>
       <button onclick="buildLeaderboardFirebase()" style="background:var(--card);border:1px solid var(--hairline);border-radius:6px;padding:6px 12px;font-family:var(--font-mono);font-size:10px;color:var(--muted);cursor:pointer;">↻ Refresh</button>
     </div>
@@ -15307,15 +15292,14 @@ async function renderGlobalLeaderboard() {
     <div style="height:32px"></div>
     <div class="trending-header" style="padding:0;border-bottom:none;background:transparent;margin-bottom:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div class="trending-title">High <span>Volume</span></div>
+        <div class="trending-title">High Volume</div>
         <button class="league-btn-compact" onclick="openLeagueDrawer()"><span id="league-label-compact">${currentLeague === 'MLB' ? 'MLB' : currentLeague === 'GOLF' ? 'Golf' : currentLeague === 'NFL' ? 'NFL' : 'NBA'}</span><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
       </div>
-      <div class="trending-sub">Players with spiking activity, buzz, and price momentum</div>
+      <div class="trending-sub">Players with spiking trade volume and price momentum</div>
       <div class="trending-tabs">
         <div class="trend-tab ${activeTrendTab==='volume'?'active':''}" id="ttab-volume" onclick="setTrendTab('volume',this)">Volume Spike</div>
         <div class="trend-tab ${activeTrendTab==='gainers'?'active':''}" id="ttab-gainers" onclick="setTrendTab('gainers',this)">Top Gainers</div>
         <div class="trend-tab ${activeTrendTab==='losers'?'active':''}" id="ttab-losers" onclick="setTrendTab('losers',this)">Top Losers</div>
-        <div class="trend-tab ${activeTrendTab==='buzz'?'active':''}" id="ttab-buzz" onclick="setTrendTab('buzz',this)">Buzz Score</div>
         <div class="trend-tab ${activeTrendTab==='watchlisted'?'active':''}" id="ttab-watchlisted" onclick="setTrendTab('watchlisted',this)" style="display:inline-flex;align-items:center;gap:5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>Most Watched</div>
       </div>
       <div class="trend-range" id="trend-range">
@@ -16900,7 +16884,7 @@ window.addEventListener('appinstalled', () => {
             <div class="pav" style="background:#0a1835;color:#3d9bff;">JT</div>
             <div class="pinfo">
               <div class="pname">Jayson Tatum</div>
-              <div class="psub">Boston Celtics · <span style="color:var(--blue)">SF</span> · TS</div>
+              <div class="psub">Boston Celtics · <span style="color:var(--blue)">SF</span></div>
             </div>
             <div class="pright">
               <div class="pprice">463.66</div>
@@ -16911,7 +16895,7 @@ window.addEventListener('appinstalled', () => {
             <div class="pav" style="background:#1f0a0a;color:#f5445f;">AE</div>
             <div class="pinfo">
               <div class="pname">Anthony Edwards</div>
-              <div class="psub">Minnesota T-Wolves · <span style="color:var(--blue)">SG</span> · TS</div>
+              <div class="psub">Minnesota T-Wolves · <span style="color:var(--blue)">SG</span></div>
             </div>
             <div class="pright">
               <div class="pprice" style="color:var(--red)">467.64</div>
