@@ -1639,6 +1639,159 @@ nav{height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;bor
 .mv-pct{width:64px;flex-shrink:0;text-align:right;font-family:var(--font-mono);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;}
 .mv-pct.up{color:var(--green);} .mv-pct.down{color:var(--red);} .mv-pct.flat{color:var(--muted);}
 
+/* ════════════════════════════════════════════════════════════════════════
+   PORTFOLIO + PROFILE
+   Portfolio: one headline value on the chart, one line of supporting
+   figures, then hairline rows - was five stat cards (total shown twice), a
+   carded chart, and bordered holding cards. Profile: identity header, the
+   same figures line, then grouped settings rows - was nine equal stat cards
+   and a column of full-width outlined buttons.
+   ════════════════════════════════════════════════════════════════════════ */
+.port-view{max-width:760px;margin:0 auto;width:100%;box-sizing:border-box;}
+.port-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;}
+.port-head-actions{display:flex;align-items:center;gap:8px;}
+.es-btn.es-sm{padding:6px 12px;font-size:12px;}
+.es-btn.danger{color:var(--red);border-color:rgba(245,68,95,.35);}
+.port-chart-wrap{background:transparent;border:none;padding:0;border-radius:0;margin-bottom:20px;}
+.pchart-val{font-size:36px;font-weight:600;letter-spacing:-1px;font-variant-numeric:tabular-nums;}
+.pchart-chg{font-size:13px;font-weight:500;}
+.pchart-date{font-family:var(--font-body);text-transform:none;letter-spacing:0;font-size:12px;}
+.pchart-svg-holder{height:170px;}
+.pchart-ranges.seg{display:flex;margin-top:12px;}
+.pchart-ranges.seg > .pchart-range{flex:1;border:none;font-family:var(--font-body);font-size:12px;font-weight:500;letter-spacing:0;}
+.pchart-ranges.seg > .pchart-range:hover{color:var(--text);}
+.pchart-ranges.seg > .pchart-range.active{background:var(--card2);color:var(--text);}
+.port-stats{display:flex;flex-wrap:wrap;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:28px;}
+.port-stats > div{flex:1 1 0;min-width:120px;padding:12px 14px;border-right:1px solid var(--border);}
+.port-stats > div:first-child{padding-left:0;}
+.port-stats > div:last-child{border-right:none;}
+.port-stats span{display:block;font-size:12px;color:var(--muted);margin-bottom:3px;}
+.port-stats b{font-family:var(--font-mono);font-weight:500;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.port-stats b small{font-size:12px;opacity:.85;}
+.port-stats b.up{color:var(--green);} .port-stats b.down{color:var(--red);} .port-stats b.flat{color:var(--muted);}
+.port-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 8px;}
+.port-section-title{font-family:var(--font-heading);font-weight:700;font-size:17px;margin:0;}
+.port-section-title span{font-family:var(--font-mono);font-size:13px;font-weight:500;color:var(--muted);margin-left:4px;}
+.dtable{font-size:12px;}
+.dtable th{font-family:var(--font-body);font-size:11px;font-weight:600;letter-spacing:0;text-transform:none;}
+.dtable td:first-child{font-family:var(--font-body);}
+.trade-verb.buy{color:var(--green);} .trade-verb.sell{color:var(--red);}
+.row-sell{padding:4px 10px;border-radius:6px;border:1px solid rgba(245,68,95,.35);background:transparent;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;}
+.row-sell:hover{background:rgba(245,68,95,.08);}
+.hrow{display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid var(--border);cursor:pointer;}
+.hrow-right{text-align:right;flex-shrink:0;}
+.hrow-val{font-family:var(--font-mono);font-size:14px;font-weight:500;font-variant-numeric:tabular-nums;}
+.hrow-ret{font-family:var(--font-mono);font-size:12px;margin-top:2px;font-variant-numeric:tabular-nums;}
+.tlcard{padding:12px 2px;}
+.tlcard-left{display:block;}
+.tlcard-name{font-family:var(--font-body);font-size:14px;font-weight:600;}
+.tlcard-sub{font-family:var(--font-body);font-size:12px;margin-top:2px;}
+.tlcard-amt{font-size:14px;font-weight:500;color:var(--text);}
+
+.profile-view{max-width:520px;}
+.pf-head{display:flex;align-items:center;gap:16px;margin:4px 0 22px;}
+.pf-ava-wrap{position:relative;flex-shrink:0;}
+.profile-ava{width:64px;height:64px;}
+.profile-ava-edit{width:24px;height:24px;padding:0;}
+.pf-id{min-width:0;}
+.pf-name{font-family:var(--font-heading);font-weight:700;font-size:22px;letter-spacing:-0.3px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pf-handle{font-size:14px;color:var(--muted);margin-top:2px;}
+.pf-meta{font-size:12px;color:var(--muted);margin-top:4px;}
+.pf-link{background:none;border:none;padding:0;margin-top:6px;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer;}
+.pf-stats{margin-bottom:26px;}
+.pl-group-lbl{font-size:12px;font-weight:600;color:var(--muted);margin:0 0 8px 2px;}
+.pl-group{background:var(--card);border:1px solid var(--hairline);border-radius:12px;overflow:hidden;margin-bottom:24px;}
+.pl-row{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:10px 14px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font:inherit;font-size:14px;text-align:left;cursor:pointer;}
+.pl-row:last-child{border-bottom:none;}
+button.pl-row:hover,label.pl-row:hover{background:rgba(255,255,255,.03);}
+.pl-static{cursor:default;}
+.pl-lbl{flex:1;min-width:0;font-weight:500;}
+.pl-lbl small{display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:2px;}
+.pl-val{font-family:var(--font-mono);font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%;}
+.pl-val small{font-family:var(--font-body);color:var(--muted);font-size:12px;}
+.pl-muted{color:var(--muted);font-family:var(--font-body);}
+.pl-chev{color:var(--muted);flex-shrink:0;}
+.pl-danger .pl-lbl{color:var(--red);text-align:center;}
+.pl-group-solo{margin-top:-4px;}
+.pl-row-form{cursor:default;flex-wrap:wrap;}
+.pl-row-form .pl-lbl{flex:0 0 auto;}
+.pl-row-form .profile-input{flex:1;min-width:140px;margin:0;font-family:var(--font-body);font-size:13px;}
+/* iOS-style switch driven by the real checkbox */
+.pl-toggle input{position:absolute;opacity:0;pointer-events:none;}
+.pl-switch{flex-shrink:0;width:42px;height:26px;border-radius:13px;background:var(--border2);position:relative;transition:background .18s;}
+.pl-switch::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .18s cubic-bezier(.3,.7,.4,1);box-shadow:0 1px 2px rgba(0,0,0,.3);}
+.pl-toggle input:checked + .pl-switch{background:var(--green);}
+.pl-toggle input:checked + .pl-switch::after{transform:translateX(16px);}
+.pl-toggle input:focus-visible + .pl-switch{outline:2px solid var(--green);outline-offset:2px;}
+.pl-toggle{position:relative;}
+.pp-note{font-size:13px;color:var(--muted);text-align:center;padding:14px 0;}
+.pp-close{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px;display:inline-flex;}
+.pp-close:hover{color:var(--text);}
+
+/* ════════════════════════════════════════════════════════════════════════
+   CHAT (global + per-player)
+   Every message was a bordered card in 10-11px mono. Now a message list:
+   avatar in the gutter, name and time on one line, body at reading size,
+   quiet text actions. Own messages get a faint tint, not a green outline.
+   ════════════════════════════════════════════════════════════════════════ */
+#gchat-messages,#chat-messages{gap:2px !important;}
+.comment-card{background:transparent;border:none;border-radius:10px;padding:8px 8px;gap:2px;}
+.comment-card.own{background:rgba(18,212,126,.05);border:none;}
+.comment-card > *:not(.comment-header){margin-left:38px;}
+.comment-header{gap:10px;}
+.comment-ava,.comment-ava-init{width:28px;height:28px;font-size:12px;font-family:var(--font-body);font-weight:700;}
+.comment-name{font-family:var(--font-body);font-size:13px;font-weight:600;}
+.comment-time{font-family:var(--font-body);font-size:12px;margin-left:0;}
+.comment-body{font-family:var(--font-body);font-size:14px;line-height:1.45;margin-top:-6px;}
+.comment-actions{gap:14px;margin-top:4px;}
+.comment-reply,.comment-like,.comment-delete,.chat-react-trigger{font-family:var(--font-body);font-size:12px;font-weight:500;}
+.comment-delete{margin-left:0;}
+.comment-card.is-reply{margin-left:38px;border-left:none;background:transparent;}
+.chat-reply-preview{font-family:var(--font-body);font-size:12px;border-left:2px solid var(--border2);background:transparent;padding:2px 8px;}
+.chat-trade-card{padding:10px 12px;border-radius:10px;background:var(--card);max-width:420px;}
+.chat-trade-type{font-family:var(--font-body);font-size:11px;letter-spacing:0;}
+.chat-trade-name{font-family:var(--font-body);font-size:14px;font-weight:600;}
+.chat-trade-sub{font-family:var(--font-body);font-size:12px;}
+.chat-trade-pct{font-size:12px;}
+.chat-reaction-pill{font-family:var(--font-body);font-size:12px;padding:3px 8px;}
+.chat-live{display:inline-flex;align-items:center;gap:5px;margin-left:6px;color:var(--green);font-weight:600;}
+.chat-live i{width:6px;height:6px;border-radius:50%;background:var(--green);animation:liveDot 2s ease-in-out infinite;}
+@keyframes liveDot{0%,100%{opacity:1}50%{opacity:.35}}
+.chat-input{flex:1;background:var(--card);border:1px solid var(--hairline);border-radius:10px;padding:9px 12px;color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.4;resize:none;max-height:100px;outline:none;}
+.chat-input:focus{border-color:var(--border2);}
+.chat-icon-btn{flex-shrink:0;width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid var(--hairline);background:transparent;color:var(--muted);cursor:pointer;}
+.chat-icon-btn:hover{color:var(--green);border-color:var(--border2);}
+
+/* Top bar: signed in, the Portfolio tab plus three nav stats overran the tab
+   row at laptop widths and wrapped into the tabs. Drop the least useful
+   stats first as the bar narrows; Portfolio shows all of it anyway. */
+.nav-stat{white-space:nowrap;}
+@media (max-width:1439px){ #last-updated{display:none !important;} }
+@media (max-width:1199px){ .nav-stat:has(#nav-total){display:none;} }
+
+.dtable.trades td:nth-child(2),.dtable.trades th:nth-child(2){text-align:left;}
+
+/* Trade confirm: a receipt, not a paragraph */
+.conf-box{font-family:var(--font-body);}
+.conf-title{font-size:20px;margin-bottom:14px;}
+.conf-receipt{border-top:1px solid var(--border);margin-bottom:20px;}
+.conf-receipt > div{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;}
+.conf-receipt span{color:var(--muted);}
+.conf-receipt b{font-family:var(--font-mono);font-weight:500;font-variant-numeric:tabular-nums;}
+.conf-btns button{font-family:var(--font-body);font-size:14px;font-weight:600;padding:12px;border-radius:10px;}
+.conf-cancel{background:transparent;border:1px solid var(--border2) !important;color:var(--text);}
+
+@media (max-width:768px){
+  /* iOS zooms the page into any focused field under 16px */
+  .chat-input,#chat-input,.search-bar,.profile-input{font-size:16px;}
+  .pchart-val{font-size:30px;}
+  .port-stats > div{min-width:50%;flex:1 1 50%;border-right:none;padding-left:0;}
+  .port-stats > div:nth-child(odd){border-right:1px solid var(--border);}
+  .port-stats > div:nth-child(even){padding-left:14px;}
+  .port-stats > div:nth-child(n+3){border-top:1px solid var(--border);}
+  .port-stats > div:last-child:nth-child(odd){flex-basis:100%;border-right:none;}
+}
+
 @media (max-width:768px){
   .lb-view{padding:16px 14px 24px;}
   .lb-title{font-size:24px;}
@@ -1712,7 +1865,7 @@ function defaultLeague(now = new Date()) {
     <span id="live-badge-nav" class="live-badge" style="display:inline;cursor:default" title="Tip-off: 4/10 - 7:00 PM EDT">
       <span id="live-dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--muted);margin-right:4px;vertical-align:middle;transition:background .3s"></span><span id="live-badge-txt">refresh 8s</span>
     </span>
-    <button class="nbtn" onclick="openSettings()" title="Settings"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Settings</button>
+    <button class="nbtn" id="nav-settings-btn" onclick="openSettings()" title="Settings" style="display:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>Settings</button>
     <div id="auth-bar" style="display:flex;align-items:center;gap:6px;">
       <button class="auth-btn" id="auth-btn" onclick="handleAuthBtn()">
         <svg width="14" height="14" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.86-7-7.93s3.06-7.44 7-7.93v15.86zm2 0V4.07c3.94.49 7 3.86 7 7.93s-3.06 7.44-7 7.93z"></path></svg>
@@ -1866,11 +2019,11 @@ function defaultLeague(now = new Date()) {
       <div id="chat-pane" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
         <div id="chat-messages" style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;"></div>
         <div id="chat-input-area" style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;">
-          <textarea id="chat-input" placeholder="Add your take…" maxlength="200" rows="1" style="flex:1;background:var(--card);border:1px solid var(--hairline);border-radius:8px;padding:8px 10px;color:var(--fg);font-family:var(--font-mono);font-size:11px;resize:none;outline:none;line-height:1.4;" onkeydown="if(event.key===&#39;Enter&#39;&amp;&amp;!event.shiftKey){event.preventDefault();postComment();}"></textarea>
-          <button onclick="postComment()" style="background:var(--green);color:#000;border:none;border-radius:8px;padding:8px 14px;font-family:var(--font-mono);font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;">Post</button>
+          <textarea id="chat-input" class="chat-input" placeholder="Add your take…" maxlength="200" rows="1" onkeydown="if(event.key===&#39;Enter&#39;&amp;&amp;!event.shiftKey){event.preventDefault();postComment();}"></textarea>
+          <button class="es-btn es-sm" onclick="postComment()" style="flex-shrink:0;">Post</button>
         </div>
-        <div id="chat-signin-prompt" style="display:none;padding:12px 16px;border-top:1px solid var(--border);text-align:center;font-family:var(--font-mono);font-size:10px;color:var(--muted);">
-          <span onclick="openProfile()" style="color:var(--green);cursor:pointer;">Sign in</span> to join the discussion
+        <div id="chat-signin-prompt" style="display:none;padding:12px 16px;border-top:1px solid var(--border);font-size:13px;color:var(--muted);">
+          <span onclick="openProfile()" style="color:var(--green);cursor:pointer;font-weight:600;">Sign in</span> to add your take on this player
         </div>
       </div>
 
@@ -2028,19 +2181,24 @@ function defaultLeague(now = new Date()) {
 <div id="view-chat" class="view" style="display:none;flex-direction:column;overflow:hidden;max-width:640px;margin:0 auto;width:100%;box-sizing:border-box;">
   <div style="padding:20px 20px 12px;border-bottom:1px solid var(--border2);flex-shrink:0;">
     <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;letter-spacing:-0.3px;">Chat</div>
-    <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:2px;">Talk trades, talk games · <span style="color:var(--green);">● live</span></div>
+    <div style="font-size:13px;color:var(--muted);margin-top:2px;">Talk trades and games with everyone playing <span class="chat-live"><i></i>Live</span></div>
   </div>
   <div id="gchat-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;">
     <div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">Loading chat…</div>
   </div>
-  <div id="gchat-signin-prompt" style="display:none;padding:14px 20px;text-align:center;color:var(--muted);font-family:var(--font-mono);font-size:10px;border-top:1px solid var(--border2);flex-shrink:0;">Sign in to join the chat</div>
+  <div id="gchat-signin-prompt" style="display:none;padding:12px 16px;border-top:1px solid var(--border2);flex-shrink:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <span style="font-size:13px;color:var(--muted);">Sign in to join the conversation</span>
+      <button class="es-btn es-sm" onclick="openProfile()">Sign in</button>
+    </div>
+  </div>
   <div id="gchat-input-area" style="display:none;padding:10px 14px;border-top:1px solid var(--border2);flex-shrink:0;flex-direction:column;gap:8px;">
     <div id="gchat-trade-picker" style="display:none;flex-direction:column;gap:4px;background:var(--card);border:1px solid var(--hairline);border-radius:8px;padding:8px;max-height:160px;overflow-y:auto;"></div>
     <div style="display:flex;gap:8px;align-items:flex-end;position:relative;">
       <div id="gchat-mention-dropdown" style="display:none;position:absolute;bottom:100%;left:44px;right:0;margin-bottom:6px;background:var(--card);border:1px solid var(--hairline);border-radius:8px;max-height:160px;overflow-y:auto;z-index:20;"></div>
-      <button class="nbtn" onclick="toggleTradePicker()" title="Share a recent trade" style="flex-shrink:0;">Share Trade</button>
-      <textarea id="gchat-input" rows="1" maxlength="280" placeholder="Talk trades, @mention friends, mention games…" style="flex:1;background:var(--bg);border:1px solid var(--hairline);border-radius:8px;padding:8px 10px;color:var(--fg);font-family:var(--font-mono);font-size:11px;resize:none;max-height:100px;" oninput="onChatInputChange(this)" onkeydown="onChatInputKeydown(event)"></textarea>
-      <button class="nbtn" onclick="sendChatMessage()" style="flex-shrink:0;">Send</button>
+      <button class="chat-icon-btn" onclick="toggleTradePicker()" title="Share a recent trade" aria-label="Share a recent trade"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17 L10 11 L14 14 L20 6"/><path d="M15 6 L20 6 L20 11"/></svg></button>
+      <textarea id="gchat-input" class="chat-input" rows="1" maxlength="280" placeholder="Message everyone…" oninput="onChatInputChange(this)" onkeydown="onChatInputKeydown(event)"></textarea>
+      <button class="es-btn es-sm" onclick="sendChatMessage()" style="flex-shrink:0;">Send</button>
     </div>
   </div>
 </div>
@@ -2122,11 +2280,17 @@ function notifyChatEvent(kind, params) {
 // file is readable by anyone via "view source."
 async function refreshAdminClaim() {
   isAdminUser = false;
+  const sBtnOff = document.getElementById('nav-settings-btn');
+  if (sBtnOff) sBtnOff.style.display = 'none';
   if (!currentUser) return false;
   try {
     const result = await currentUser.getIdTokenResult(true);
     isAdminUser = result.claims && result.claims.admin === true;
   } catch (e) { console.warn('Could not check admin claim:', e); }
+  // Settings is admin-only (see openSettings) - don't show players a button
+  // that only answers "Admin access only".
+  const sBtn = document.getElementById('nav-settings-btn');
+  if (sBtn) sBtn.style.display = isAdminUser ? '' : 'none';
   return isAdminUser;
 }
 let userProfile = null;
@@ -10662,8 +10826,9 @@ function _setPchartHead(endPt, startPt, scrubTs){
   const pct = startPt.value ? diff/startPt.value*100 : 0;
   const up = diff >= 0;
   if (chgEl){
-    chgEl.textContent = `${up?'+':''}${fmt(diff)} (${up?'+':''}${pct.toFixed(2)}%)`;
-    chgEl.style.color = up ? 'var(--green)' : 'var(--red)';
+    const flat = Math.abs(pct) < 0.005;
+    chgEl.textContent = flat ? `No change` : `${up?'+':''}${fmt(diff)} (${up?'+':''}${pct.toFixed(2)}%)`;
+    chgEl.style.color = flat ? 'var(--muted)' : up ? 'var(--green)' : 'var(--red)';
   }
   if (dateEl){
     if (scrubTs){
@@ -11447,50 +11612,47 @@ function buildPortfolio(){
   const todayPp = holdingsVal > 0 ? (todayPnl / holdingsVal) * 100 : 0;
 
   const portLabel = contextDisplayName(activePortfolioId);
+  // One headline number (the chart's own value, which also tracks the scrub
+  // point), then a single line of supporting figures - instead of five
+  // equal-weight stat cards that repeated the total twice.
+  const figCls = n => isFlatPct(n) ? 'flat' : n > 0 ? 'up' : 'down';
   let html=`
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;"><div class="ptitle">Portfolio</div>${isWallet ? '' : `<button onclick="sharePortfolio()" style="margin-top:8px;padding:7px 14px;background:#12d47e18;border:1px solid #12d47e44;border-radius:6px;color:var(--green);font-family:var(--font-mono);font-size:11px;cursor:pointer">Share</button>`}</div>
-    <button class="league-btn-compact" onclick="openPortfolioDrawer()" style="margin-bottom:10px;"><span>${escHtml(portLabel)}</span><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
-    <div class="psub-txt">Holdings, performance, and trade history</div>
-    <div class="pgrid">
-      <div class="pcard"><div class="pclbl">Total Value</div><div class="pcval" style="color:var(--green)">${fmt(total)}</div></div>
-      <div class="pcard"><div class="pclbl">Coins</div><div class="pcval">${fmt(cash)}</div></div>
-      <div class="pcard"><div class="pclbl">Holdings</div><div class="pcval">${fmt(total-cash)}</div></div>
-      <div class="pcard"><div class="pclbl">Portfolio Today</div>
-        <div class="pcval" style="color:${todayPnl>=0?'var(--green)':'var(--red)'}">${fmtS(todayPnl)}</div>
-        <div class="pcsub" style="color:${todayPnl>=0?'var(--green)':'var(--red)'}">${fmtP(todayPp)}</div>
+    <div class="port-head">
+      <h2 class="lb-title">Portfolio</h2>
+      <div class="port-head-actions">
+        <button class="league-btn-compact" onclick="openPortfolioDrawer()"><span>${escHtml(portLabel)}</span><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+        ${isWallet ? '' : `<button class="es-btn ghost es-sm" onclick="sharePortfolio()">Share</button>`}
       </div>
-      ${isWallet
-        ? `<div class="pcard"><div class="pclbl">Balance</div><div class="pcval">${fmt(total)}</div></div>`
-        : `<div class="pcard"><div class="pclbl">Total Coins Gain</div>
-        <div class="pcval" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${fmtS(pnl)}</div>
-        <div class="pcsub" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${fmtP(pp)}</div>
-      </div>`}
+    </div>
+    <div class="port-chart-wrap" id="port-chart-wrap">
+      <div class="pchart-head">
+        <div class="pchart-val" id="pchart-val">${fmt(total)}</div>
+        <div class="pchart-chg" id="pchart-chg"></div>
+        <div class="pchart-date" id="pchart-date"></div>
+      </div>
+      <div class="pchart-svg-holder" id="pchart-svg-holder"></div>
+      <div class="seg pchart-ranges" role="group" aria-label="Chart period">
+        ${['1D','1W','1M','3M','ALL'].map(r=>`<button type="button" class="pchart-range${r===_portRange?' active':''}" data-range="${r}" onclick="setPortRange('${r}',this)">${r==='ALL'?'All':r}</button>`).join('')}
+      </div>
+    </div>
+    <div class="port-stats">
+      <div><span>Coins to spend</span><b>${fmt(cash)}</b></div>
+      <div><span>In players</span><b>${fmt(total-cash)}</b></div>
+      <div><span>Today</span><b class="${figCls(todayPp)}">${fmtS(todayPnl)} <small>${fmtP(todayPp)}</small></b></div>
+      ${isWallet ? '' : `<div><span>All-time</span><b class="${figCls(pp)}">${fmtS(pnl)} <small>${fmtP(pp)}</small></b></div>`}
     </div>`;
-
-  // Portfolio value chart - interactive, ranged (Robinhood-style)
-  html+=`<div class="port-chart-wrap" id="port-chart-wrap">
-    <div class="pchart-head">
-      <div class="pchart-val" id="pchart-val">${fmt(total)}</div>
-      <div class="pchart-chg" id="pchart-chg"></div>
-      <div class="pchart-date" id="pchart-date"></div>
-    </div>
-    <div class="pchart-svg-holder" id="pchart-svg-holder"></div>
-    <div class="pchart-ranges">
-      ${['1D','1W','1M','3M','ALL'].map(r=>`<button class="pchart-range${r==='1W'?' active':''}" data-range="${r}" onclick="setPortRange('${r}',this)">${r}</button>`).join('')}
-    </div>
-  </div>`;
 
   const held=Object.entries(holdings).filter(([,h])=>h.shares>0);
   if(!held.length){
-    html+=`<div style="background:var(--card);border:1px solid var(--hairline);padding:40px;text-align:center;font-family:var(--font-mono);font-size:11px;color:var(--muted);">No positions yet - go to Market to buy your first player.</div>`;
+    html+=emptyState('No players yet', 'Pick someone you believe in, buy a few shares, and track them here.', `<button class="es-btn" onclick="goToMarketTop()">Go to Market</button>`);
   }else{
-    html+=`<div class="section-hdr" style="display:flex;justify-content:space-between;align-items:center;">
-      <span>Holdings</span>
-      <button onclick="sellAllPositions()" style="padding:5px 12px;background:#ff335518;border:1px solid #ff335544;border-radius:6px;color:var(--red);font-family:var(--font-mono);font-size:11px;cursor:pointer">Sell All</button>
+    html+=`<div class="port-section-head">
+      <h3 class="port-section-title">Holdings <span>${held.length}</span></h3>
+      <button class="es-btn ghost es-sm danger" onclick="sellAllPositions()">Sell all</button>
     </div>
     <div class="dtable-wrap">
     <table class="dtable"><thead><tr>
-      <th>Player</th><th>Shares</th><th>Avg Buy</th><th>Cur Price</th><th>Value</th><th>Today</th><th>Total P&L</th><th>P&L %</th><th></th>
+      <th>Player</th><th>Shares</th><th>Avg cost</th><th>Price</th><th>Value</th><th>Today</th><th>Return</th><th>Return %</th><th></th>
     </tr></thead><tbody>`;
     let cardsHtml = '';
     held.sort(([a],[b])=>holdings[b].shares*activePrice(b)-holdings[a].shares*activePrice(a))
@@ -11506,8 +11668,8 @@ function buildPortfolio(){
         const todayBase = (dayOpen[r] && dayOpen[r].price > 0) ? dayOpen[r].price : avg;
         const todayH = (cur - todayBase) * h.shares;
         const todayPp = todayBase>0 ? (cur-todayBase)/todayBase*100 : 0;
-        const todayColor = todayH>=0?'var(--green)':'var(--red)';
-        const pnlColor = pnlH>=0?'var(--green)':'var(--red)';
+        const todayColor = isFlatPct(todayPp)?'var(--muted)':todayH>0?'var(--green)':'var(--red)';
+        const pnlColor = isFlatPct(ppH)?'var(--muted)':pnlH>0?'var(--green)':'var(--red)';
         html+=`<tr onclick="goMarket(${rank})">
           <td style="white-space:nowrap">${p.name}</td><td>${fmtShares(h.shares)}</td>
           <td style="color:var(--muted)">${fmt(avg)}</td>
@@ -11516,22 +11678,20 @@ function buildPortfolio(){
           <td style="color:${todayColor}">${fmtS(todayH)}</td>
           <td style="color:${pnlColor}">${fmtS(pnlH)}</td>
           <td style="color:${pnlColor}">${fmtP(ppH)}</td>
-          <td><button onclick="event.stopPropagation();sellAll(${r})" style="padding:3px 8px;background:#ff335518;border:1px solid #ff335544;border-radius:4px;color:var(--red);font-family:var(--font-mono);font-size:10px;cursor:pointer">Sell All</button></td>
+          <td><button class="row-sell" onclick="event.stopPropagation();sellAll(${r})">Sell</button></td>
         </tr>`;
         // Mobile card equivalent of the row above - see .hcard, shown instead
         // of the table below the mobile breakpoint (no horizontal scroll).
-        cardsHtml += `<div class="hcard" onclick="goMarket(${rank})">
-          <div class="hcard-row1">
-            <div class="hcard-name">${p.name}</div>
-            <button class="hcard-sell" onclick="event.stopPropagation();sellAll(${r})">Sell</button>
+        const hs = headshotUrl(r);
+        cardsHtml += `<div class="hrow" role="button" tabindex="0" onclick="goMarket(${rank})">
+          <div class="mv-av">${hs ? `<img src="${hs}" alt="" onerror="this.style.display='none'">` : `<div class="mv-init" style="background:${p.cols[0]};color:${p.cols[1]};">${p.initials}</div>`}</div>
+          <div class="mv-info">
+            <div class="mv-name">${p.name}</div>
+            <div class="mv-sub">${fmtShares(h.shares)} shares · avg ${fmt(avg)}</div>
           </div>
-          <div class="hcard-row2">
-            <div class="hcard-sub">${fmtShares(h.shares)} sh · avg ${fmt(avg)}</div>
-            <div class="hcard-val">${fmt(h.shares*cur)}</div>
-          </div>
-          <div class="hcard-row3">
-            <div style="color:${todayColor}">Today ${fmtS(todayH)} (${fmtP(todayPp)})</div>
-            <div style="color:${pnlColor}">${fmtS(pnlH)} (${fmtP(ppH)})</div>
+          <div class="hrow-right">
+            <div class="hrow-val">${fmt(h.shares*cur)}</div>
+            <div class="hrow-ret" style="color:${pnlColor}">${fmtS(pnlH)} · ${fmtP(ppH)}</div>
           </div>
         </div>`;
       });
@@ -11540,28 +11700,29 @@ function buildPortfolio(){
   }
 
   if(logs.length){
-    html+=`<div class="section-hdr">Trade History</div>
+    html+=`<div class="port-section-head"><h3 class="port-section-title">Trade history</h3></div>
     <div class="dtable-wrap">
-    <table class="dtable"><thead><tr>
-      <th>Action</th><th>Player</th><th>Shares</th><th>Amount</th><th>Price</th>
+    <table class="dtable trades"><thead><tr>
+      <th>Trade</th><th>Player</th><th>Shares</th><th>Coins</th><th>Price</th>
     </tr></thead><tbody>`;
     let historyCardsHtml = '';
+    // Coins out on a buy isn't a loss, so amounts stay neutral; the verb
+    // carries the direction.
     logs.forEach(l=>{
+      const verb = l.type==='buy' ? 'Bought' : 'Sold';
       html+=`<tr>
-        <td style="color:${l.type==='buy'?'var(--green)':'var(--red)'}">${l.type==='buy'?'▲ BUY':'▼ SELL'}</td>
+        <td class="trade-verb ${l.type}">${verb}</td>
         <td style="white-space:nowrap">${l.name}</td><td>${fmtShares(l.shares)}</td>
-        <td style="color:${l.type==='buy'?'var(--red)':'var(--green)'}">${l.type==='buy'?'-':'+'}${fmt(l.amount)}</td>
+        <td>${l.type==='buy'?'−':'+'}${fmt(l.amount)}</td>
         <td>${fmt(l.price)}</td>
       </tr>`;
-      // Mobile card equivalent - see .tlcard.
       historyCardsHtml += `<div class="tlcard">
         <div class="tlcard-left">
-          <span class="tlcard-badge ${l.type}">${l.type==='buy'?'BUY':'SELL'}</span>
-          <span class="tlcard-name">${l.name}</span>
+          <div class="tlcard-name">${l.name}</div>
+          <div class="tlcard-sub"><span class="trade-verb ${l.type}">${verb}</span> ${fmtShares(l.shares)} at ${fmt(l.price)}</div>
         </div>
         <div class="tlcard-right">
-          <div class="tlcard-amt" style="color:${l.type==='buy'?'var(--red)':'var(--green)'}">${l.type==='buy'?'-':'+'}${fmt(l.amount)}</div>
-          <div class="tlcard-sub">${fmtShares(l.shares)} sh @ ${fmt(l.price)}</div>
+          <div class="tlcard-amt">${l.type==='buy'?'−':'+'}${fmt(l.amount)}</div>
         </div>
       </div>`;
     });
@@ -11874,16 +12035,16 @@ function showTradeConfirm(mode, shares, cost, player) {
       <div class="conf-overlay" id="conf-overlay" role="dialog" aria-modal="true" aria-label="${isBuy ? 'Confirm buy' : 'Confirm sell'}" onclick="if(event.target===this)dismissConfirm(false)">
         <div class="conf-box">
           <div class="sheet-handle"></div>
-          <div class="conf-title">${isBuy ? 'Confirm Buy' : 'Confirm Sell'}</div>
-          <div class="conf-detail">
-            <strong style="color:var(--text)">${fmtShares(shares)} shares of ${player}</strong><br>
-            ${isBuy ? 'Cost' : 'Return'}: <strong style="color:${isBuy?'var(--red)':'var(--green)'}">${fmt(cost)}</strong><br>
-            ${isBuy ? `Coins after: <strong>${fmt(cash - cost)}</strong>` : `Coins after: <strong>${fmt(cash + cost)}</strong>`}
+          <div class="conf-title">${isBuy ? 'Buy' : 'Sell'} ${player}?</div>
+          <div class="conf-receipt">
+            <div><span>Shares</span><b>${fmtShares(shares)}</b></div>
+            <div><span>${isBuy ? 'Cost' : 'You get'}</span><b>${fmt(cost)}</b></div>
+            <div><span>Coins after</span><b>${fmt(isBuy ? cash - cost : cash + cost)}</b></div>
           </div>
           <div class="conf-btns">
             <button class="conf-cancel" onclick="dismissConfirm(false)">Cancel</button>
             <button class="conf-confirm ${mode}" onclick="dismissConfirm(true)">
-              ${isBuy ? 'Buy' : 'Sell'}
+              ${isBuy ? 'Buy' : 'Sell'} ${fmtShares(shares)} ${+shares === 1 ? 'share' : 'shares'}
             </button>
           </div>
         </div>
@@ -13245,69 +13406,68 @@ function renderProfileView() {
     const total = portVal();
     const pnl = total - START_VALUE;
     const pnlPct = pnl / START_VALUE * 100;
+    const chev = `<svg class="pl-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+    const isWallet = isWalletContext(activePortfolioId);
+    const retCls = isFlatPct(pnlPct) ? 'flat' : pnlPct > 0 ? 'up' : 'down';
+    // Identity up top, then the numbers that matter, then grouped rows - the
+    // settings-list shape players already know, instead of a wall of
+    // equal-weight stat cards.
     inner.innerHTML = `
-      <div class="profile-title">Profile</div>
-      <div class="profile-ava-wrap">
-        <div style="position:relative;">
+      <div class="pf-head">
+        <div class="pf-ava-wrap">
           ${p.photoURL
             ? `<img class="profile-ava" src="${p.photoURL}" alt="">`
-            : `<div class="profile-ava" style="background:${p.avatarColor};display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:32px;color:#fff;">${(p.displayName||'?')[0].toUpperCase()}</div>`
+            : `<div class="profile-ava" style="background:${p.avatarColor};display:flex;align-items:center;justify-content:center;font-family:var(--font-heading);font-weight:700;font-size:28px;color:#fff;">${escHtml((p.displayName||'?')[0].toUpperCase())}</div>`
           }
-          <div class="profile-ava-edit" title="Change photo" onclick="document.getElementById('avatar-file-input').click()">
+          <button class="profile-ava-edit" title="Change photo" aria-label="Change photo" onclick="document.getElementById('avatar-file-input').click()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-          </div>
+          </button>
+          <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="handleAvatarFileChange(event)">
         </div>
-        <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="handleAvatarFileChange(event)">
-        <div style="display:flex;gap:10px;font-family:var(--font-mono);font-size:9px;">
-          <span class="comment-reply" onclick="document.getElementById('avatar-file-input').click()">change photo</span>
-          ${p.customPhoto ? `<span class="comment-reply" onclick="removeCustomAvatar()">remove</span>` : ''}
+        <div class="pf-id">
+          <div class="pf-name">${escHtml(p.displayName || 'Trader')}</div>
+          <div class="pf-handle">${p.username ? '@' + escHtml(p.username) : 'No username yet'}</div>
+          ${p.customPhoto ? `<button class="pf-link" onclick="removeCustomAvatar()">Remove photo</button>` : ''}
         </div>
-        <div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);">${currentUser.email}</div>
-      </div>
-      <div class="profile-stat-row">
-        <div class="profile-stat"><div class="profile-stat-lbl">Coins</div><div class="profile-stat-val">${fmt(cash)}</div></div>
-        <div class="profile-stat"><div class="profile-stat-lbl">Total Value</div><div class="profile-stat-val">${fmt(total)}</div></div>
-        ${isWalletContext(activePortfolioId)
-          ? `<div class="profile-stat"><div class="profile-stat-lbl">Wallet</div><div class="profile-stat-val">${escHtml(contextDisplayName(activePortfolioId))}</div></div>`
-          : `<div class="profile-stat"><div class="profile-stat-lbl">P&amp;L</div><div class="profile-stat-val" style="color:${pnl>=0?'var(--green)':'var(--red)'}">${fmtP(pnlPct)}</div></div>`}
       </div>
 
-      <label style="font-family:var(--font-mono);font-size:9px;color:var(--muted);display:block;margin-bottom:4px;">Username</label>
-      ${p.username
-        ? `<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;font-family:var(--font-mono);font-size:12px;">
-             <span style="color:var(--green);">@${escHtml(p.username)}</span>
-             <span class="comment-reply" onclick="promptChangeUsername()">change</span>
-           </div>`
-        : `<div style="display:flex;gap:8px;margin-bottom:16px;">
-             <input class="profile-input" id="profile-username-inp" maxlength="20" placeholder="e.g. ryanl" style="margin-bottom:0;"
-               onkeydown="if(event.key==='Enter'){event.preventDefault();claimUsername(document.getElementById('profile-username-inp').value);}">
-             <button class="profile-btn primary" style="flex-shrink:0;" onclick="claimUsername(document.getElementById('profile-username-inp').value)">Save</button>
-           </div>`}
-
-      <div class="profile-section-lbl">Social</div>
-      <div class="profile-stat-grid" id="profile-social-stats">
-        <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('friends')"><div class="profile-stat-lbl">Friends</div><div class="profile-stat-val">${_myFriends.length}</div></div>
-        <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('friends')"><div class="profile-stat-lbl">Added</div><div class="profile-stat-val">${_outgoingRequests.length}</div></div>
-        <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('global')"><div class="profile-stat-lbl">Global Rank</div><div class="profile-stat-val" id="profile-global-rank">…</div></div>
-        <div class="profile-stat" style="cursor:pointer;" onclick="goToLeaderboardTab('friends')"><div class="profile-stat-lbl">Friends Rank</div><div class="profile-stat-val" id="profile-friends-rank">…</div></div>
+      <div class="port-stats pf-stats">
+        <div><span>Portfolio value</span><b>${fmt(total)}</b></div>
+        <div><span>Coins to spend</span><b>${fmt(cash)}</b></div>
+        ${isWallet ? '' : `<div><span>All-time return</span><b class="${retCls}">${fmtP(pnlPct)}</b></div>`}
       </div>
 
-      <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;font-family:var(--font-mono);font-size:10.5px;color:var(--muted);cursor:pointer;">
-        <input type="checkbox" id="holdings-public-toggle" ${p.showHoldingsPublicly ? 'checked' : ''} onchange="toggleHoldingsPublic(this.checked)">
-        Make my holdings visible on my public profile
-      </label>
-
-      <div class="profile-row">
-        <button class="profile-btn secondary" style="width:100%;" onclick="saveCloudPortfolio()">Save Portfolio️</button>
+      <div class="pl-group-lbl">Standing</div>
+      <div class="pl-group">
+        <button class="pl-row" onclick="goToLeaderboardTab('global')"><span class="pl-lbl">Global rank</span><span class="pl-val" id="profile-global-rank">…</span>${chev}</button>
+        <button class="pl-row" onclick="goToLeaderboardTab('friends')"><span class="pl-lbl">Rank among friends</span><span class="pl-val" id="profile-friends-rank">…</span>${chev}</button>
+        <button class="pl-row" onclick="goToLeaderboardTab('friends')"><span class="pl-lbl">Friends</span><span class="pl-val" id="profile-friends-count">${_myFriends.length}${_outgoingRequests.length ? ` <small>· ${_outgoingRequests.length} pending</small>` : ''}</span>${chev}</button>
       </div>
-      <div class="profile-section-lbl">Account</div>
-      <div class="profile-row">
-        <button class="profile-btn secondary" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:6px;" onclick="enablePushNotifications()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>Enable Notifications</button>
+
+      <div class="pl-group-lbl">Account</div>
+      <div class="pl-group">
+        ${p.username
+          ? `<button class="pl-row" onclick="promptChangeUsername()"><span class="pl-lbl">Username</span><span class="pl-val">@${escHtml(p.username)}</span>${chev}</button>`
+          : `<div class="pl-row pl-row-form">
+               <span class="pl-lbl">Username</span>
+               <input class="profile-input" id="profile-username-inp" maxlength="20" placeholder="Pick one so friends can find you"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();claimUsername(document.getElementById('profile-username-inp').value);}">
+               <button class="es-btn es-sm" onclick="claimUsername(document.getElementById('profile-username-inp').value)">Save</button>
+             </div>`}
+        <div class="pl-row pl-static"><span class="pl-lbl">Email</span><span class="pl-val pl-muted">${escHtml(currentUser.email || '')}</span></div>
+        <label class="pl-row pl-toggle">
+          <span class="pl-lbl">Public holdings<small>Let others see what you own on your profile</small></span>
+          <input type="checkbox" id="holdings-public-toggle" ${p.showHoldingsPublicly ? 'checked' : ''} onchange="toggleHoldingsPublic(this.checked)">
+          <span class="pl-switch" aria-hidden="true"></span>
+        </label>
+        <button class="pl-row" onclick="enablePushNotifications()"><span class="pl-lbl">Notifications<small>Replies, mentions, and big moves</small></span><span class="pl-val pl-muted">Turn on</span>${chev}</button>
+        <button class="pl-row" onclick="saveCloudPortfolio()"><span class="pl-lbl">Sync portfolio now<small>It syncs on its own - use this if something looks off</small></span>${chev}</button>
       </div>
       <!-- Payout Account (paid-challenge winnings) - hidden for the coins-only
            launch. Restore this block when challenges come back. -->
-      <div class="profile-row">
-        <button class="profile-btn danger" style="width:100%;" onclick="signOutUser()">Sign Out</button>
+
+      <div class="pl-group pl-group-solo">
+        <button class="pl-row pl-danger" onclick="signOutUser()"><span class="pl-lbl">Sign out</span></button>
       </div>`;
     refreshConnectStatusUI();
     startFriendsListener();  // no-op if already running - ensures Friends/Added counts are live
@@ -13378,9 +13538,7 @@ async function openPublicProfile(uid){
     const avatar = u.photoURL
       ? `<img src="${u.photoURL}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;">`
       : `<div style="width:64px;height:64px;border-radius:50%;background:${u.avatarColor||'#4caf50'};display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:26px;color:#fff;">${(u.displayName||'?')[0].toUpperCase()}</div>`;
-    const nameBlock = u.username
-      ? `<div style="font-family:var(--font-mono);font-size:18px;color:var(--green);">@${escHtml(u.username)}</div><div style="font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-top:2px;">${escHtml(u.displayName||'Trader')}</div>`
-      : `<div style="font-family:var(--font-mono);font-size:18px;">${escHtml(u.displayName||'Trader')}</div>`;
+    const nameBlock = `<div class="pf-name">${escHtml(u.displayName||'Trader')}</div>${u.username ? `<div class="pf-handle">@${escHtml(u.username)}</div>` : ''}`;
     const joined = u.createdAt?.toMillis ? new Date(u.createdAt.toMillis()) : (u.createdAt?.seconds ? new Date(u.createdAt.seconds*1000) : null);
     const joinedStr = joined ? `Member since ${joined.toLocaleDateString([], {month:'long', year:'numeric'})}` : null;
     const ret = u.returnPct || 0;
@@ -13391,7 +13549,7 @@ async function openPublicProfile(uid){
       : status === 'incoming' ? `<button class="nbtn" style="border-color:var(--green);color:var(--green);" onclick="acceptFriendRequest('${_friendshipId(currentUser.uid,uid)}')">Accept request</button>`
       : currentUser ? `<button class="nbtn" onclick="openPublicProfileAddFriend('${uid}')">+ Add friend</button>` : '';
 
-    let holdingsHtml = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:12px 0;">This trader's holdings are private.</div>`;
+    let holdingsHtml = `<div class="pp-note">This trader keeps their holdings private.</div>`;
     if (u.showHoldingsPublicly) {
       try {
         const pSnap = await window._fbGetDoc(window._fbDoc(db, 'portfolios', uid));
@@ -13403,31 +13561,33 @@ async function openPublicProfile(uid){
           .sort((a,b) => (liveP[b.rank]*b.shares) - (liveP[a.rank]*a.shares));
         holdingsHtml = rows.length
           ? rows.map(r => `
-            <div class="ulb-card" style="padding:8px 12px;cursor:pointer;" onclick="closePublicProfile();goMarket(${r.rank})">
-              <div class="ulb-info"><div class="ulb-name" style="font-size:12px;">${escHtml(r.player.name)}</div><div class="ulb-sub">${fmtShares(r.shares)} sh</div></div>
-              <div class="ulb-ret pos" style="font-size:12px;">${fmt(liveP[r.rank]*r.shares)}</div>
+            <div class="ulb-card" style="cursor:pointer;" onclick="closePublicProfile();goMarket(${r.rank})">
+              <div class="ulb-info"><div class="ulb-name">${escHtml(r.player.name)}</div><div class="ulb-sub">${fmtShares(r.shares)} shares</div></div>
+              <div class="ulb-ret">${fmt(liveP[r.rank]*r.shares)}</div>
             </div>`).join('')
-          : `<div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:center;padding:12px 0;">No open positions.</div>`;
+          : `<div class="pp-note">No open positions right now.</div>`;
       } catch(e) {
-        holdingsHtml = `<div style="font-family:var(--font-mono);font-size:10px;color:var(--red);text-align:center;padding:12px 0;">Could not load holdings.</div>`;
+        holdingsHtml = `<div class="pp-note">Couldn’t load holdings. Try again in a moment.</div>`;
       }
     }
 
     content.innerHTML = `
       <div style="display:flex;justify-content:flex-end;margin-bottom:-10px;">
-        <span onclick="closePublicProfile()" style="cursor:pointer;color:var(--muted);font-family:var(--font-mono);font-size:14px;padding:4px;" title="Close" aria-label="Close">✕</span>
+        <button class="pp-close" onclick="closePublicProfile()" title="Close" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:18px;text-align:center;">
+      <div class="pf-head">
         ${avatar}
-        ${nameBlock}
-        ${joinedStr ? `<div style="font-family:var(--font-mono);font-size:9px;color:var(--muted);">${joinedStr}</div>` : ''}
-        ${friendActionHtml}
+        <div class="pf-id">
+          ${nameBlock}
+          ${joinedStr ? `<div class="pf-meta">${joinedStr}</div>` : ''}
+        </div>
       </div>
-      <div class="profile-stat-row" style="margin-bottom:18px;">
-        <div class="profile-stat"><div class="profile-stat-lbl">Portfolio</div><div class="profile-stat-val">${coinIcon()} ${(u.portfolioValue||0).toLocaleString()}</div></div>
-        <div class="profile-stat"><div class="profile-stat-lbl">Return</div><div class="profile-stat-val" style="color:${ret>=0?'var(--green)':'var(--red)'}">${ret>=0?'+':''}${ret.toFixed(1)}%</div></div>
+      ${friendActionHtml ? `<div style="margin-bottom:14px;">${friendActionHtml}</div>` : ''}
+      <div class="port-stats pf-stats">
+        <div><span>Portfolio value</span><b>${(u.portfolioValue||0).toLocaleString()}</b></div>
+        <div><span>Return</span><b class="${pctDir(ret)}">${fmtP(ret)}</b></div>
       </div>
-      <div class="profile-section-lbl">Holdings</div>
+      <div class="pl-group-lbl">Holdings</div>
       <div style="max-height:220px;overflow-y:auto;">${holdingsHtml}</div>`;
   } catch(e) {
     content.innerHTML = `<div class="g10-loading" style="color:var(--red)">Could not load profile: ${e.code || e.message}</div>`;
@@ -13909,7 +14069,7 @@ function renderChat() {
   const el = document.getElementById('gchat-messages');
   if (!el) return;
   if (!_chatItems.length) {
-    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">No messages yet. Say something.</div>';
+    el.innerHTML = emptyState('No messages yet', 'Start the conversation: call a breakout, or share a trade.');
     return;
   }
 
@@ -13929,7 +14089,7 @@ function renderChat() {
     const ts = m.createdAt?.toMillis ? m.createdAt.toMillis() : (m.ts || 0);
     const tradeCard = (m.kind === 'trade' && m.trade) ? `
       <div class="chat-trade-card" onclick="goMarket(${m.trade.rank})">
-        <span class="chat-trade-type ${m.trade.type}">${m.trade.type === 'buy' ? 'BOUGHT' : 'SOLD'}</span>
+        <span class="chat-trade-type ${m.trade.type}">${m.trade.type === 'buy' ? 'Bought' : 'Sold'}</span>
         <span class="chat-trade-name">${escHtml(m.trade.playerName||'')}</span>
         <span class="chat-trade-sub">${fmtShares(m.trade.shares)} sh @ ${fmt(Number(m.trade.price||0))}</span>
         ${m.trade.pct != null ? `<span class="chat-trade-pct ${m.trade.pct>=0?'up':'down'}">${fmtP(m.trade.pct)}</span>` : ''}
@@ -13969,9 +14129,9 @@ function renderChat() {
         ${m.text ? `<div class="comment-body">${_highlightMentions(escHtml(censorText(m.text)), m.mentions)}</div>` : ''}
         ${tradeCard}
         <div class="comment-actions">
-          <span class="comment-reply" onclick="replyToChatMessage(${i})">↩ reply</span>
-          <span class="chat-react-trigger" onclick="toggleReactionBar('${m.id}')">☺+</span>
-          ${isOwn ? `<span class="comment-delete" onclick="deleteChatMessage('${m.id}')">delete</span>` : ''}
+          <span class="comment-reply" onclick="replyToChatMessage(${i})">Reply</span>
+          <span class="chat-react-trigger" onclick="toggleReactionBar('${m.id}')">React</span>
+          ${isOwn ? `<span class="comment-delete" onclick="deleteChatMessage('${m.id}')">Delete</span>` : ''}
         </div>
         ${reactionBarHtml}
         ${reactionsHtml}
@@ -14477,7 +14637,7 @@ function renderComments(comments) {
           <span class="comment-like ${likedByMe?'liked':''}" onclick="likeComment('${c.id}',${selRank})">
             ${likedByMe?'♥':'♡'} ${c.likes||0}
           </span>
-          <span class="comment-reply" onclick="startReply('${c.id}')">↩ reply${replyCount?' ('+replyCount+')':''}</span>
+          <span class="comment-reply" onclick="startReply('${c.id}')">Reply${replyCount?' ('+replyCount+')':''}</span>
           ${isOwn ? `<span class="comment-delete" onclick="deleteComment('${c.id}',${selRank})">delete</span>` : ''}
         </div>
       </div>`;
@@ -14721,7 +14881,7 @@ function _rebuildFriendLists(){
     _renderFriendsLbList();
   }
   refreshFriendActionButtons();
-  if (document.getElementById('profile-social-stats')) renderProfileView();
+  if (document.getElementById('profile-friends-count')) renderProfileView();
 }
 
 // Redraws whichever friend-action surfaces are currently on screen from already-
