@@ -7666,8 +7666,17 @@ async function nflReconcileStaleLive() {
       // non-stale path) already does derive-then-finalize in this order; this reconcile path
       // was skipping straight to finalize. Confirmed live 2026-09-21: every rank finalized
       // through this path locked in flat at statPrice regardless of real performance.
-      try { if (ENGINE.deriveAll) ENGINE.deriveAll(); } catch(e){}
-      nflPlayers.forEach(p => { if (lineByRank[p.rank]) ENGINE.finalize(p, dateStr); });
+      // Price each reconciled player straight from its final line rather than via
+      // deriveAll(): deriveAll drops any stat whose lastNight entry is dated before
+      // today and no longer live - which is exactly what the _setLastNight above just
+      // made this one - so it repriced everyone at base and finalize() locked in a
+      // flat close. Confirmed live 2026-09-29: Monday night's PHI @ CHI game, opened
+      // after midnight, closed flat at every player's prior price.
+      nflPlayers.forEach(p => {
+        if (!lineByRank[p.rank] || !window._engineStats[p.rank]) return;
+        try { ENGINE.price(p, window._engineStats[p.rank]); } catch(e){}
+        ENGINE.finalize(p, dateStr);
+      });
     }
   }
   if (moved > 0) {
@@ -10380,7 +10389,9 @@ function updateMovers(){
         // Golf gets a wider window (round-to-round within/adjacent to an event); MLB/NBA stay
         // tight since they play near-daily.
         const isGolf = p.rank >= 2001 && p.rank < 3001;
-        const maxGap = isGolf ? 5 : 2;
+        // NFL plays once a week, so a player's prior close is normally 7 days back
+        // (Sun->Sun); a 2-day guard rejected every NFL player after Week 1.
+        const maxGap = currentLeague === 'NFL' ? 8 : isGolf ? 5 : 2;
         const dayGap = Math.round((Date.parse(slateDate) - Date.parse(prevDate)) / 86400000);
         if (dayGap > maxGap) return null;
         const pct = (c[slateDate] - prevClose) / prevClose * 100;
