@@ -1985,7 +1985,7 @@ body:has(#view-market.active) .nav-back.force{display:inline-flex;}
 // 0-based); golf runs nearly year-round and is the fallback.
 const LEAGUE_SEASONS = {
   NBA: [921, 520],  // Oct 21 - Jun 20
-  MLB: [225, 830],  // Mar 25 - Sep 30
+  MLB: [225, 1005], // Mar 25 - Nov 5 (includes postseason / World Series)
   NFL: [805, 112],  // Sep 5 - Feb 12
 };
 function leagueInSeason(lg, now = new Date()) {
