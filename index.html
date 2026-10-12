@@ -4318,7 +4318,9 @@ async function loadPortfolioBlob(portfolioId){
       const snap = await window._fbGetDoc(window._fbDoc(db, 'portfolios', currentUser.uid, cloudSubcollection, portfolioId));
       if (snap.exists()) {
         const d = snap.data();
-        return { cash: d.cash ?? freshCash, holdings: d.holdings || {}, logs: d.logs || [], portHx: d.portHx || [], pools: d.pools || {} };
+        let localHx = [];
+        try { localHx = JSON.parse(localStorage.getItem(localKeyPrefix + portfolioId) || '{}').portHx || []; } catch(e) {}
+        return { cash: d.cash ?? freshCash, holdings: d.holdings || {}, logs: d.logs || [], portHx: mergePortHx(d.portHx, localHx), pools: d.pools || {} };
       }
     } catch(e) { console.warn('[portfolio] load ' + cloudSubcollection + ' portfolio failed:', e.message); }
   }
@@ -4330,6 +4332,25 @@ async function loadPortfolioBlob(portfolioId){
     }
   } catch(e) {}
   return { cash: freshCash, holdings: {}, logs: [], portHx: [{day:0,value:freshCash,t:Date.now()}], pools: {} };
+}
+
+// Shrink portfolio history for storage: raw points for the last 6h, then one
+// (the latest) per hour. A plain slice(-400) of the 2-minute ticks only reaches
+// back ~13 hours, which is why week-old history never survived a save.
+function compactPortHx(arr, max = 900){
+  const HOUR = 3600000, cutoff = Date.now() - 6*HOUR;
+  const byBucket = new Map();
+  (arr || [])
+    .filter(p => p && p.t && p.value > 0)
+    .sort((a, b) => a.t - b.t)
+    .forEach(p => byBucket.set(p.t >= cutoff ? 'r' + p.t : 'h' + Math.floor(p.t / HOUR), p));
+  return [...byBucket.values()].slice(-max);
+}
+// Union of two saved histories (cloud + this device), de-duped by timestamp.
+function mergePortHx(a, b){
+  const m = new Map();
+  [...(a || []), ...(b || [])].forEach(p => { if (p && p.t && p.value > 0) m.set(p.t, p); });
+  return compactPortHx([...m.values()]);
 }
 
 // Record a portfolio-value snapshot stamped with the real wall-clock time, so the
@@ -12231,7 +12252,7 @@ function saveLocalPortfolio(portfolioId = 'regular') {
     const key = (isWalletContext(portfolioId) ? 'ax_wallet_' : 'ax_portfolio_ch_') + portfolioId;
     try {
       localStorage.setItem(key, JSON.stringify({
-        cash, holdings, logs: logs.slice(0, 50), portHx: portHx.slice(-400), savedAt: Date.now(),
+        cash, holdings, logs: logs.slice(0, 50), portHx: compactPortHx(portHx), savedAt: Date.now(),
         pools: challengePools[portfolioId] || {}, // this context's own AMM drift, not the shared market
       }));
     } catch(e) {}
@@ -12364,7 +12385,16 @@ function loadLocalPortfolio() {
 }
 
 // Auto-save local portfolio after every trade and every 2 minutes
-setInterval(() => { if (!_fetchLiveStatsRunning) { pushPortHx(); saveLocalPortfolio(); } }, 2 * 60 * 1000);
+setInterval(() => {
+  if (!_fetchLiveStatsRunning) {
+    pushPortHx(); saveLocalPortfolio();
+    // Persist chart history to the cloud at most every 30 min while the app is open.
+    if (currentUser && db && Date.now() - (window._lastHxCloudSave || 0) > 30*60*1000) {
+      window._lastHxCloudSave = Date.now();
+      saveCloudPortfolio(true);
+    }
+  }
+}, 2 * 60 * 1000);
 // Sync leaderboard value every 5 minutes if signed in
 setInterval(() => { if (currentUser && db) saveCloudPortfolio(); }, 5 * 60 * 1000);
 
@@ -13703,6 +13733,7 @@ async function saveCloudPortfolio(silent = false, portfolioId = activePortfolioI
     await window._fbSetDoc(docRef, {
       cash, holdings,
       logs: logs.slice(-50),
+      portHx: compactPortHx(portHx), // value history for the portfolio chart - nothing server-side writes this
       savedAt: window._fbServerTimestamp(),
       // This challenge's own AMM drift, not the shared practice market -
       // never written to the 'regular' doc.
