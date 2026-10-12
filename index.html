@@ -17550,6 +17550,9 @@ window.addEventListener('appinstalled', () => {
 
   const app = initializeApp(firebaseConfig);
 
+  // Page-view / active-user tracking (GA4 via measurementId above). Wrapped so blockers can't break the app.
+  import("https://www.gstatic.com/firebasejs/12.9.0/firebase-analytics.js").then(m => m.getAnalytics(app)).catch(e => console.warn('[analytics] unavailable:', e.message));
+
   // Messaging (push). Wrapped in try - not all browsers support it (older iOS, etc.).
   try {
     window._fbMessaging = getMessaging(app);
