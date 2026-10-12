@@ -12,8 +12,16 @@ service cloud.firestore {
     // removed entirely; the news feature now proxies through worker-payments'
     // POST /news, which holds the key as a Worker secret the client never
     // sees. Nothing secret belongs under config/ - anything here is public.
+    //
+    // Hardened 2026-10-12 ahead of public launch: reads stay public, but writes
+    // now require a signed-in user and docs can never be deleted. This stops
+    // anonymous scripts from wiping or poisoning shared price history. Signed-
+    // in clients still sync (the app writes here today); the real fix is moving
+    // those writes to the pricing worker so this can become `write: if false`.
     match /config/{doc} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if request.auth != null;
+      allow delete: if false;
     }
 
     // Trade log - append-only, owner-authored. Tamper-resistant (create-only,
