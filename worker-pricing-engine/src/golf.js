@@ -37,8 +37,44 @@ function parseScore(sc) {
   return null;
 }
 
-// Returns { relevantEvents, isLive, isComplete, byName } where byName maps
-// normalizedName -> { cumToPar, thru, rounds, posName, evDate, evLive }.
+// ESPN reports each round as a linescore: displayValue is that round's score to
+// par ("-3", "E", "+2", or "-" if not started) and its nested linescores are
+// one entry per hole played. That is the only trustworthy per-round signal -
+// the competitor-level score is the whole tournament's cumulative, and
+// deriving a round from it (cum minus a stored prior) produced a phantom
+// whole-tournament "round" whenever no prior was on file (first sighting
+// mid-event, or history left over from last week's event).
+export function parseRounds(c) {
+  const out = [];
+  for (const l of c.linescores || []) {
+    const holes = (l.linescores || []).length;
+    if (!holes) continue;
+    const dv = l.displayValue;
+    let toPar = null;
+    if (typeof dv === 'string') toPar = /^e$/i.test(dv.trim()) ? 0 : parseScore(dv);
+    if (toPar == null) continue;
+    out.push({ period: l.period ?? out.length + 1, toPar, holes });
+  }
+  return out;
+}
+
+function easternDate(ms) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(ms));
+  const get = t => parts.find(p => p.type === t).value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// Returns { eventsToProcess, isLive, isComplete, currentPeriod, byName } where
+// byName maps normalizedName -> { cumToPar, rounds: [{period,toPar,holes}],
+// posName, evStart, evLive }.
 export function extractCompetitors(sb, todayStr) {
   const events = sb?.events || [];
   const relevantEvents = events.filter(e => {
@@ -50,15 +86,12 @@ export function extractCompetitors(sb, todayStr) {
   const isComplete = !anyLive && eventsToProcess.some(e => e.status?.type?.completed === true);
 
   const byName = {};
+  let currentPeriod = 0;
   for (const ev of eventsToProcess) {
     const evLive = ev.status?.type?.state === 'in';
-    let evDate = todayStr;
-    const rawDate = ev.competitions?.[0]?.date || ev.date || ev.endDate;
-    if (rawDate) {
-      const d = new Date(rawDate);
-      if (!isNaN(d)) evDate = d.toISOString().slice(0, 10);
-    }
-    if (evLive) evDate = todayStr;
+    const rawDate = ev.competitions?.[0]?.date || ev.date;
+    const t = rawDate ? new Date(rawDate).getTime() : NaN;
+    const evStart = isNaN(t) ? todayStr : easternDate(t);
 
     const comp = ev.competitions?.[0];
     const competitors = comp?.competitors || ev.competitors || [];
@@ -70,62 +103,53 @@ export function extractCompetitors(sb, todayStr) {
 
       const posName = c.status?.position?.displayName || c.status?.position?.id
         || (c.status?.position != null ? String(c.status.position) : null);
-      const thru = c.status?.thru != null ? c.status.thru : (c.status?.hole != null ? c.status.hole : null);
-      const rounds = (c.linescores || []).length;
+      const rounds = parseRounds(c);
+      for (const r of rounds) currentPeriod = Math.max(currentPeriod, r.period);
 
       const existing = byName[nm];
-      const candidate = { cumToPar, thru, rounds, posName, evDate, evLive };
+      const candidate = { cumToPar, rounds, posName, evStart, evLive };
       if (!existing) byName[nm] = candidate;
       else if (existing.posName == null && posName != null) byName[nm] = { ...existing, ...candidate };
     }
   }
-  return { eventsToProcess, isLive: anyLive, isComplete, byName };
+  return { eventsToProcess, isLive: anyLive, isComplete, currentPeriod, byName };
 }
 
-// Field average round, relative to which every priced golfer's round is
-// judged (par is a fixed yardstick, the field is the real one). Needs >= 8
-// samples to trust, else falls back to 0 (par). `cumHxByRank` is trusted,
-// server-persisted cumulative history for OUR rostered golfers only (Firestore-
-// backed) - matches the client's approach of using stored history where
-// available and raw cumulative otherwise.
-export function computeFieldAverage(byName, rankByNormName, cumHxByRank) {
-  const fieldRounds = [];
-  for (const [nm, rec] of Object.entries(byName)) {
-    if (!rec || rec.cumToPar == null) continue;
-    const played = (rec.thru != null && rec.thru > 0) || rec.rounds > 0 || rec.cumToPar !== 0;
-    if (!played) continue;
-    let r = rec.cumToPar;
-    const rk = rankByNormName[nm];
-    const hx = rk != null ? cumHxByRank[rk] : null;
-    if (hx) {
-      const priorDates = Object.keys(hx).filter(d => d < (rec.evDate)).sort();
-      if (priorDates.length) r = rec.cumToPar - hx[priorDates[priorDates.length - 1]];
-    }
-    if (r >= -13 && r <= 18) fieldRounds.push(r);
+function currentRound(rec, currentPeriod) {
+  return (rec.rounds || []).find(r => r.period === currentPeriod) || null;
+}
+
+// Field's average strokes-to-par PER HOLE in the current round, across every
+// golfer in the event (not just rostered ones). Per hole rather than per
+// round so golfers mid-round are judged against what the field shot over the
+// same number of holes. Needs >= 8 samples to trust, else 0 (par).
+export function computeFieldRate(byName, currentPeriod) {
+  let strokes = 0, holes = 0, n = 0;
+  for (const rec of Object.values(byName)) {
+    const r = rec && currentRound(rec, currentPeriod);
+    if (!r) continue;
+    strokes += r.toPar; holes += r.holes; n++;
   }
-  if (fieldRounds.length < 8) return 0;
-  return fieldRounds.reduce((a, b) => a + b, 0) / fieldRounds.length;
+  return n >= 8 && holes > 0 ? strokes / holes : 0;
 }
 
-// For one rostered golfer: derive today's round-to-par delta from their own
-// cumulative history, clamp to a realistic single round, and return both the
-// stat to feed the engine and the updated history to persist.
-export function deriveRoundForGolfer(rec, cumHxForRank) {
-  const cum = rec.cumToPar;
-  if (cum == null) return null;
-  const startedPlay = (rec.thru != null && rec.thru > 0) || rec.rounds > 0 || cum !== 0;
-  if (!startedPlay) return null;
-
-  const hx = { ...(cumHxForRank || {}) };
-  const roundDate = rec.evDate;
-  const priorDates = Object.keys(hx).filter(d => d < roundDate).sort();
-  const hasPrior = priorDates.length > 0;
-  const priorCum = hasPrior ? hx[priorDates[priorDates.length - 1]] : null;
-
-  let tp = hasPrior ? cum - priorCum : cum;
-  tp = Math.max(-13, Math.min(18, tp));
-  tp = Math.round(tp);
-
-  hx[roundDate] = cum;
-  return { toPar: tp, date: roundDate, updatedHx: hx };
+// For one rostered golfer: today's round to par + holes played, straight from
+// ESPN's linescores. `roundDay` ({ period -> date first counted }) is the only
+// persisted state: a COMPLETED round must stop counting once its day is over,
+// otherwise Friday morning would re-price Thursday's finished round on top of
+// Thursday's move. Returns null when there is nothing to price today (hasn't
+// teed off, missed the cut, or the latest round belongs to an earlier day).
+export function deriveRoundForGolfer(rec, currentPeriod, roundDay, todayStr) {
+  const r = currentRound(rec, currentPeriod);
+  if (!r) return null;
+  const days = { ...(roundDay || {}) };
+  if (days[r.period]) {
+    if (days[r.period] !== todayStr) return null;
+  } else {
+    const scheduled = addDays(rec.evStart, r.period - 1);
+    if (!(r.holes < 18 || scheduled >= todayStr)) return null;
+    days[r.period] = todayStr;
+  }
+  const toPar = Math.round(Math.max(-13, Math.min(18, r.toPar)));
+  return { toPar, holes: r.holes, period: r.period, date: todayStr, updatedRoundDay: days };
 }

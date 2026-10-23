@@ -1984,7 +1984,7 @@ body:has(#view-market.active) .nav-back.force{display:inline-flex;}
 // offseason market. Windows are approximate regular-season dates (month is
 // 0-based); golf runs nearly year-round and is the fallback.
 const LEAGUE_SEASONS = {
-  NBA: [921, 520],  // Oct 21 - Jun 20
+  NBA: [915, 520],  // Oct 15 - Jun 20 (opening night lands ~Oct 20-22; 2026 tipped Oct 20)
   MLB: [225, 1005], // Mar 25 - Nov 5 (includes postseason / World Series)
   NFL: [805, 112],  // Sep 5 - Feb 12
 };
@@ -5269,7 +5269,7 @@ const ENGINE = (() => {
       }
       if (yday && rd && rd < yday) return 0;
     }
-    const fieldAvg = (typeof window !== 'undefined' && window._golfFieldAvg) || 0;
+    const fieldAvg = s.fieldAvg != null ? s.fieldAvg : ((typeof window !== 'undefined' && window._golfFieldAvg) || 0);
     // Strokes better than the field. Positive = beat the field.
     const vsField = fieldAvg - s.toPar;
     if (vsField === 0) return 0;                 // exactly average → no move
@@ -8021,6 +8021,10 @@ setTimeout(() => window._mlbStatUpdate(), 4000);
 (function scrubBadGolf(){
   try {
     // Load persisted golf cumulative history for round-delta scoring.
+    if (!window._golfRoundDay) {
+      try { window._golfRoundDay = JSON.parse(localStorage.getItem('ax_golf_roundday') || '{}'); }
+      catch(e){ window._golfRoundDay = {}; }
+    }
     if (!window._golfCumHx) {
       try { window._golfCumHx = JSON.parse(localStorage.getItem('ax_golf_cumhx') || '{}'); }
       catch(e){ window._golfCumHx = {}; }
@@ -8066,6 +8070,33 @@ setTimeout(() => window._mlbStatUpdate(), 4000);
 // which no longer matched the roster's "James Cook" once suffix-stripping
 // was gone, so his real rushing line silently never made it into lineByRank.
 
+// ESPN's per-round linescores: displayValue = that round's score to par ("-3", "E",
+// "+2", "-" if not started), nested linescores = one entry per hole played. This is
+// the only trustworthy per-round signal. Deriving a round as (cumulative - stored
+// prior) produced a phantom whole-tournament "round" whenever no prior was on file
+// (first sighting mid-event, or history left over from last week's event) - e.g. a
+// golfer at -11 through two rounds priced as one -11 round (+12% instead of ~+2%).
+// Mirrors worker-pricing-engine/src/golf.js - keep both in sync.
+function _golfParseRounds(c) {
+  const out = [];
+  for (const l of c.linescores || []) {
+    const holes = (l.linescores || []).length;
+    if (!holes) continue;
+    const dv = l.displayValue;
+    if (typeof dv !== 'string') continue;
+    const n = /^e$/i.test(dv.trim()) ? 0 : parseInt(dv.replace('+',''));
+    if (isNaN(n)) continue;
+    out.push({ period: l.period ?? out.length + 1, toPar: n, holes });
+  }
+  return out;
+}
+function _golfEasternDate(ms) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+}
+function _golfAddDays(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10);
+}
+
 let _golfFetchRunning = false;
 async function fetchGolfLiveStats(isFinal=false) {
   if (_golfFetchRunning) return;
@@ -8092,8 +8123,12 @@ async function fetchGolfLiveStats(isFinal=false) {
 
     // Build a merged name → score map across all events.
     const byName = {};
+    let currentPeriod = 0;
     for (const ev of eventsToProcess) {
       const evLive = ev.status?.type?.state === 'in';
+      const _evRaw = ev.competitions?.[0]?.date || ev.date;
+      const _evT = _evRaw ? new Date(_evRaw).getTime() : NaN;
+      const evStart = isNaN(_evT) ? today : _golfEasternDate(_evT);
       // This event's date (used as the round date) - ALWAYS today, the local calendar
       // date this poll is running. Used to fall back to ev.competitions[0].date/ev.date
       // once the event left the 'in' state, but that's the tournament's static START
@@ -8150,31 +8185,19 @@ async function fetchGolfLiveStats(isFinal=false) {
           : (c.status?.hole != null ? c.status.hole : null);
         const teeStatus = c.status?.type?.description || c.status?.displayValue || null;
 
-        // Per-round to-par - only from a COMPLETE round (guards partial/in-progress).
+        // Per-round to-par + holes played, from the linescores (see _golfParseRounds).
         const ls = c.linescores || [];
-        let roundToPar = null;
-        for (let i = ls.length - 1; i >= 0; i--) {
-          const r = ls[i];
-          const strokes = Number(r?.value);
-          if (!strokes || isNaN(strokes)) continue;
-          const par = Number(r?.par) || coursePar;
-          let rtp;
-          if (Math.abs(strokes) <= 20) rtp = strokes;              // to-par given directly
-          else if (strokes >= 55 && strokes <= 100) rtp = strokes - par; // complete round
-          else continue;                                           // partial/garbage
-          if (rtp < -13 || rtp > 18) continue;
-          roundToPar = rtp;
-          break;
-        }
+        const rds = _golfParseRounds(c);
+        for (const r of rds) currentPeriod = Math.max(currentPeriod, r.period);
 
         // Only overwrite an existing entry if this event gives us MORE info (a real
         // round, or a position we didn't have). Prevents an empty second-event record
         // from clobbering a good one.
         const existing = byName[nm];
-        const candidate = { cumToPar, roundToPar, rounds: ls.length, posName, thru, teeStatus, evDate, evLive };
+        const candidate = { cumToPar, rds, rounds: ls.length, posName, thru, teeStatus, evDate, evStart, evLive };
         if (!existing) byName[nm] = candidate;
         else {
-          if (existing.roundToPar == null && roundToPar != null) byName[nm] = candidate;
+          if (!existing.rds?.length && rds.length) byName[nm] = candidate;
           else if (existing.posName == null && posName != null) byName[nm] = {...existing, posName, thru, teeStatus, cumToPar: cumToPar ?? existing.cumToPar};
         }
       });
@@ -8190,104 +8213,63 @@ async function fetchGolfLiveStats(isFinal=false) {
     // brutal wind is a strong round; -2 when the field averages -5 is a poor one. Par
     // is a fixed yardstick - the field is the real one. Computed across EVERY golfer in
     // the event (not just our roster) so it isn't skewed by which players we track.
-    const fieldRounds = [];
-    // Map normalized name -> rank for the golfers we track, so we can look up stored
-    // cumulative history. Field members we don't track contribute their standing only.
-    const rankByNorm = {};
-    golfPlayers.forEach(p => { rankByNorm[_normName(p.name)] = p.rank; });
+    // Strokes-to-par PER HOLE across the field in the current round, so a golfer
+    // mid-round is judged against what the field shot over the same holes.
+    let _fStrokes = 0, _fHoles = 0, _fN = 0;
     Object.keys(byName).forEach(nm => {
-      const rec = byName[nm];
-      if (!rec || rec.cumToPar == null) return;
-      const played = (rec.thru != null && rec.thru > 0) || (rec.rounds > 0) || rec.cumToPar !== 0;
-      if (!played) return;
-      // Use each golfer's round delta where we can derive one, else their standing.
-      let r = rec.cumToPar;
-      const rk = rankByNorm[nm];
-      const hx = rk != null ? (window._golfCumHx || {})[rk] : null;
-      if (hx) {
-        const pd = Object.keys(hx).filter(d => d < (rec.evDate || eventDate)).sort();
-        if (pd.length) r = rec.cumToPar - hx[pd[pd.length - 1]];
-      }
-      if (r >= -13 && r <= 18) fieldRounds.push(r);
+      const r = (byName[nm].rds || []).find(x => x.period === currentPeriod);
+      if (!r) return;
+      _fStrokes += r.toPar; _fHoles += r.holes; _fN++;
     });
     // Need a real sample before trusting an average; otherwise fall back to par (0).
-    const fieldAvg = fieldRounds.length >= 8
-      ? fieldRounds.reduce((a, b) => a + b, 0) / fieldRounds.length
-      : 0;
+    const fieldRate = _fN >= 8 && _fHoles > 0 ? _fStrokes / _fHoles : 0;
+    const fieldAvg = fieldRate * 18;
     window._golfFieldAvg = fieldAvg;
-    if (fieldRounds.length) {
+    if (_fN) {
       console.log('[golf] field avg round:', fieldAvg.toFixed(2),
-                  'from', fieldRounds.length, 'golfers');
+                  'from', _fN, 'golfers');
     }
 
     const statsArr = [];
     golfPlayers.forEach(p => {
       const rec = byName[_normName(p.name)];
       if (!rec) return;
-      // Price off THAT DAY'S ROUND to par (roundToPar), not the cumulative tournament
-      // total. Cumulative was compounding: base rolls forward each day, so applying the
-      // full -15 every day re-elevated an already-elevated price. A single round's score
-      // is a true daily move that legitimately compounds round-over-round (shoot -5
-      // today → up today; +2 tomorrow → down tomorrow). Fall back to cumulative only if
-      // a round figure isn't available (e.g. first read of an in-progress round).
-      // ROUND SCORE via CUMULATIVE DELTA - the reliable method. Reverse-engineering a
-      // round from stroke counts kept producing wrong values (a +13 round next to a -15
-      // total is impossible). Instead: round = today's cumulative to-par minus the last
-      // cumulative we recorded. ESPN reports cumulative reliably (e.g. -15, E), so the
-      // day's move is just the change in that number. Store cumulative-by-date to compute it.
+      // Price off THAT DAY'S ROUND to par, not the cumulative tournament total (base rolls
+      // forward each day, so a cumulative would re-elevate an already-elevated price).
       const cum = rec.cumToPar;
       if (cum == null) return;                    // no reliable standing yet → skip
+      // Persist standings so the card shows position/total even before a re-fetch (and on
+      // days the golfer has no round to price - e.g. the morning after a finished round).
+      try {
+        const _cr = (rec.rds || []).find(r => r.period === currentPeriod);
+        window._golfStandings = window._golfStandings || {};
+        window._golfStandings[p.rank] = { pos: rec.posName || null, total: cum, thru: _cr ? _cr.holes : rec.thru };
+        localStorage.setItem('ax_golf_standings', JSON.stringify(window._golfStandings));
+      } catch(e){}
 
-      // Has this golfer ACTUALLY started playing? ESPN reports cumToPar = 0 for a player
-      // who hasn't teed off yet - indistinguishable from a real even-par round. Writing
-      // that phantom 0 into history poisoned every later delta (a whole field showing
-      // "0" on a non-round day, which then made round = total forever). Only trust the
-      // standing when there's real evidence of play: holes completed, a round posted,
-      // or a non-zero score.
-      const startedPlay = (rec.thru != null && rec.thru > 0)
-        || (rec.rounds > 0)
-        || cum !== 0;
-      if (!startedPlay) return;                   // hasn't teed off → record nothing
-
-      window._golfCumHx = window._golfCumHx || {};
-      const hx = window._golfCumHx[p.rank] || {};
+      // Today's round comes straight from ESPN's linescores for the event's current
+      // round. window._golfRoundDay (rank -> { round -> date first counted }) is the only
+      // persisted state: a COMPLETED round must stop counting once its day is over, else
+      // Friday morning would re-price Thursday's finished round on top of Thursday's move.
+      // Nothing to price today if they haven't teed off, missed the cut, or their latest
+      // round belongs to an earlier day.
+      const cr = (rec.rds || []).find(r => r.period === currentPeriod);
+      if (!cr) return;
+      window._golfRoundDay = window._golfRoundDay || {};
+      const days = window._golfRoundDay[p.rank] || {};
       const roundDate = rec.evDate || eventDate;
-
-      // Prior cumulative = most recent recorded cumulative from a DIFFERENT (earlier) date.
-      const priorDates = Object.keys(hx).filter(d => d < roundDate).sort();
-      const hasPrior = priorDates.length > 0;
-      const priorCum = hasPrior ? hx[priorDates[priorDates.length - 1]] : null;
-
-      // Today's round is the change since that prior standing. With NO prior on file we
-      // try the feed's per-round linescore, but it can't always be trusted - for a
-      // golfer several rounds into an event the parse sometimes returns the wrong round
-      // (Schauffele: feed round -6 while his tournament TOTAL was only -4, which is
-      // impossible unless an earlier round was well over par). So we cross-check the
-      // feed round against the cumulative and the number of rounds played.
-      let tp;
-      if (hasPrior) {
-        // The only reliable case: today's round = today's standing minus yesterday's.
-        tp = cum - priorCum;
+      if (days[cr.period]) {
+        if (days[cr.period] !== roundDate) return;
       } else {
-        // NO prior on file (first time we've seen this golfer this event). We do NOT
-        // know the round/other-round split, and every attempt to guess it (dividing the
-        // cumulative by rounds played) has produced wrong numbers - Schauffele shot -4
-        // to a -4 total and the division reported -1. The cumulative is the one number
-        // we actually know is real, so show THAT. On the opening round it's exactly the
-        // round; on later first-sightings it's the tournament standing, which is honest
-        // rather than invented. Once a prior is stored, the delta above takes over.
-        tp = cum;
+        const scheduled = _golfAddDays(rec.evStart || roundDate, cr.period - 1);
+        if (!(cr.holes < 18 || scheduled >= roundDate)) return;
+        days[cr.period] = roundDate;
+        window._golfRoundDay[p.rank] = days;
+        try { localStorage.setItem('ax_golf_roundday', JSON.stringify(window._golfRoundDay)); } catch(e){}
       }
-      if (tp < -13) tp = -13;                     // clamp to a realistic single round
-      if (tp > 18)  tp = 18;
-      // Golf is played in whole strokes - you can't shoot -3.5.
-      tp = Math.round(tp);
-
-      // Record today's cumulative for tomorrow's delta.
-      hx[roundDate] = cum;
-      window._golfCumHx[p.rank] = hx;
-      try { localStorage.setItem('ax_golf_cumhx', JSON.stringify(window._golfCumHx)); } catch(e){}
-      try { if (typeof syncGolfHistoryToFirestore === 'function') syncGolfHistoryToFirestore(); } catch(e){}
+      // Clamp to a realistic single round; golf is whole strokes.
+      const tp = Math.round(Math.max(-13, Math.min(18, cr.toPar)));
+      rec.thru = cr.holes;                        // holes played this round, for the card
 
       _setLastNight(p.rank, {
         played: true, date: roundDate, live: !!rec.evLive, golf: true, toPar: tp,
@@ -8295,13 +8277,7 @@ async function fetchGolfLiveStats(isFinal=false) {
         golfTotal: cum,                      // total score to par for the event
         golfThru: rec.thru,                  // holes played this round
       });
-      // Persist standings so the card shows position/total even before a re-fetch.
-      try {
-        window._golfStandings = window._golfStandings || {};
-        window._golfStandings[p.rank] = { pos: rec.posName || null, total: cum, thru: rec.thru };
-        localStorage.setItem('ax_golf_standings', JSON.stringify(window._golfStandings));
-      } catch(e){}
-      statsArr.push({ rank: p.rank, toPar: tp, date: roundDate });
+      statsArr.push({ rank: p.rank, toPar: tp, date: roundDate, fieldAvg: fieldRate * cr.holes });
       moved++;
     });
 
@@ -8311,7 +8287,7 @@ async function fetchGolfLiveStats(isFinal=false) {
       {
         const map = window._engineStats || {};
         Object.keys(map).forEach(r => { if (+r >= 2001) delete map[r]; });
-        statsArr.forEach(s => { map[s.rank] = { toPar: s.toPar, date: s.date }; });
+        statsArr.forEach(s => { map[s.rank] = { toPar: s.toPar, date: s.date, fieldAvg: s.fieldAvg }; });
         window._engineStats = map;
         ENGINE.deriveAll();
 

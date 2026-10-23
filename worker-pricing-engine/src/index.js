@@ -139,7 +139,7 @@ function defaultState(league, player) {
     avg: player.avg, hr: player.hr, rbi: player.rbi, ops: player.ops, // mlb hitter
     era: player.era, kper9: player.kper9, ipp: player.ipp, // mlb pitcher
     fpts: player.fpts, // nfl
-    cumHx: {}, // golf
+    golfRoundDay: {}, // golf: round number -> date it first counted
     pitcherLastStart: null, // mlb SP
   };
 }
@@ -382,20 +382,14 @@ export async function runMlbDailyRefresh(env) {
 // locked into a persisted close until the whole event ends).
 async function tickGolf(env, today) {
   const sb = await golf.fetchScoreboard();
-  const { isComplete, byName } = golf.extractCompetitors(sb, today);
+  const { isComplete, currentPeriod, byName } = golf.extractCompetitors(sb, today);
   if (!Object.keys(byName).length) return { league: 'golf', players: 0, processed: 0, finalized: 0 };
-
-  const rankByNorm = {};
-  for (const p of golfRaw) rankByNorm[golf.normalizeName(p.name)] = p.rank;
 
   const tracked = golfRaw.filter(p => byName[golf.normalizeName(p.name)]);
   if (!tracked.length) return { league: 'golf', players: Object.keys(byName).length, processed: 0, finalized: 0 };
 
   const states = await loadStatesBatch(env, 'golf', tracked);
-  const cumHxByRank = {};
-  for (const player of tracked) cumHxByRank[player.rank] = states[player.rank].cumHx || {};
-
-  const fieldAvg = golf.computeFieldAverage(byName, rankByNorm, cumHxByRank);
+  const fieldRate = golf.computeFieldRate(byName, currentPeriod);
   const clientCloses = (await firestoreGetDoc(env, 'config/prices').catch(() => null))?.closes || {};
 
   const updates = [];
@@ -406,13 +400,13 @@ async function tickGolf(env, today) {
   for (const player of tracked) {
     const rec = byName[golf.normalizeName(player.name)];
     const st = states[player.rank];
-    const derived = golf.deriveRoundForGolfer(rec, st.cumHx || {});
+    const derived = golf.deriveRoundForGolfer(rec, currentPeriod, st.golfRoundDay, today);
     if (!derived) continue;
 
     const p = { rank: player.rank, tier: st.tier, statPrice: st.statPrice };
-    const perf = golfPerf(p, { toPar: derived.toPar }, fieldAvg);
+    const perf = golfPerf(p, { toPar: derived.toPar }, fieldRate * derived.holes);
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
-    const fields = { base: newBaseRecord, cumHx: derived.updatedHx, tier: st.tier, statPrice: st.statPrice };
+    const fields = { base: newBaseRecord, golfRoundDay: derived.updatedRoundDay, tier: st.tier, statPrice: st.statPrice };
     if (isComplete) {
       const closeVal = finalize(value, derived.date, st.closes);
       fields.closes = { ...st.closes, [derived.date]: closeVal };
