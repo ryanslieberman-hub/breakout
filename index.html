@@ -8343,6 +8343,7 @@ async function fetchLiveStats(isFinal=false) {
   if (_fetchLiveStatsRunning) return;
   _fetchLiveStatsRunning = true;
   window._anyLiveThisCycle = false; // reset; each fetcher sets true if it sees a live game
+  ensureNbaEspnIds().catch(() => {});
   // Always fetch MLB too
   try { await fetchMLBLiveStats(isFinal); } catch(e) { console.warn('MLB fetch:', e.message); }
   // Always fetch Golf too
@@ -8352,7 +8353,7 @@ async function fetchLiveStats(isFinal=false) {
   try { await nflReconcileStaleLive(); } catch(e) { console.warn('NFL reconcile:', e.message); }
   try {
     let _nbaSlateSeen = false;
-    for (let ago = 0; ago <= 2; ago++) {
+    for (let ago = 0; ago <= 4; ago++) {
       const d = new Date(); d.setDate(d.getDate() - ago);
       const ds = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
       const dd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -11774,8 +11775,49 @@ function headshotUrl(rank){
     if (espnId) return `https://a.espncdn.com/i/headshots/nba/players/full/${espnId}.png`;
   }
   const nbaId = NBA_IDS[rank];
-  if (!nbaId) return null;
+  if (!nbaId) {
+    // Rookies / anyone missing from NBA_IDS: ESPN id looked up by name from the rosters
+    // (ensureNbaEspnIds). Null until that loads → initials avatar.
+    try {
+      const p = (typeof nbaPlayers !== 'undefined' ? nbaPlayers : []).find(x => x.rank === rank);
+      const id = p && _nbaEspnIds()[_normName(p.name)];
+      if (id) return `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png`;
+    } catch(e) {}
+    return null;
+  }
   return `https://cdn.nba.com/headshots/nba/latest/1040x760/${nbaId}.png`;
+}
+
+// name → ESPN athlete id for every current NBA roster, cached in localStorage.
+function _nbaEspnIds() {
+  if (!window._nbaEspnIdMap) {
+    try { window._nbaEspnIdMap = JSON.parse(localStorage.getItem('ax_nba_espn_ids') || '{}'); }
+    catch(e) { window._nbaEspnIdMap = {}; }
+  }
+  return window._nbaEspnIdMap;
+}
+let _nbaEspnIdsLoading = false;
+async function ensureNbaEspnIds() {
+  if (_nbaEspnIdsLoading || typeof nbaPlayers === 'undefined') return;
+  const stillMissing = nbaPlayers.some(p => !NBA_IDS[p.rank] && !_nbaEspnIds()[_normName(p.name)]);
+  if (!stillMissing) return;
+  let last = 0; try { last = +localStorage.getItem('ax_nba_espn_ids_at') || 0; } catch(e) {}
+  if (Date.now() - last < 6 * 3600 * 1000) return; // tried recently; don't hammer ESPN
+  _nbaEspnIdsLoading = true;
+  try {
+    const map = _nbaEspnIds();
+    await Promise.all(Array.from({length: 30}, (_, i) => i + 1).map(async tid => {
+      try {
+        const d = await espnFetch(`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${tid}/roster`);
+        (d?.athletes || []).forEach(a => { if (a.id && a.displayName) map[_normName(a.displayName)] = a.id; });
+      } catch(e) {}
+    }));
+    try {
+      localStorage.setItem('ax_nba_espn_ids', JSON.stringify(map));
+      localStorage.setItem('ax_nba_espn_ids_at', String(Date.now()));
+    } catch(e) {}
+    renderAll();
+  } finally { _nbaEspnIdsLoading = false; }
 }
 
 function playerAvatarEl(rank, sizeClass, p){
