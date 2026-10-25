@@ -8334,6 +8334,7 @@ async function fetchGolfLiveStats(isFinal=false) {
 }
 
 
+const _nbaBoxShown = new Set(); // finished game ids whose box-score line was rendered this session
 let _fetchLiveStatsRunning = false;
 let _smartTrackerHandledLive = false;
 window._anyLiveThisCycle = false;
@@ -8383,6 +8384,15 @@ async function fetchLiveStats(isFinal=false) {
             newGames.forEach(e => (e.competitions?.[0]?.competitors||[]).forEach(c => c.team?.id && teamIds.add(String(c.team.id))));
             const stats = await fetchBoxScores(newGames.map(e => e.id));
             applyRealStats(stats, eventLocalDate(newGames[0]), teamIds, true, isFinal);
+          }
+          // Box-score line for every finished game on this day. processedGameIds can't
+          // gate this: it also marks games applyRealStats silently skipped (it was handed
+          // an object, expects an array), so those games would never get a line.
+          const boxIds = finished.map(e => e.id).filter(id => !_nbaBoxShown.has(id));
+          if (boxIds.length) {
+            boxIds.forEach(id => _nbaBoxShown.add(id));
+            try { applyNbaBoxDisplay(await fetchBoxScores(boxIds), dd, false); }
+            catch(e) { boxIds.forEach(id => _nbaBoxShown.delete(id)); }
           }
         }
         if (live.length || finished.length) break;
@@ -12711,6 +12721,44 @@ async function refreshSeasonStats() {
 }
 
 
+// Looks one roster player up in fetchBoxScores()'s result (keyed by lowercase ESPN
+// displayName). This was called by applyLiveStats() but never defined anywhere, so the
+// NBA box-score line (PTS/REB/AST, FG, +/-) threw a ReferenceError and never rendered.
+// Exact name first, then a suffix/accent-insensitive match ("Jimmy Butler III" etc.).
+let _nbaBoxNormIdx = null, _nbaBoxNormSrc = null;
+function resolveStats(allStats, p) {
+  if (!allStats || !p) return null;
+  const direct = allStats[p.name.toLowerCase().trim()];
+  if (direct) return direct;
+  if (_nbaBoxNormSrc !== allStats) {
+    _nbaBoxNormSrc = allStats; _nbaBoxNormIdx = {};
+    Object.keys(allStats).forEach(k => { if (isNaN(k)) _nbaBoxNormIdx[_normName(k)] = allStats[k]; });
+  }
+  return _nbaBoxNormIdx[_normName(p.name)] || null;
+}
+
+// DISPLAY ONLY: writes each NBA player's box-score line into lastNight. Deliberately does
+// not touch ENGINE / closes / Firestore prices - NBA prices are driven by the pricing
+// worker, and re-deriving them here would fight it.
+function applyNbaBoxDisplay(allStats, gameDate, isLive) {
+  let n = 0;
+  nbaPlayers.forEach(p => {
+    const stat = resolveStats(allStats, p);
+    if (!stat || !(stat.min > 0)) return;
+    const prev = lastNight[p.rank];
+    if (prev && prev.date && prev.date > gameDate) return; // never replace a newer game
+    _setLastNight(p.rank, {
+      pts:stat.pts, reb:stat.reb, ast:stat.ast, stl:stat.stl||0, blk:stat.blk||0, tov:stat.tov||0,
+      min:stat.min, fg:`${stat.fgm}/${stat.fga}`, fg3:`${stat.fg3m}/${stat.fg3a}`,
+      pm:stat.pm>0?`+${stat.pm}`:`${stat.pm}`, played:true, live:!!isLive, date:gameDate,
+    });
+    if (isLive) { INJURED.delete(p.rank); QUESTIONABLE.delete(p.rank); }
+    n++;
+  });
+  if (n) { _saveLastNight(); renderAll(); }
+  return n;
+}
+
 async function fetchBoxScores(gameIds) {
   const allStats = {}; // keyed by lowercase displayName - reliable, no ID guessing needed
   // Fetch all game summaries concurrently - sequential awaits made multi-game
@@ -12772,87 +12820,9 @@ async function fetchBoxScores(gameIds) {
 }
 
 function applyLiveStats(allStats, playingTeamIds, gameDate) {
-  // NBA ONLY
+  // NBA ONLY, display only (see applyNbaBoxDisplay) - live prices come from the worker.
   if (currentLeague === 'MLB') return;
-  if (!isGameLive) return;
-  const liveDate = gameDate || localDateStr();
-
-  // Build the engine stat map for NBA players and update their display lines.
-  const map = window._engineStats || {};
-  Object.keys(map).forEach(r => { const rk = +r; if (rk < 1001) delete map[r]; }); // clear old NBA
-  let anyLive = false;
-  players.forEach(p => {
-    if (p.rank >= 1001) return; // NBA only here
-    const stat = resolveStats(allStats, p, playingTeamIds);
-    if (!stat) return;
-    if (stat.min > 0) {
-      map[p.rank] = stat; // engine reads { pts, reb, ast, stl, blk, tov, min }
-      _setLastNight(p.rank, {
-        pts:stat.pts, reb:stat.reb, ast:stat.ast, stl:stat.stl||0, blk:stat.blk||0, tov:stat.tov||0,
-        min:stat.min, fg:`${stat.fgm}/${stat.fga}`, fg3:`${stat.fg3m}/${stat.fg3a}`,
-        pm:stat.pm>0?`+${stat.pm}`:`${stat.pm}`, played:true, live:true, date:liveDate,
-      });
-      anyLive = true;
-    }
-  });
-  window._engineStats = map;
-
-  // Injuries: clear false positives for players now in-game.
-  [...INJURED].forEach(rank => {
-    const s = map[rank];
-    if (s && (s.min || 0) > 0) { INJURED.delete(rank); QUESTIONABLE.delete(rank); }
-  });
-
-  // SINGLE authority: derive every price from base × (1+perf). Idempotent.
-  ENGINE.deriveAll();
-  _saveLastNight();
-
-  // Capture intraday ticks for the 1D chart. This USED to live in the old live-stats
-  // function; when pricing moved to ENGINE.deriveAll the capture was orphaned, so MLB live
-  // games updated liveP but never recorded the arc - the 1D chart collapsed a whole game
-  // (e.g. Joe Ryan -9% after 1 inning → -4.5% by the 4th) to a single point. Record a point
-  // for any player who has a stat today and whose price moved enough since the last tick.
-  {
-    const _now = Date.now();
-    Object.keys(map).forEach(rk => {
-      const r = +rk;
-      const np = liveP[r];
-      if (!(np > 0)) return;
-      if (!intraday[r]) intraday[r] = [];
-      const arr = intraday[r];
-      const last = arr.length ? arr[arr.length-1] : null;
-      const mins = last ? (_now - last.t) / 60000 : 999;
-      const delta = last ? Math.abs(np - last.price) / last.price : 1;
-      if (!last || mins > 5 || delta > 0.003) {
-        arr.push({ t: _now, price: np });
-        if (!priceHx[r]) priceHx[r] = [];
-        priceHx[r].push({ day: todayDayNum(), price: np });
-      }
-    });
-  }
-
-  if (anyLive) {
-    pushPortHx();
-    syncPricesToFirestore();
-    const liveMoverData = [...players]
-      .map(p => ({ rank: p.rank, name: p.name, pct: getTodayPct(p.rank) }))
-      .filter(m => Math.abs(m.pct) > 0.05);
-    if (liveMoverData.length) lastRunMovers = liveMoverData;
-    renderAll();
-    updateMovers();
-    updateRangePcts(selRank);
-    const now = new Date();
-    const tel = document.getElementById('update-time');
-    const el  = document.getElementById('last-updated');
-    if (el)  el.style.display = 'inline';
-    if (tel) tel.textContent  = now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    const dot = document.getElementById('live-dot');
-    if (dot) {
-      dot.style.background  = 'var(--green)';
-      dot.style.boxShadow   = '0 0 6px var(--green)';
-      setTimeout(() => { dot.style.background=''; dot.style.boxShadow=''; }, 800);
-    }
-  }
+  applyNbaBoxDisplay(allStats, gameDate || localDateStr(), true);
 }
 
 
