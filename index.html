@@ -8385,9 +8385,13 @@ async function fetchLiveStats(isFinal=false) {
             const stats = await fetchBoxScores(newGames.map(e => e.id));
             applyRealStats(stats, eventLocalDate(newGames[0]), teamIds, true, isFinal);
           }
-          // Box-score line for every finished game on this day. processedGameIds can't
-          // gate this: it also marks games applyRealStats silently skipped (it was handed
-          // an object, expects an array), so those games would never get a line.
+        }
+        // Box-score line for every finished game on this day. processedGameIds can't
+        // gate this: it also marks games applyRealStats silently skipped (it was handed
+        // an object, expects an array), so those games would never get a line. Also NOT
+        // gated on (isFinal || ago > 0): today's finished games (ago === 0) on a routine
+        // poll never reached this block, so tonight's stat lines stayed blank.
+        if (finished.length) {
           const boxIds = finished.map(e => e.id).filter(id => !_nbaBoxShown.has(id));
           if (boxIds.length) {
             boxIds.forEach(id => _nbaBoxShown.add(id));
