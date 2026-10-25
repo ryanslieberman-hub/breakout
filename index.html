@@ -8351,6 +8351,7 @@ async function fetchLiveStats(isFinal=false) {
   try { await nflTick(); } catch(e) { console.warn('NFL fetch:', e.message); }
   try { await nflReconcileStaleLive(); } catch(e) { console.warn('NFL reconcile:', e.message); }
   try {
+    let _nbaSlateSeen = false;
     for (let ago = 0; ago <= 2; ago++) {
       const d = new Date(); d.setDate(d.getDate() - ago);
       const ds = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
@@ -8375,7 +8376,7 @@ async function fetchLiveStats(isFinal=false) {
           const stats = await fetchBoxScores(live.map(e => e.id));
           applyLiveStats(stats, liveTeamIds, eventLocalDate(live[0]));
         }
-        if (finished.length && (isFinal || ago > 0)) {
+        if (!_nbaSlateSeen && finished.length && (isFinal || ago > 0)) {
           const newGames = finished.filter(e => !processedGameIds.has(e.id));
           if (newGames.length) {
             newGames.forEach(e => processedGameIds.add(e.id));
@@ -8399,7 +8400,7 @@ async function fetchLiveStats(isFinal=false) {
             catch(e) { boxIds.forEach(id => _nbaBoxShown.delete(id)); }
           }
         }
-        if (live.length || finished.length) break;
+        if (live.length || finished.length) _nbaSlateSeen = true; // pricing path stops at the newest slate; box lines keep going back
       } catch(e) { console.warn(`NBA fetch ago=${ago}:`, e.message); }
     }
     // Authoritative reset: if NO league saw a live game this cycle, clear the live
