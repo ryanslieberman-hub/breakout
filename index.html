@@ -6161,6 +6161,9 @@ function dayFromDateStr(s){
 }
 function todayDayNum(){ return dateToDayNum(new Date()); }
 // Always use local date strings - toISOString() returns UTC and shifts date after ~7pm EST
+// NFL plays once a week, so the 31-35 day close window that suits daily leagues shows only ~4 games
+// (CeeDee Lamb 2026-10-29: 7 closes in Firestore, 4 visible). Keep the whole season for NFL.
+function closeKeepDays(p, daily){ return p && p.league==='NFL' ? 200 : daily; }
 function localDateStr(offsetDays=0){
   const d = new Date(); d.setDate(d.getDate() - offsetDays);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -10168,13 +10171,13 @@ async function loadPricesFromFirestore() {
 
     // Always restore closes from Firestore - they're written immediately after every game
     if (d.closes) {
-      const _closeCutoff = localDateStr(35); // reject anything older than 34 days
       const _allPlayers = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers];
       Object.entries(d.closes).forEach(([rank, c]) => {
         const r = parseInt(rank);
         const pl = _allPlayers.find(x => x.rank === r);
         if (c && typeof c === 'object') {
           if (!closes[r]) closes[r] = {};
+          const _closeCutoff = localDateStr(closeKeepDays(pl, 35)); // reject anything older than 34 days (NFL: whole season)
           Object.entries(c).forEach(([date, price]) => {
             // Skip stale entries AND entries that equal statPrice (backfill artifacts)
             if (price <= 0 || date < _closeCutoff) return;
@@ -13260,7 +13263,7 @@ async function refreshAll() {
       if (!closes[p.rank]) closes[p.rank] = {};
       // Remove stale closes older than 31 days - they cause wrong 7/30D anchors
       Object.keys(closes[p.rank]).forEach(ds => {
-        if (ds < localDateStr(32)) delete closes[p.rank][ds];
+        if (ds < localDateStr(closeKeepDays(p, 32))) delete closes[p.rank][ds];
       });
 
       // Also seed priceHx from closes so multi-day charts have one point per game night
