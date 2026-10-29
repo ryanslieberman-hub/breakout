@@ -1,5 +1,6 @@
 import type { GameModule } from '../core/types';
-import { DashIcon, FlappyIcon, HopIcon, MergeIcon, StackIcon } from '../ui/icons';
+import { BaseballIcon, DashIcon, FlappyIcon, HopIcon, MergeIcon, StackIcon } from '../ui/icons';
+import Baseball from './baseball/Baseball';
 import Flappy from './flappy/Flappy';
 import LaneDash from './dash/LaneDash';
 import Hop from './hop/Hop';
@@ -12,4 +13,5 @@ export const games: GameModule[] = [
   { id: 'dash', title: 'Lane Dash', Icon: DashIcon, Component: LaneDash },
   { id: 'stack', title: 'Tower Stack', Icon: StackIcon, Component: TowerStack },
   { id: 'merge', title: 'Merge 16', Icon: MergeIcon, Component: Merge16 },
+  { id: 'baseball', title: 'Diamond Duel', Icon: BaseballIcon, Component: Baseball },
 ];
