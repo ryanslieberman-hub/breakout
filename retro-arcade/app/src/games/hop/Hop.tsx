@@ -47,7 +47,7 @@ const mix = (a: string, b: string, t: number) => {
   const [x, y] = [hex(a), hex(b)];
   return `#${x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')}`;
 };
-function skyAt(score: number) {
+export function skyAt(score: number) {
   let i = SKY.length - 2;
   for (let k = 0; k < SKY.length - 1; k++) if (score < SKY[k + 1].s) { i = k; break; }
   const a = SKY[i];
