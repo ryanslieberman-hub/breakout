@@ -8,7 +8,7 @@ import {
   golfPerf, priceFromPerf, finalize,
 } from './engine.js';
 import * as espnNba from './espn.js';
-import { fetchSeasonAverages } from './balldontlie.js';
+import { fetchSeasonAverages, blendAverage, espnSeasonLabel } from './espn-stats.js';
 import * as mlb from './mlb.js';
 import * as golf from './golf.js';
 import * as nfl from './nfl.js';
@@ -228,18 +228,24 @@ async function tickNba(env, today) {
 }
 
 export async function runNbaDailyRefresh(env) {
-  const season = new Date().getFullYear();
-  const averages = await fetchSeasonAverages(season, env.BALLDONTLIE_API_KEY);
+  const averages = await fetchSeasonAverages(espnSeasonLabel(), espnNba.normalizeName);
   const toUpdate = nbaRaw.filter(p => averages[espnNba.normalizeName(p.name)]);
   if (!toUpdate.length) return { league: 'nba', updated: 0, totalPlayers: nbaRaw.length };
 
   const states = await loadStatesBatch(env, 'nba', toUpdate);
+  // Blend against the roster's own line (nbaRaw), never the stored doc's - the
+  // doc's ppg is last night's blend, which would compound on itself daily.
   const updates = toUpdate.map(player => {
     const avg = averages[espnNba.normalizeName(player.name)];
     const existing = states[player.rank];
     return {
       path: docPath('nba', player.rank),
-      fields: { ppg: avg.ppg, rpg: avg.rpg, apg: avg.apg, statPrice: existing.statPrice, tier: existing.tier },
+      fields: {
+        ppg: blendAverage(player.ppg, avg.ppg, avg.gp),
+        rpg: blendAverage(player.rpg, avg.rpg, avg.gp),
+        apg: blendAverage(player.apg, avg.apg, avg.gp),
+        statPrice: existing.statPrice, tier: existing.tier,
+      },
     };
   });
   await firestoreBatchWriteDocs(env, updates);

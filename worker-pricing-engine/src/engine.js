@@ -8,6 +8,8 @@
 // ONE RULE: price = base × (1 + todayPerf)
 
 const MULT = { S: 1.35, A: 0.44, B: 0.10, C: 0.04, D: 0.018 };
+// NBA-only (repriced 2026-10-29; shared MULT left 189/285 players under $10). Keep in sync with index.html NBA_MULT.
+const NBA_MULT = { S: 1.35, A: 0.60, B: 0.28, C: 0.14, D: 0.08 };
 const PRICE_SCALE = 1;
 
 const UP = { S: 0.045, A: 0.048, B: 0.052, C: 0.056, D: 0.060 };
@@ -16,7 +18,7 @@ const CAP = 0.20;
 
 // ── Fundamental / statPrice, per league ──
 export function nbaStatPrice(p) {
-  return Math.max(0.01, (p.ppg * 10 + p.apg * 7 + p.rpg * 5) * MULT[p.tier] * PRICE_SCALE);
+  return Math.max(0.01, (p.ppg * 10 + p.apg * 7 + p.rpg * 5) * NBA_MULT[p.tier] * PRICE_SCALE);
 }
 
 export function mlbStatPrice(p) {

@@ -13,12 +13,9 @@ server-only writes.
 1. `npm install`
 2. `cp .dev.vars.example .dev.vars` and fill in:
    - `FIREBASE_SERVICE_ACCOUNT` - same service account JSON used by `worker-payments`
-   - `BALLDONTLIE_API_KEY` - sign up free at balldontlie.io; without this the
-     NBA daily baseline refresh (ppg/rpg/apg) fails with 401 and does nothing
 3. `npm run dev` to run locally, `npm run deploy` to ship it, then:
    ```
    npx wrangler secret put FIREBASE_SERVICE_ACCOUNT
-   npx wrangler secret put BALLDONTLIE_API_KEY
    ```
 
 ## What it does

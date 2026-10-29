@@ -12,6 +12,6 @@ crons = ["*/15 * * * *", "30 8 * * *", "0 11 * * *"]
 
 # Secrets (set with `wrangler secret put <NAME>`, never in this file):
 #   FIREBASE_SERVICE_ACCOUNT - same Firebase service account JSON as worker-payments
-#   BALLDONTLIE_API_KEY      - optional; balldontlie works unauthenticated at low volume
+#   (NBA season averages now come from ESPN - no API key needed)
 [vars]
 FIREBASE_PROJECT_ID = "athletex-ae63d"

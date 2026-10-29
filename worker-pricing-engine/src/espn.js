@@ -16,8 +16,14 @@ export async function fetchSummary(eventId) {
   return res.json();
 }
 
+// Roster names that differ from ESPN's displayName beyond a Jr./II suffix.
+const NAME_ALIASES = { 'alexandre sarr': 'alex sarr', 'cam johnson': 'cameron johnson', 'ron holland': 'ronald holland' };
+
 function normalizeName(name) {
-  return (name || '').toLowerCase().trim().replace(/[.'-]/g, '').replace(/\s+/g, ' ');
+  const n = (name || '').toLowerCase().trim()
+    .replace(/\b(jr|sr|ii|iii|iv)\b\.?/g, '') // ESPN says "Mikel Brown Jr.", roster says "Mikel Brown"
+    .replace(/[.'-]/g, '').replace(/\s+/g, ' ').trim();
+  return NAME_ALIASES[n] || n;
 }
 
 // Extracts { normalizedName -> { pts, reb, ast, stl, blk, tov, min } } from an
