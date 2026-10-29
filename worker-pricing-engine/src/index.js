@@ -440,7 +440,25 @@ async function tickGolf(env, today) {
 // today. For this trusted server-side engine, finalize is called here when
 // the game is complete, matching every other league's pattern, rather than
 // silently reproducing what looks like an oversight.
+//
+// Late-night games (TNF/SNF/MNF) can still be live or just-final after
+// midnight ET, at which point `today` has rolled over and today's scoreboard
+// no longer lists them - their close was silently never written (confirmed
+// live 2026-10-27: CeeDee Lamb missing 10/8 TNF and 10/18 SNF, ~19 players on
+// 10/8). So before 6am ET also sweep yesterday's scoreboard, skipping anyone
+// already closed for that date.
 async function tickNfl(env, today) {
+  const today_ = await tickNflDay(env, today, false);
+  if (easternHour() >= 6) return today_;
+  const carryover = await tickNflDay(env, easternDateStr(1), true);
+  return { ...today_, carryover };
+}
+
+function easternHour() {
+  return +new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: '2-digit', hour12: false }).format(new Date()) % 24;
+}
+
+async function tickNflDay(env, today, carryover) {
   const dateCompact = today.replaceAll('-', '');
   const sb = await nfl.fetchScoreboard(dateCompact);
   const events = sb.events || [];
@@ -480,11 +498,13 @@ async function tickNfl(env, today) {
     }
   }
 
-  const toProcess = Object.keys(fptsByRank).map(Number).filter(r => byRank[r]).map(r => byRank[r]);
+  let toProcess = Object.keys(fptsByRank).map(Number).filter(r => byRank[r]).map(r => byRank[r]);
   if (!toProcess.length) return { league: 'nfl', games: relevant.length, processed: 0, finalized: 0 };
 
-  const states = await loadStatesBatch(env, 'nfl', toProcess);
   const clientCloses = (await firestoreGetDoc(env, 'config/prices').catch(() => null))?.closes || {};
+  if (carryover) toProcess = toProcess.filter(pl => finalByRank[pl.rank] && clientCloses[String(pl.rank)]?.[today] === undefined);
+  if (!toProcess.length) return { league: 'nfl', games: relevant.length, processed: 0, finalized: 0 };
+  const states = await loadStatesBatch(env, 'nfl', toProcess);
   const updates = [];
   const movers = [];
   const configWrites = []; // mirrors finalized closes into config/prices - see below
