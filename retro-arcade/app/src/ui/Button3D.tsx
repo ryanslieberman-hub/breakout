@@ -9,10 +9,13 @@ interface Props {
   lip?: string;
   size?: number;
   minWidth?: number;
+  textColor?: string;
+  stroke?: string;
+  strokeWidth?: number;
 }
 
 /** Chunky button with a hard bottom lip that squashes on press. */
-export default function Button3D({ label, onPress, face = theme.orange, lip = theme.orangeDark, size = 24, minWidth = 150 }: Props) {
+export default function Button3D({ label, onPress, face = theme.orange, lip = theme.orangeDark, size = 24, minWidth = 150, textColor, stroke, strokeWidth = 2 }: Props) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
       {({ pressed }) => (
@@ -20,7 +23,7 @@ export default function Button3D({ label, onPress, face = theme.orange, lip = th
           <View style={[styles.lip, { backgroundColor: lip, paddingBottom: pressed ? 0 : 0 }]}>
             <View style={[styles.face, { backgroundColor: face }]}>
               <View style={styles.shine} />
-              <StrokedText size={size} width={2} style={{ paddingHorizontal: 22, paddingVertical: 7 }}>{label}</StrokedText>
+              <StrokedText size={size} width={strokeWidth} color={textColor} stroke={stroke} style={{ paddingHorizontal: 22, paddingVertical: 7 }}>{label}</StrokedText>
             </View>
           </View>
         </View>

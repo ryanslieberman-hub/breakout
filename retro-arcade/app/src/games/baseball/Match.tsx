@@ -3,6 +3,10 @@ import { useEffect, useMemo, useReducer, useRef } from 'react';
 import { Platform as RNPlatform, Pressable, StyleSheet, Text, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
 import { useGameLoop } from '../../core/useGameLoop';
 import Button3D from '../../ui/Button3D';
+import Bust from './Bust';
+import { GOLD, NAVY } from './Card';
+import { BackButton } from './Chrome';
+import Stadium from './Stadium';
 import StrokedText from '../../ui/StrokedText';
 import { fonts, theme } from '../../ui/theme';
 import Runner from '../dash/Runner';
@@ -66,6 +70,8 @@ export default function Match({ lineup, oppTeam, oppOvr, onFinish, onExit }: {
   const batterIdx = useRef(0);
   const cpuRuns = useRef(0);
   const finalWon = useRef(false);
+  const youLine = useRef<number[]>([]);
+  const oppLine = useRef<number[]>([]);
 
   const batter = lineup[batterIdx.current % 9];
 
@@ -82,7 +88,10 @@ export default function Match({ lineup, oppTeam, oppOvr, onFinish, onExit }: {
 
   const nextBatter = () => { batterIdx.current += 1; balls.current = 0; strikes.current = 0; };
 
-  const addRuns = (n: number) => { runsFor.current += n; };
+  const addRuns = (n: number) => {
+    runsFor.current += n;
+    youLine.current[inning.current - 1] = (youLine.current[inning.current - 1] ?? 0) + n;
+  };
 
   const advance = (n: number) => {
     const next = [false, false, false];
@@ -171,6 +180,7 @@ export default function Match({ lineup, oppTeam, oppOvr, onFinish, onExit }: {
       const gauss = (Math.random() + Math.random() + Math.random() - 1.5) * 1.6;
       cpuRuns.current = Math.max(0, Math.round(0.9 + (oppOvr - 58) / 34 + gauss));
       runsAgainst.current += cpuRuns.current;
+      oppLine.current[inning.current - 1] = cpuRuns.current;
       setPhase('cpu');
       return true;
     }
@@ -306,11 +316,10 @@ export default function Match({ lineup, oppTeam, oppOvr, onFinish, onExit }: {
   // ---- render ----
   const p = pitch.current;
   const ph = phase.current;
+  const ballAt = (t: number) => (p ? pitchPos(p, Math.min(1.08, t)) : null);
+  const tNow = p ? (time.current - p.t0) / p.dur : 0;
   const ballNow = (() => {
-    if (ph === 'pitch' && p) {
-      const t = Math.min(1.08, (time.current - p.t0) / p.dur);
-      return pitchPos(p, t);
-    }
+    if (ph === 'pitch' && p) return ballAt(tNow);
     if (ph === 'flight') {
       const f = flight.current;
       const t = Math.min(1, phaseT.current / f.dur);
@@ -321,64 +330,96 @@ export default function Match({ lineup, oppTeam, oppOvr, onFinish, onExit }: {
     }
     return null;
   })();
-  const shadow = ph === 'flight' && ballNow ? (() => {
-    const f = flight.current;
-    const t = Math.min(1, phaseT.current / f.dur);
-    const e = 1 - (1 - t) * (1 - t);
-    return { x: f.fromX + (f.toX - f.fromX) * e, y: f.fromY + (f.toY - f.fromY) * e };
-  })() : null;
+  const trail = ph === 'pitch' && p ? [0.05, 0.1, 0.15].map((d) => ballAt(tNow - d / p.dur * 1)).filter(Boolean) : [];
+  const shadow = (() => {
+    if (ph === 'flight') {
+      const f = flight.current;
+      const t = Math.min(1, phaseT.current / f.dur);
+      const e = 1 - (1 - t) * (1 - t);
+      return { x: f.fromX + (f.toX - f.fromX) * e, y: f.fromY + (f.toY - f.fromY) * e, s: 1 - Math.sin(Math.PI * t) * 0.4 };
+    }
+    if (ph === 'pitch' && ballNow) return { x: ballNow.x, y: ballNow.y + ballNow.size * 0.9, s: 0.6 + tNow * 0.4 };
+    return null;
+  })();
 
   const bannerNow = ph === 'result' ? banner.current : null;
   const batAngle = BAT_ANGLE(batT.current);
   const showBat = ph !== 'cpu' && ph !== 'final';
+  const cols = Math.max(INNINGS, inning.current);
+  const abbr = oppTeam.name.slice(0, 3).toUpperCase();
+  const foul = (len: number, angle: number, x: number, y: number, key: string) => (
+    <View key={key} pointerEvents="none" style={{ position: 'absolute', left: x - 1.5, top: y - len, width: 3, height: len, backgroundColor: 'rgba(255,255,255,0.85)', transformOrigin: 'bottom', transform: [{ rotate: `${angle}deg` }] }} />
+  );
+  const leg = diagHalf * Math.SQRT2;
+
+  const led = (text: string | number, on = true, w = 22) => (
+    <Text style={[styles.led, { width: w }, !on && { opacity: 0.25 }]}>{text}</Text>
+  );
+  const lights = (n: number, on: number, color: string) => (
+    <View style={{ flexDirection: 'row', gap: 4 }}>
+      {Array.from({ length: n }, (_, i) => <View key={i} style={[styles.bulb, { backgroundColor: i < on ? color : '#2a2f45', boxShadow: i < on ? `0px 0px 6px ${color}` : undefined }]} />)}
+    </View>
+  );
 
   return (
     <View style={styles.root} onStartShouldSetResponder={() => true} onResponderGrant={onGrant}>
-      {/* stands + wall */}
-      <LinearGradient colors={['#3b2a5e', '#5a4890']} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: wallY }} />
-      {crowd.map((c, i) => <View key={i} style={{ position: 'absolute', left: c.x, top: c.y + 24, width: 5, height: 5, borderRadius: 3, backgroundColor: c.c, opacity: 0.8 }} />)}
-      <View style={{ position: 'absolute', left: 0, right: 0, top: wallY - 8, height: 30, backgroundColor: '#1f5a34', borderTopWidth: 3, borderBottomWidth: 3, borderColor: theme.ink, flexDirection: 'row' }}>
-        {TEAMS.slice(0, 8).map((t) => <View key={t.id} style={{ flex: 1, marginVertical: 4, marginHorizontal: 2, backgroundColor: t.color, opacity: 0.9, borderRadius: 2 }} />)}
+      <Stadium horizon={wallY / H} lights={false} />
+
+      {/* outfield wall + warning track */}
+      <View style={{ position: 'absolute', left: 0, right: 0, top: wallY - 12, height: 34, backgroundColor: '#0f4a2a', borderTopWidth: 5, borderTopColor: GOLD, borderBottomWidth: 3, borderBottomColor: theme.ink, flexDirection: 'row', paddingVertical: 4, paddingHorizontal: 3, gap: 3 }}>
+        {TEAMS.slice(0, 8).map((t) => (
+          <View key={t.id} style={{ flex: 1, backgroundColor: t.color, borderRadius: 2, borderWidth: 1.5, borderColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }}>
+            <View style={{ height: 2, backgroundColor: t.accent, opacity: 0.8 }} />
+          </View>
+        ))}
       </View>
-      {/* field */}
-      <LinearGradient colors={['#4fb36a', '#3a9a56']} style={{ position: 'absolute', left: 0, right: 0, top: wallY + 22, bottom: 0 }} />
-      {Array.from({ length: 12 }, (_, i) => (
-        <View key={i} style={{ position: 'absolute', left: 0, right: 0, top: wallY + 22 + i * 64, height: 32, backgroundColor: 'rgba(255,255,255,0.05)' }} />
-      ))}
-      {/* infield */}
-      <View style={{ position: 'absolute', left: cx - diagHalf * 0.72, top: centerY - diagHalf * 0.72, width: diagHalf * 1.44, height: diagHalf * 1.44, backgroundColor: '#c98f5a', borderWidth: 3, borderColor: 'rgba(255,255,255,0.8)', transform: [{ rotate: '45deg' }] }}>
-        <View style={{ position: 'absolute', left: '16%', right: '16%', top: '16%', bottom: '16%', backgroundColor: '#4fb36a' }} />
-      </View>
-      <View style={{ position: 'absolute', left: cx - 26, top: moundY - 16, width: 52, height: 32, borderRadius: 26, backgroundColor: '#c98f5a', borderWidth: 2, borderColor: 'rgba(59,42,63,0.4)' }} />
+      <LinearGradient colors={['#a57738', '#8a5f2b']} style={{ position: 'absolute', left: 0, right: 0, top: wallY + 22, height: 22 }} />
+
+      {/* infield dirt, grass and chalk */}
+      <View style={{ position: 'absolute', left: cx - diagHalf * 0.98, top: centerY + diagHalf * 0.08 - diagHalf * 0.98, width: diagHalf * 1.96, height: diagHalf * 1.96, borderRadius: diagHalf, backgroundColor: '#b8803f' }} />
+      <View style={{ position: 'absolute', left: cx - diagHalf * 0.5, top: centerY - diagHalf * 0.5, width: diagHalf, height: diagHalf, backgroundColor: '#2a7f46', transform: [{ rotate: '45deg' }], borderRadius: 6 }} />
+      {foul(leg * 1.9, 45, cx, homeY, 'f1')}
+      {foul(leg * 1.9, -45, cx, homeY, 'f2')}
+      {foul(leg, -45, bases[0].x, bases[0].y, 'b1')}
+      {foul(leg, 45, bases[2].x, bases[2].y, 'b2')}
+      <View style={{ position: 'absolute', left: cx - 48, top: homeY - 48, width: 96, height: 96, borderRadius: 48, backgroundColor: '#b8803f' }} />
+      {[-1, 1].map((s) => <View key={s} style={{ position: 'absolute', left: cx + s * 40 - 13, top: homeY - 34, width: 26, height: 56, borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)' }} />)}
+      <View style={{ position: 'absolute', left: cx - 30, top: moundY - 20, width: 60, height: 40, borderRadius: 30, backgroundColor: '#a06f33' }} />
+      <View style={{ position: 'absolute', left: cx - 10, top: moundY - 2, width: 20, height: 4, backgroundColor: '#fff', borderRadius: 1 }} />
 
       {/* bases */}
       {bases.map((b, i) => (
-        <View key={i} style={{ position: 'absolute', left: b.x - 12, top: b.y - 12, width: 24, height: 24, backgroundColor: onBase.current[i] ? theme.yellow : '#fff', borderWidth: 2.5, borderColor: theme.ink, transform: [{ rotate: '45deg' }] }} />
+        <View key={i} style={{ position: 'absolute', left: b.x - 12, top: b.y - 12, width: 24, height: 24, backgroundColor: onBase.current[i] ? GOLD : '#fff', borderWidth: 2.5, borderColor: theme.ink, transform: [{ rotate: '45deg' }], boxShadow: '2px 3px 0px rgba(0,0,0,0.3)' }} />
       ))}
-      <View style={{ position: 'absolute', left: cx - 14, top: homeY - 10, width: 28, height: 22, backgroundColor: '#fff', borderWidth: 2.5, borderColor: theme.ink, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }} />
+      <View style={{ position: 'absolute', left: cx - 15, top: homeY - 11, width: 30, height: 24, backgroundColor: '#fff', borderWidth: 2.5, borderColor: theme.ink, borderBottomLeftRadius: 9, borderBottomRightRadius: 9 }} />
       {onBase.current.map((on, i) => on && (
-        <View key={`r${i}`} style={{ position: 'absolute', left: bases[i].x - 13, top: bases[i].y - 50 }}>
-          <Runner size={46} cycle={time.current * 6 + i} jersey={TEAMS[0].color} cap={TEAMS[0].accent} />
+        <View key={`r${i}`} style={{ position: 'absolute', left: bases[i].x - 14, top: bases[i].y - 56 }}>
+          <View style={styles.shadow} />
+          <Runner size={52} cycle={time.current * 6 + i} jersey={lineup[0].team.color} cap={lineup[0].team.accent} />
         </View>
       ))}
 
       {/* pitcher */}
-      <View style={{ position: 'absolute', left: cx - 12, top: moundY - 46 }}>
-        <Runner size={44} cycle={0} jersey={oppTeam.color} cap={oppTeam.accent} />
+      <View style={{ position: 'absolute', left: cx - 17, top: moundY - 52 }}>
+        <Pitcher s={56} team={oppTeam} wind={ph === 'wait' ? Math.min(1, phaseT.current / 0.9) : ph === 'pitch' && tNow < 0.15 ? 1 : 0} />
       </View>
 
       {/* strike zone */}
-      <View style={{ position: 'absolute', left: cx - ZONE_HALF, top: homeY - 40, width: ZONE_HALF * 2, height: 52, borderWidth: 2, borderColor: 'rgba(255,255,255,0.75)', borderStyle: 'dashed', borderRadius: 4 }} />
+      <View style={{ position: 'absolute', left: cx - ZONE_HALF, top: homeY - 40, width: ZONE_HALF * 2, height: 52, borderWidth: 2, borderColor: 'rgba(255,255,255,0.7)', borderStyle: 'dashed', borderRadius: 4 }} />
 
       {/* batter */}
       {showBat && (
-        <View style={{ position: 'absolute', left: cx - 78, top: homeY - 52 }}>
-          <Runner size={74} cycle={0} jersey={batter.team.color} cap={batter.team.accent} />
-          <View style={{ position: 'absolute', left: 46, top: 18, width: 8, height: 62, borderRadius: 4, backgroundColor: '#d9a066', borderWidth: 2, borderColor: theme.ink, transformOrigin: 'bottom', transform: [{ rotate: `${batAngle}deg` }] }} />
+        <View style={{ position: 'absolute', left: cx - 86, top: homeY - 66 }}>
+          <View style={[styles.shadow, { left: 10, width: 54 }]} />
+          <Runner size={92} cycle={0} jersey={batter.team.color} cap={batter.team.accent} />
+          <View style={{ position: 'absolute', left: 56, top: 24, width: 9, height: 74, borderRadius: 5, backgroundColor: '#e2b070', borderWidth: 2, borderColor: theme.ink, transformOrigin: 'bottom', transform: [{ rotate: `${batAngle}deg` }] }} />
         </View>
       )}
 
-      {shadow && <View style={{ position: 'absolute', left: shadow.x - 8, top: shadow.y + 8, width: 16, height: 6, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.25)' }} />}
+      {shadow && <View style={{ position: 'absolute', left: shadow.x - 9 * shadow.s, top: shadow.y + 6, width: 18 * shadow.s, height: 7 * shadow.s, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.3)' }} />}
+      {trail.map((t, i) => t && (
+        <View key={i} style={{ position: 'absolute', left: t.x - t.size / 2, top: t.y - t.size / 2, width: t.size, height: t.size, borderRadius: t.size / 2, backgroundColor: '#fff', opacity: 0.28 - i * 0.08 }} />
+      ))}
       {ballNow && (
         <View style={{ position: 'absolute', left: ballNow.x - ballNow.size / 2, top: ballNow.y - ballNow.size / 2, width: ballNow.size, height: ballNow.size, borderRadius: ballNow.size / 2, backgroundColor: '#fff', borderWidth: Math.max(1.5, ballNow.size / 12), borderColor: theme.ink, overflow: 'hidden' }}>
           <View style={{ position: 'absolute', left: -ballNow.size * 0.55, top: ballNow.size * 0.1, width: ballNow.size * 0.6, height: ballNow.size * 0.75, borderRadius: ballNow.size, borderWidth: 1.2, borderColor: theme.red }} />
@@ -386,66 +427,81 @@ export default function Match({ lineup, oppTeam, oppOvr, onFinish, onExit }: {
         </View>
       )}
 
-      {ph === 'pitch' && p && time.current - p.t0 < 0.45 && (
+      {ph === 'pitch' && p && time.current - p.t0 < 0.5 && (
         <View style={styles.pitchTag} pointerEvents="none"><Text style={styles.pitchTagText}>{p.type}</Text></View>
       )}
 
-      {/* scoreboard */}
-      <View style={styles.hud} pointerEvents="none">
-        <View style={styles.scoreBox}>
-          <Text style={styles.hudLabel}>INN</Text>
-          <StrokedText size={22} width={2}>{inning.current > INNINGS ? `${inning.current}X` : String(inning.current)}</StrokedText>
+      {/* LED scoreboard */}
+      <View style={styles.board} pointerEvents="none">
+        <View style={{ flex: 1 }}>
+          <View style={styles.lineRow}>
+            {led('', true, 40)}
+            {Array.from({ length: cols }, (_, i) => led(i + 1, i < inning.current, 20))}
+            {led('R', true, 24)}
+          </View>
+          <View style={styles.lineRow}>
+            {led('YOU', true, 40)}
+            {Array.from({ length: cols }, (_, i) => led(i < inning.current ? (youLine.current[i] ?? 0) : '·', i < inning.current, 20))}
+            {led(runsFor.current, true, 24)}
+          </View>
+          <View style={styles.lineRow}>
+            {led(abbr, true, 40)}
+            {Array.from({ length: cols }, (_, i) => led(i < inning.current - 1 || (i === inning.current - 1 && ph === 'cpu') ? (oppLine.current[i] ?? 0) : '·', i < inning.current, 20))}
+            {led(runsAgainst.current, true, 24)}
+          </View>
         </View>
-        <View style={[styles.scoreBox, { minWidth: 138 }]}>
-          <View style={styles.scoreRow}>
-            <Text style={styles.hudLabel}>YOU</Text>
-            <StrokedText size={24} width={2}>{runsFor.current}</StrokedText>
-          </View>
-          <View style={styles.scoreRow}>
-            <Text style={styles.hudLabel}>{oppTeam.name.toUpperCase().slice(0, 8)}</Text>
-            <StrokedText size={24} width={2}>{runsAgainst.current}</StrokedText>
-          </View>
-        </View>
-        <View style={styles.scoreBox}>
-          <Text style={styles.hudLabel}>B-S</Text>
-          <StrokedText size={22} width={2}>{`${balls.current}-${strikes.current}`}</StrokedText>
-          <View style={{ flexDirection: 'row', gap: 4, marginTop: 2 }}>
-            {[0, 1, 2].map((i) => <View key={i} style={[styles.out, i < outs.current && { backgroundColor: theme.red }]} />)}
-          </View>
+        <View style={styles.bso}>
+          <View style={styles.bsoRow}><Text style={styles.bsoLabel}>B</Text>{lights(3, balls.current, '#46e07a')}</View>
+          <View style={styles.bsoRow}><Text style={styles.bsoLabel}>S</Text>{lights(2, strikes.current, '#ffb02e')}</View>
+          <View style={styles.bsoRow}><Text style={styles.bsoLabel}>O</Text>{lights(2, outs.current, '#ff4d3d')}</View>
         </View>
       </View>
 
-      <Pressable style={styles.exit} onPress={onExit} hitSlop={12} accessibilityLabel="Quit game">
-        <Text style={styles.exitText}>‹</Text>
-      </Pressable>
+      <BackButton onPress={onExit} label="Quit game" />
 
-      {/* batter strip */}
+      {/* batter plate */}
       <View style={styles.strip} pointerEvents="none">
-        <Text style={styles.stripName}>{batter.first} {batter.last}</Text>
-        <Text style={styles.stripStats}>OVR {batter.ovr}  CON {batter.contact}  POW {batter.power}  SPD {batter.speed}</Text>
-        {phase.current === 'wait' && batterIdx.current === 0 && inning.current === 1 && <Text style={styles.stripHint}>TAP ON THE BALL AS IT REACHES THE PLATE</Text>}
+        <View style={[styles.stripFace, { backgroundColor: batter.team.color }]}>
+          <View style={{ position: 'absolute', left: -4, top: 4 }}><Bust p={batter} w={58} /></View>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text numberOfLines={1} style={styles.stripName}>{batter.first} {batter.last}</Text>
+          <View style={{ flexDirection: 'row', gap: 6, marginTop: 3 }}>
+            {[['CON', batter.contact], ['POW', batter.power], ['SPD', batter.speed]].map(([l, v]) => (
+              <View key={l as string} style={styles.chip}><Text style={styles.chipLabel}>{l}</Text><Text style={styles.chipValue}>{v}</Text></View>
+            ))}
+          </View>
+        </View>
+        <View style={styles.ovr}><Text style={styles.ovrNum}>{batter.ovr}</Text><Text style={styles.ovrPos}>{batter.pos}</Text></View>
       </View>
+      {phase.current === 'wait' && batterIdx.current === 0 && inning.current === 1 && (
+        <Text style={styles.hint} pointerEvents="none">TAP WHERE THE BALL ARRIVES, THE MOMENT IT ARRIVES</Text>
+      )}
 
       {bannerNow && (
-        <View style={styles.banner} pointerEvents="none">
-          <StrokedText size={bannerNow.text.length > 10 ? 34 : 44} color={bannerNow.color} width={3} drop={3}>{bannerNow.text}</StrokedText>
-          {bannerNow.sub && <StrokedText size={13} font={fonts.pixelBold} width={2}>{bannerNow.sub}</StrokedText>}
+        <View style={styles.stinger} pointerEvents="none">
+          <View style={styles.stingerBand}>
+            <View style={styles.stingerRule} />
+            <StrokedText size={bannerNow.text.length > 10 ? 36 : 46} color={bannerNow.color} width={3} drop={3}>{bannerNow.text}</StrokedText>
+            {bannerNow.sub && <Text style={styles.stingerSub}>{bannerNow.sub.toUpperCase()}</Text>}
+            <View style={styles.stingerRule} />
+          </View>
         </View>
       )}
 
       {ph === 'cpu' && (
         <View style={styles.interstitial} pointerEvents="none">
-          <StrokedText size={20} font={fonts.pixelBold} width={2}>{`BOTTOM OF ${inning.current}`}</StrokedText>
-          <StrokedText size={34} color={cpuRuns.current ? '#ff8a8a' : '#9ee6a8'} width={3} drop={3}>{cpuRuns.current ? `${oppTeam.name} score ${cpuRuns.current}` : `${oppTeam.name} go down 1-2-3`}</StrokedText>
+          <Text style={styles.interLabel}>{`BOTTOM OF INNING ${inning.current}`}</Text>
+          <StrokedText size={36} color={cpuRuns.current ? '#ff8a8a' : '#7ee08f'} width={3} drop={3}>{cpuRuns.current ? `${oppTeam.name} score ${cpuRuns.current}` : `${oppTeam.name} go down 1-2-3`}</StrokedText>
         </View>
       )}
 
       {ph === 'final' && (
         <View style={styles.interstitial}>
-          <StrokedText size={50} color={finalWon.current ? theme.yellow : '#ff8a8a'} width={3} drop={3}>{finalWon.current ? 'YOU WIN!' : 'YOU LOSE'}</StrokedText>
-          <StrokedText size={30} width={2.5}>{`${runsFor.current} - ${runsAgainst.current}`}</StrokedText>
+          <StrokedText size={52} color={finalWon.current ? GOLD : '#ff8a8a'} width={3.5} drop={4}>{finalWon.current ? 'YOU WIN!' : 'YOU LOSE'}</StrokedText>
+          <StrokedText size={34} width={3}>{`${runsFor.current} – ${runsAgainst.current}`}</StrokedText>
           <View style={{ marginTop: 14 }}>
-            <Button3D label="Collect" onPress={() => onFinish({ won: finalWon.current, runsFor: runsFor.current, runsAgainst: runsAgainst.current })} />
+            <Button3D label="Collect" onPress={() => onFinish({ won: finalWon.current, runsFor: runsFor.current, runsAgainst: runsAgainst.current })} face={GOLD} lip="#b8860b" textColor={NAVY} stroke="#fff3b0" strokeWidth={1.5} />
           </View>
         </View>
       )}
@@ -453,22 +509,58 @@ export default function Match({ lineup, oppTeam, oppOvr, onFinish, onExit }: {
   );
 }
 
+/** Front-facing pitcher: jersey, glove, cap. `wind` raises the arm for the delivery. */
+function Pitcher({ s, team, wind }: { s: number; team: Team; wind: number }) {
+  const w = s * 0.62;
+  const b = Math.max(1.5, s / 30);
+  return (
+    <View style={{ width: w, height: s }}>
+      <View style={[styles.shadow, { left: 0, width: w, top: s - 6 }]} />
+      {[0.14, 0.5].map((x) => <View key={x} style={{ position: 'absolute', left: w * x, top: s * 0.62, width: w * 0.36, height: s * 0.36, borderRadius: 4, backgroundColor: '#e9edf5', borderWidth: b, borderColor: theme.ink }} />)}
+      <View style={{ position: 'absolute', left: w * 0.06, top: s * 0.3, width: w * 0.88, height: s * 0.4, borderRadius: w * 0.22, backgroundColor: team.color, borderWidth: b, borderColor: theme.ink, overflow: 'hidden' }}>
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: '35%', backgroundColor: 'rgba(255,255,255,0.15)' }} />
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: s * 0.05, backgroundColor: team.accent }} />
+      </View>
+      <View style={{ position: 'absolute', left: -w * 0.12, top: s * 0.34 - wind * s * 0.3, width: w * 0.22, height: s * 0.3, borderRadius: w * 0.1, backgroundColor: team.color, borderWidth: b, borderColor: theme.ink, transform: [{ rotate: `${wind * -22}deg` }] }}>
+        <View style={{ position: 'absolute', left: -3, top: -s * 0.1, width: w * 0.3, height: w * 0.3, borderRadius: w * 0.15, backgroundColor: '#7a4a22', borderWidth: b, borderColor: theme.ink }} />
+      </View>
+      <View style={{ position: 'absolute', right: -w * 0.08, top: s * 0.38, width: w * 0.2, height: s * 0.26, borderRadius: w * 0.1, backgroundColor: team.color, borderWidth: b, borderColor: theme.ink }} />
+      <View style={{ position: 'absolute', left: w * 0.24, top: s * 0.08, width: w * 0.52, height: w * 0.52, borderRadius: w * 0.26, backgroundColor: '#e0a878', borderWidth: b, borderColor: theme.ink }}>
+        {[0.2, 0.62].map((x) => <View key={x} style={{ position: 'absolute', left: `${x * 100}%`, top: '45%', width: 3, height: 3, borderRadius: 2, backgroundColor: theme.ink }} />)}
+      </View>
+      <View style={{ position: 'absolute', left: w * 0.2, top: s * 0.02, width: w * 0.6, height: w * 0.3, borderTopLeftRadius: w * 0.3, borderTopRightRadius: w * 0.3, backgroundColor: team.color, borderWidth: b, borderColor: theme.ink }} />
+      <View style={{ position: 'absolute', left: w * 0.16, top: s * 0.1, width: w * 0.68, height: w * 0.1, borderRadius: 4, backgroundColor: team.color, borderWidth: b, borderColor: theme.ink }} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#3a9a56', overflow: 'hidden' },
-  hud: { position: 'absolute', top: 44, left: 62, right: 12, flexDirection: 'row', justifyContent: 'flex-end', gap: 6 },
-  scoreBox: { backgroundColor: theme.ink, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, alignItems: 'center', minWidth: 54 },
-  scoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, alignSelf: 'stretch' },
-  hudLabel: { fontFamily: fonts.pixelBold, fontSize: 9, color: '#ffb74d', letterSpacing: 1 },
-  out: { width: 9, height: 9, borderRadius: 5, borderWidth: 1.5, borderColor: '#fff', backgroundColor: 'transparent' },
-  exit: { position: 'absolute', top: 44, left: 14, width: 40, height: 40, borderRadius: 20, backgroundColor: theme.ink, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.85)' },
-  exitText: { color: '#fff', fontSize: 28, lineHeight: 30, fontFamily: fonts.display, marginTop: -3 },
-  strip: { position: 'absolute', left: 14, right: 14, bottom: 26, backgroundColor: 'rgba(59,42,63,0.86)', borderRadius: 14, paddingVertical: 8, paddingHorizontal: 14, alignItems: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
+  root: { flex: 1, backgroundColor: '#1f6b3d', overflow: 'hidden' },
+  shadow: { position: 'absolute', left: 8, top: '88%', width: 40, height: 10, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.28)' },
+  board: { position: 'absolute', top: 40, left: 62, right: 10, flexDirection: 'row', gap: 10, backgroundColor: '#070a18', borderRadius: 10, borderWidth: 2.5, borderColor: '#2a2f45', paddingVertical: 5, paddingHorizontal: 8, boxShadow: '0px 4px 0px rgba(0,0,0,0.4)' },
+  lineRow: { flexDirection: 'row', alignItems: 'center', height: 18 },
+  led: { fontFamily: fonts.pixelBold, fontSize: 11, color: '#ffb02e', textAlign: 'center', textShadowColor: 'rgba(255,176,46,0.75)', textShadowRadius: 6, textShadowOffset: { width: 0, height: 0 } },
+  bso: { justifyContent: 'center', gap: 3, paddingLeft: 10, borderLeftWidth: 2, borderLeftColor: '#2a2f45' },
+  bsoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  bsoLabel: { width: 10, fontFamily: fonts.pixelBold, fontSize: 9, color: '#9aa3c4' },
+  bulb: { width: 11, height: 11, borderRadius: 6, borderWidth: 1, borderColor: '#0a0c18' },
+  strip: { position: 'absolute', left: 12, right: 12, bottom: 22, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: NAVY, borderRadius: 16, borderWidth: 3, borderColor: GOLD, paddingVertical: 7, paddingLeft: 8, paddingRight: 12, boxShadow: '0px 5px 0px rgba(0,0,0,0.4)' },
+  stripFace: { width: 50, height: 50, borderRadius: 25, borderWidth: 3, borderColor: '#fff', overflow: 'hidden' },
   stripName: { fontFamily: fonts.display, fontSize: 20, color: '#fff' },
-  stripStats: { fontFamily: fonts.pixelBold, fontSize: 10, color: '#ffb74d', marginTop: 2, letterSpacing: 0.5 },
-  stripHint: { fontFamily: fonts.pixel, fontSize: 9, color: '#fff', marginTop: 5, opacity: 0.85 },
-  pitchTag: { position: 'absolute', left: 0, right: 0, top: H_TAG, alignItems: 'center' },
-  pitchTagText: { fontFamily: fonts.pixelBold, fontSize: 11, color: theme.ink, backgroundColor: 'rgba(255,255,255,0.85)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
-  banner: { position: 'absolute', left: 0, right: 0, top: '44%', alignItems: 'center', gap: 6 },
-  interstitial: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: 'rgba(59,42,63,0.6)', paddingHorizontal: 20 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#1b2a5c', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+  chipLabel: { fontFamily: fonts.pixelBold, fontSize: 7, color: '#8f9bc0' },
+  chipValue: { fontFamily: fonts.display, fontSize: 13, color: '#fff' },
+  ovr: { alignItems: 'center', minWidth: 42 },
+  ovrNum: { fontFamily: fonts.display, fontSize: 28, lineHeight: 30, color: GOLD },
+  ovrPos: { fontFamily: fonts.pixelBold, fontSize: 9, color: '#8f9bc0' },
+  hint: { position: 'absolute', left: 0, right: 0, bottom: 100, textAlign: 'center', fontFamily: fonts.pixelBold, fontSize: 9, color: '#fff', textShadowColor: '#000', textShadowRadius: 3, textShadowOffset: { width: 1, height: 1 } },
+  pitchTag: { position: 'absolute', left: 0, right: 0, top: 112, alignItems: 'center' },
+  pitchTagText: { fontFamily: fonts.pixelBold, fontSize: 11, color: GOLD, backgroundColor: 'rgba(7,10,24,0.85)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 4, overflow: 'hidden', letterSpacing: 1 },
+  stinger: { position: 'absolute', left: -20, right: -20, top: '38%', transform: [{ rotate: '-3deg' }] },
+  stingerBand: { backgroundColor: 'rgba(7,10,24,0.88)', paddingVertical: 8, alignItems: 'center', gap: 4 },
+  stingerRule: { alignSelf: 'stretch', height: 3, backgroundColor: GOLD },
+  stingerSub: { fontFamily: fonts.pixelBold, fontSize: 11, color: '#fff', letterSpacing: 1.5 },
+  interstitial: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: 'rgba(7,10,24,0.82)', paddingHorizontal: 20 },
+  interLabel: { fontFamily: fonts.pixelBold, fontSize: 12, color: GOLD, letterSpacing: 2 },
 });
 
