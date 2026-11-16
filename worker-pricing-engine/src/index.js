@@ -280,8 +280,11 @@ export async function runNbaDailyRefresh(env) {
 // other's drift onto the client.
 function mirrorClose(rank, perf, workerCloseVal, statPrice, today, clientClosesByRank) {
   const clientCloses = (clientClosesByRank && clientClosesByRank[String(rank)]) || {};
+  // Only a close inside the client's own validity band counts as a prior
+  // price. An out-of-band one is a write the client already ignores; deriving
+  // tonight's close from it would just reproduce the same bad value.
   const priorDates = Object.keys(clientCloses)
-    .filter(d => d < today && clientCloses[d] > 0)
+    .filter(d => d < today && clientCloses[d] >= statPrice * 0.55 && clientCloses[d] <= statPrice * 1.70)
     .sort();
   let val;
   if (priorDates.length) {
@@ -515,6 +518,34 @@ async function tickNflDay(env, today, carryover) {
   if (carryover) toProcess = toProcess.filter(pl => finalByRank[pl.rank] && clientCloses[String(pl.rank)]?.[today] === undefined);
   if (!toProcess.length) return { league: 'nfl', games: relevant.length, processed: 0, finalized: 0 };
   const states = await loadStatesBatch(env, 'nfl', toProcess);
+  // The roster file shipped with this worker is the source of truth for what a
+  // player is worth (tier, statPrice, fpts baseline) - NOT the copy stored in
+  // their priceEngine doc, which loadStatesBatch lets override the defaults.
+  // A stored copy from an older price scale never gets refreshed on its own:
+  // confirmed live 2026-11-16, six players (Joe Burrow, Ja'Marr Chase, Chase
+  // Brown, Jordan Love, Marvin Harrison Jr., Jayden Reed) still carried a
+  // statPrice ~30x too low (Burrow 22.01 vs 648). Every game was then priced
+  // and band-clamped against that, and mirrored into config/prices at a few
+  // dollars - a value the client's own validity band throws away, so the
+  // player showed no movement at all after a real game.
+  // When the stored scale disagrees with the roster, adopt the roster's and
+  // rebuild the price history from config/prices' own in-band closes, so the
+  // next close is derived from a real prior price rather than the bad scale.
+  let rescaled = 0;
+  for (const player of toProcess) {
+    const st = states[player.rank];
+    const want = statPriceFor('nfl', player);
+    if (!(want > 0)) continue;
+    if (Math.abs((st.statPrice || 0) - want) / want <= 0.02 && st.tier === player.tier) continue;
+    const cc = clientCloses[String(player.rank)] || {};
+    const seeded = {};
+    for (const [d, v] of Object.entries(cc)) {
+      if (d < today && v >= want * 0.55 && v <= want * 1.70) seeded[d] = v;
+    }
+    states[player.rank] = { ...st, tier: player.tier, statPrice: want, fpts: player.fpts, closes: seeded, base: null };
+    rescaled++;
+  }
+  if (rescaled) console.log(`tickNfl: re-based ${rescaled} player(s) whose stored statPrice/tier disagreed with the roster`);
   const updates = [];
   const movers = [];
   const configWrites = []; // mirrors finalized closes into config/prices - see below
