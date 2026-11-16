@@ -4,6 +4,8 @@ import {
   firestorePatchDoc,
   firestoreSetNestedField,
   firestoreQuery,
+  firestoreDeleteDoc,
+  firestoreListCollection,
   firestoreBeginTransaction,
   firestoreCommit,
   updateWrite,
@@ -1422,6 +1424,70 @@ export async function runRedemptionRetrySweep(env) {
   return { checked: allFailed.length, retried };
 }
 
+// ── POST /account/delete ── in-app account deletion (required by both app
+// stores). Runs with the service account, so it can remove documents the
+// client rules deliberately make undeletable (users/{uid}, coinAccounts,
+// dailyGrants). The client removes the Firebase Auth login itself straight
+// after this returns - see deleteAccount() in index.html.
+//
+// Deleted: profile, username reservation, portfolios (incl. challenge and
+// wallet sub-docs), push tokens, friendships, chat messages, player comments,
+// coin account and daily-grant timestamps.
+// Kept on purpose: /trades, /coinDeposits, /coinRedemptions and settled
+// challenge records - the financial and anti-tamper history, keyed only by a
+// uid that no longer resolves to a person once the profile is gone.
+//
+// Refuses while money is still in motion, so deleting can never strand an
+// entry fee or a payout: an unsettled paid challenge the user is in, or a
+// redemption that has not finished.
+async function handleAccountDelete(request, env) {
+  const user = await requireUser(request, env);
+  const uid = user.uid;
+
+  const challenges = await firestoreQuery(env, 'challenges');
+  const inFlight = challenges.find(c =>
+    c.settled !== true && Number(c.entryFee) > 0 && c.participants && uid in c.participants);
+  if (inFlight) {
+    throw new HttpError(409, 'You are in a paid challenge that has not settled yet. You can delete your account once it has finished and paid out.');
+  }
+  if (await hasUnresolvedRedemption(env, uid)) {
+    throw new HttpError(409, 'You have a redemption in progress. You can delete your account once it has completed.');
+  }
+
+  const byUid = collectionId => firestoreQuery(env, collectionId, [{ field: 'uid', op: 'EQUAL', value: uid }]);
+  const [usernames, pushTokens, chatMsgs, comments, friendships, challengeDocs, walletDocs] = await Promise.all([
+    byUid('usernames'), byUid('pushTokens'), byUid('globalChat'), byUid('comments'),
+    firestoreQuery(env, 'friendships', [{ field: 'users', op: 'ARRAY_CONTAINS', value: uid }]),
+    firestoreListCollection(env, `portfolios/${uid}/challenges?pageSize=300`),
+    firestoreListCollection(env, `portfolios/${uid}/wallets?pageSize=300`),
+  ]);
+
+  const paths = [
+    ...usernames.map(d => `usernames/${d.id}`),
+    ...pushTokens.map(d => `pushTokens/${d.id}`),
+    ...chatMsgs.map(d => `globalChat/${d.id}`),
+    ...comments.map(d => `comments/${d.id}`),
+    ...friendships.map(d => `friendships/${d.id}`),
+    ...challengeDocs.map(d => `portfolios/${uid}/challenges/${d.id}`),
+    ...walletDocs.map(d => `portfolios/${uid}/wallets/${d.id}`),
+    `portfolios/${uid}`,
+    `coinAccounts/${uid}`,
+    `dailyGrants/${uid}`,
+    // Last: if anything above throws, the profile still exists and the user
+    // can simply run the deletion again.
+    `users/${uid}`,
+  ];
+  // Sequential in small batches - doc IDs can contain characters that need
+  // encoding (push tokens contain ':'), and a burst of several hundred
+  // parallel subrequests would hit the Worker's per-request limit.
+  for (let i = 0; i < paths.length; i += 10) {
+    await Promise.all(paths.slice(i, i + 10).map(p =>
+      firestoreDeleteDoc(env, p.split('/').map(encodeURIComponent).join('/'))));
+  }
+  console.log(`Account deleted: ${uid} (${paths.length} docs)`);
+  return json({ deleted: true, docs: paths.length }, 200, env);
+}
+
 // ── Router ──
 export default {
   async fetch(request, env) {
@@ -1483,6 +1549,9 @@ export default {
       // Manual trigger for the settlement sweep. ADMIN ONLY: this moves real
       // money (it creates Stripe transfers), so it must never be reachable by
       // anyone who merely knows the URL - it was previously wide open.
+      if (request.method === 'POST' && url.pathname === '/account/delete') {
+        return await handleAccountDelete(request, env);
+      }
       if (request.method === 'POST' && url.pathname === '/internal/run-settlement') {
         const user = await requireUser(request, env);
         if (!user.admin) throw new HttpError(403, 'Admin only');

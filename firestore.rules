@@ -168,6 +168,23 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
+    // Abuse reports on chat messages / player comments (the in-app "Report"
+    // action - required by both app stores for user-posted content). Any
+    // signed-in user may file one, only as themselves and only with the
+    // expected fields; nobody but an admin can read, change or remove them,
+    // so a report can't be used to look up who reported whom.
+    match /reports/{reportId} {
+      allow read, update, delete: if request.auth != null && request.auth.token.admin == true;
+      allow create: if request.auth != null
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'collection', 'msgId', 'reportedUid', 'reportedName', 'text', 'reporterUid', 'status', 'createdAt'
+        ])
+        && request.resource.data.collection in ['globalChat', 'comments']
+        && request.resource.data.status == 'open'
+        && request.resource.data.text is string && request.resource.data.text.size() <= 600;
+    }
+
     // Username reservations - one doc per lowercase username, doc ID IS the
     // username, so "claim" is just create-if-doesn't-exist. `allow update: if false`
     // means a client trying to setDoc() an ALREADY-CLAIMED username hits the update

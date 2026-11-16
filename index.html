@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Breakout: The Market for Sports Conviction</title>
 <meta name="description" content="Buy and sell athletes like stocks. Prices move with real game performance. Claim free Coins every day and build the best portfolio.">
-<meta name="theme-color" content="#04070e">
+<meta name="theme-color" content="#0a0a0b">
 
 <!-- Open Graph (Facebook, Discord, iMessage previews) -->
 <meta property="og:title" content="Breakout: The Market for Sports Conviction">
@@ -35,7 +35,7 @@
 <meta name="apple-touch-fullscreen" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg:#06070a; --surface:#0d0f14; --card:#101318; --card2:#171b22;
@@ -43,18 +43,13 @@
   --green:#12d47e; --red:#f5445f; --gold:#f2b843;
   --blue:#3d9bff; --purple:#9d6fff; --text:#e9eef7; --muted:#7d8794; --dim:#030405;
   --t1:#f2b843; --t2:#b8ccdc; --t3:#e8823a; --t4:#9d6fff; --t5:#4a8fa8;
-  /* Typography tokens - Stage 2: neutral slate palette + Fira Code/Fira Sans
-     (swapped from a blue-tinted navy palette + Archivo/Space Grotesk/IBM Plex Mono,
-     which read as a generic dark-mode SaaS default). Fira Code doing double duty as
-     both display and mono keeps headers and price data visually related - a trading
-     terminal, not a marketing site.
-       --font-display : big headers, the "Breakout" wordmark, section titles
-       --font-body    : UI text, labels, buttons
-       --font-mono    : prices and numeric data (mono keeps digits from jittering) */
-  --font-display: 'Fira Code', monospace;
+  /* Typography: one family. Prices and stats are set in Fira Sans with
+     tabular figures (see the final block of this stylesheet) - digits still
+     line up in columns, without the code-editor look a monospace gives them.
+     The three tokens stay separate so roles can diverge again later. */
+  --font-display: 'Fira Sans', sans-serif;
   --font-body: 'Fira Sans', sans-serif;
-  --font-mono: 'Fira Code', monospace;
-  /* Headings and names: sans, one color. Mono stays for numbers only. */
+  --font-mono: 'Fira Sans', sans-serif;
   --font-heading: 'Fira Sans', sans-serif;
   /* Hairline token - Stage 3: structural borders point here. Set very dim so cards
      separate by surface contrast and spacing, with the outline only a faint whisper
@@ -73,7 +68,7 @@ button,input,select,textarea{font-family:inherit;}
 html{-webkit-tap-highlight-color:transparent;}
 body{background:var(--bg);color:var(--text);font-family:var(--font-body);height:100vh;height:100dvh;overflow:hidden;overscroll-behavior:none;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
 ::selection{background:rgba(18,212,126,.22);color:var(--text);}
-button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--green);outline-offset:2px;}
+button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--text);outline-offset:2px;}
 /* A long-press on a control is not a text selection or a "save image"
    gesture. Scoped to real controls, not reading content - numbers and
    copy stay selectable. overscroll-behavior stops a scrolled-out list from
@@ -1912,12 +1907,12 @@ nav:has(.auth-btn) .nav-stat{display:none !important;}
 .nav-back:active{opacity:.6;}
 .mobile-back{display:none !important;}
 @media (max-width:768px){
-  body:has(#view-market.active .market-layout.show-detail) .nav-back{display:inline-flex;}
+  body:has(#view-market.active:not([style*="display: none"]) .market-layout.show-detail) .nav-back{display:inline-flex;}
 }
-body:has(#view-market.active) .nav-back.force{display:inline-flex;}
+body:has(#view-market.active:not([style*="display: none"])) .nav-back.force{display:inline-flex;}
 @media (max-width:768px){
-  body:has(#view-market.active .market-layout.show-detail) .logo .brand-mark,
-  body:has(#view-market.active .market-layout.show-detail) #league-btn{display:none !important;}
+  body:has(#view-market.active:not([style*="display: none"]) .market-layout.show-detail) .logo .brand-mark,
+  body:has(#view-market.active:not([style*="display: none"]) .market-layout.show-detail) #league-btn{display:none !important;}
 }
 
 /* Native scrollbars, selects and date pickers render light unless the page
@@ -1975,6 +1970,70 @@ body:has(#view-market.active) .nav-back.force{display:inline-flex;}
   .mv-price{font-size:13px;}
   .lb-toolbar .seg{max-width:100%;overflow-x:auto;scrollbar-width:none;}
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   NEUTRAL PASS
+   Three decisions, applied by source order like the passes above:
+   1. Surfaces and greys lose their blue cast. Graphite, not navy.
+   2. Green means one thing: the price went up, or you are buying. It is no
+      longer also the brand colour on every button, tab and outline.
+   3. Fewer boxes. Controls that sat inside an outline inside a track keep
+      the track only.
+   ════════════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0a0a0b; --surface:#111113; --card:#18181b; --card2:#232327;
+  --border:#232327; --border2:#36363c; --dim:#050506;
+  --text:#f3f3f4; --muted:#8e8e96;
+  --ink:#0a0a0b;            /* text on a light button */
+}
+body{font-variant-numeric:tabular-nums;}
+
+/* Numbers: sans needs a touch more weight than the mono did to hold its place */
+.logo,.ob-logo{font-weight:700;letter-spacing:-0.02em;}
+.hprice{font-weight:600;letter-spacing:-0.03em;}
+.pprice{font-weight:500;letter-spacing:-0.01em;}
+.pchart-val{letter-spacing:-0.02em;}
+.hs-v,.pvv,.sinp,.ulb-ret,.mv-price{font-weight:500;}
+
+/* Primary action = light button. Buy and Sell keep their colours. */
+.es-btn:not(.ghost):not(.danger),.ob-btn.primary,.mbtn.primary,.wc-btn.primary,.share-act-btn.primary{
+  background:var(--text);background-image:none;border-color:var(--text);color:var(--ink);box-shadow:none;}
+.es-btn:not(.ghost):not(.danger):hover,.ob-btn.primary:hover,.mbtn.primary:hover,.wc-btn.primary:hover,.share-act-btn.primary:hover{filter:none;background:#fff;}
+/* Sign in sits in the bar on every screen - present, not shouting */
+.auth-btn:not(.signed-in){background:var(--card2);color:var(--text);border:1px solid var(--border2);font-weight:600;}
+.auth-btn:not(.signed-in):hover{filter:none;background:var(--border2);}
+.ob-dot.active{background:var(--text);}
+.comment-card.own{background:rgba(255,255,255,.04);}
+
+/* Where you are is shown in white; green stays with the prices */
+.nav-tab.active,.ctab.active{border-bottom-color:var(--text);}
+@media (max-width:768px){ .nav-tab.active{color:var(--text);} }
+.league-option.active,.portfolio-option.active{background:rgba(255,255,255,.04);}
+.league-option.active .lo-name{color:var(--text);}
+.league-option.active::after,.portfolio-option.active::after{border-color:var(--text);}
+.league-option:hover{background:rgba(255,255,255,.03);}
+
+/* Fewer boxes */
+.seg{border:none;}
+.rb{border-color:transparent;}
+.rb.active{border-color:transparent;background:var(--card2);color:var(--text);}
+.tf{border-color:transparent;}
+.tf.active{border-color:transparent;background:var(--card2);color:var(--text);}
+.prow-up,.prow-down{box-shadow:none;}
+.tcard.hot-up,.tcard.hot-dn,.tcard.vol-spike{border-left:1px solid var(--hairline);}
+.ob-rule{border-left:none;padding-left:4px;}
+
+/* Onboarding: same graphite, and emphasis by weight instead of green */
+.ob-overlay{background:rgba(5,5,6,.86);}
+.ob-body{color:#c6c6cc;}
+.ob-highlight{color:var(--text);font-weight:600;}
+
+/* Player header: the team colour rings the photo. The wash and top rule go. */
+.hero{background:none;box-shadow:none;}
+/* Initials fallback (no headshot): quiet, instead of a random tint per player.
+   Photos keep their team-colour ring. */
+.hav{background:var(--card2) !important;color:var(--muted) !important;}
+.pav{background:var(--card2) !important;color:var(--muted) !important;border-color:var(--border2) !important;}
 </style>
 </head>
 <body>
@@ -2401,7 +2460,7 @@ function defaultLeague(now = new Date()) {
     <div class="modal-btns">
       <button class="mbtn" onclick="closeSettings()">Cancel</button>
       <button class="mbtn" onclick="debugMovers()" style="color:#f2b843;">Debug Chart</button>
-      <button class="mbtn primary" onclick="loadCloudPortfolio().then(()=&gt;closeSettings())" style="color:#12d47e;">️ Sync from Cloud</button>
+      <button class="mbtn primary" onclick="loadCloudPortfolio().then(()=&gt;closeSettings())">️ Sync from Cloud</button>
     </div>
   </div>
 </div>
@@ -8920,7 +8979,7 @@ function renderList(){
       ${avatarHtml}
       <div class="pinfo">
         <div class="pname">${p.name}${isInj?' <span class="inj-badge">OUT</span>':''}${isQtm?' <span class="q-badge">Q</span>':''}${isHot?' <span style="display:inline-flex;align-items:center;gap:2px;font-size:8px;color:var(--green);letter-spacing:0">'+breakoutMark('up')+'HOT</span>':''}${isCold?' <span style="display:inline-flex;align-items:center;gap:2px;font-size:8px;color:var(--blue);letter-spacing:0">'+breakoutMark('down')+'COLD</span>':''}</div>
-        <div class="psub">${p.team} · <span style="color:var(--blue)">${p.pos}</span>${owned?' · <span style="color:var(--green)">'+fmt(ownVal)+'</span>':''}</div>
+        <div class="psub">${p.team} · ${p.pos}${owned?' · <span style="color:var(--green)">'+fmt(ownVal)+'</span>':''}</div>
       </div>
       <div class="pright">
         <div class="pprice${tickCls}" style="${isInj?'color:var(--red)':''}">${fmt(price)}</div>
@@ -10783,7 +10842,7 @@ function drawMain(hoverX){
   // grid - whisper-dim so the price line owns the frame
   ctx.strokeStyle='rgba(255,255,255,0.045)';ctx.lineWidth=1;
   for(let i=0;i<=4;i++){const y=pad.t+(i/4)*(H-pad.t-pad.b);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();}
-  ctx.fillStyle='#7d8794';ctx.font=`10px 'Fira Code'`;ctx.textAlign='left';
+  ctx.fillStyle='#8e8e96';ctx.font=`500 10px 'Fira Sans'`;ctx.textAlign='left';
   // No emoji/currency symbol here - canvas text width math elsewhere in this
   // function (the tooltip below) depends on predictable monospace glyph
   // widths, which an emoji prefix would throw off. Plain number instead.
@@ -10795,7 +10854,7 @@ function drawMain(hoverX){
   function dayToTime(d){ const dt=new Date(EPOCH+d*86400000); const h=dt.getHours(),m=dt.getMinutes(); return (h%12||12)+':'+(m<10?'0':'')+m+(h<12?'am':'pm'); }
   const showTime = (daySpan < 2); // 1D shows time, multi-day shows date
   const labelCount = Math.min(5, hx.length);
-  ctx.fillStyle='#7d8794'; ctx.font=`10px 'Fira Code'`; ctx.textAlign='center';
+  ctx.fillStyle='#8e8e96'; ctx.font=`500 10px 'Fira Sans'`; ctx.textAlign='center';
   for (let i = 0; i < labelCount; i++) {
     // Pick the point whose day is closest to the evenly-spaced time target
     const targetDay = dayMin + (i / (labelCount - 1)) * daySpan;
@@ -10803,7 +10862,10 @@ function drawMain(hoverX){
     hx.forEach((h, j) => { if (Math.abs(h.day - targetDay) < Math.abs(hx[best].day - targetDay)) best = j; });
     const x = px(best);
     const label = showTime ? dayToTime(hx[best].day) : dayToDate(hx[best].day);
-    ctx.fillText(label, x, H - 2);
+    // Keep the first and last labels inside the canvas (the first date used
+    // to lose its leading letter off the left edge).
+    const half = ctx.measureText(label).width / 2;
+    ctx.fillText(label, Math.max(half + 1, Math.min(W - half - 1, x)), H - 2);
   }
 
   // avg buy line - always visible since price range is expanded to include it
@@ -10812,7 +10874,7 @@ function drawMain(hoverX){
     ctx.strokeStyle='#f2b843';ctx.lineWidth=1;ctx.setLineDash([3,5]);
     ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle='#f2b843';ctx.font=`10px 'Fira Code'`;ctx.textAlign='left';
+    ctx.fillStyle='#f2b843';ctx.font=`500 10px 'Fira Sans'`;ctx.textAlign='left';
     ctx.fillText('avg $'+avgBuy.toFixed(2),pad.l+3,y-3);
   }
 
@@ -10888,7 +10950,7 @@ function drawMain(hoverX){
     const pctStr=(pct>=0?'+':'')+pct.toFixed(2)+'%';
     const dateStr = daySpan < 2 ? dayToTime(hx[hovIdx].day) : dayToDate(hx[hovIdx].day);
     const label=price.toFixed(2)+'  '+pctStr+'  '+dateStr;
-    ctx.font=`600 11px 'Fira Code'`;
+    ctx.font=`600 11px 'Fira Sans'`;
     const tw=ctx.measureText(label).width;
     const tp=8, th=20, tx=Math.min(Math.max(hpx-tw/2-tp,pad.l), W-pad.r-tw-tp*2);
     const ty=pad.t+4;
@@ -13636,6 +13698,7 @@ async function handleAuthChange(user) {
         // custom one right back to the Google photo, below AND in Firestore.
         const photoURL = stored.customPhoto ? stored.photoURL : (user.photoURL || stored.photoURL);
         userProfile = { ...userProfile, ...stored, displayName: user.displayName || stored.displayName, photoURL };
+        _syncBlockedFromProfile();
       } else {
         // Brand new user - write immediately so they appear on leaderboard. createdAt
         // powers the "member since" line on public profiles - there's no way to
@@ -13729,6 +13792,7 @@ async function loadCloudPortfolio() {
 
 async function saveCloudPortfolio(silent = false, portfolioId = activePortfolioId) {
   if (!currentUser || !db) return;
+  if (window._deletingAccount) return; // never re-create docs the server just deleted
   // Don't save if we're in default state - likely localStorage was cleared on mobile
   // and cloud data would be overwritten with blank state. The "default" baseline is
   // context-specific: practice/challenges start at $100k, a coin wallet starts at $0.
@@ -13933,8 +13997,13 @@ function renderProfileView() {
            launch. Restore this block when challenges come back. -->
 
       <div class="pl-group pl-group-solo">
+        <button class="pl-row" onclick="manageBlockedUsers()"><span class="pl-lbl">Blocked users</span><span class="pl-val pl-muted">${Object.keys(_blocked).length || 'None'}</span>${chev}</button>
+        <button class="pl-row" onclick="window.open('/terms.html','_blank','noopener')"><span class="pl-lbl">Terms of use</span>${chev}</button>
         <button class="pl-row" onclick="window.open('/privacy.html','_blank','noopener')"><span class="pl-lbl">Privacy policy</span>${chev}</button>
         <button class="pl-row pl-danger" onclick="signOutUser()"><span class="pl-lbl">Sign out</span></button>
+      </div>
+      <div class="pl-group pl-group-solo">
+        <button class="pl-row" onclick="deleteAccount()"><span class="pl-lbl">Delete account<small>Permanently removes your profile, portfolio and messages</small></span>${chev}</button>
       </div>`;
     refreshConnectStatusUI();
     startFriendsListener();  // no-op if already running - ensures Friends/Added counts are live
@@ -14556,6 +14625,7 @@ function renderChat() {
   _chatItems.forEach(x => { byId[x.id] = x; });
 
   el.innerHTML = _chatItems.map((m, i) => {
+    if (isHiddenMsg(m)) return '';
     const isOwn = currentUser && m.uid === currentUser.uid;
     const ts = m.createdAt?.toMillis ? m.createdAt.toMillis() : (m.ts || 0);
     const tradeCard = (m.kind === 'trade' && m.trade) ? `
@@ -14602,7 +14672,8 @@ function renderChat() {
         <div class="comment-actions">
           <span class="comment-reply" onclick="replyToChatMessage(${i})">Reply</span>
           <span class="chat-react-trigger" onclick="toggleReactionBar('${m.id}')">React</span>
-          ${isOwn ? `<span class="comment-delete" onclick="deleteChatMessage('${m.id}')">Delete</span>` : ''}
+          ${isOwn ? `<span class="comment-delete" onclick="deleteChatMessage('${m.id}')">Delete</span>`
+                  : `<span class="comment-delete" onclick="reportMessage('globalChat','${m.id}')">Report</span><span class="comment-delete" onclick="blockUser('${m.uid}')">Block</span>`}
         </div>
         ${reactionBarHtml}
         ${reactionsHtml}
@@ -14663,6 +14734,137 @@ function cancelChatReply(){
   _chatReplyTo = null;
   const bar = document.getElementById('gchat-reply-bar');
   if (bar) bar.style.display = 'none';
+}
+
+// ── Report / block ───────────────────────────────────────────────────────────
+// Both app stores require these wherever users can post: a way to report a
+// message, and a way to stop seeing someone. Blocking is per-viewer - it hides
+// that person's messages in the Chat tab and in player threads for you only.
+// The list lives in localStorage (so it works signed out) and is mirrored to
+// users/{uid}.blocked so it follows the account to another device.
+// A report writes one doc to /reports (admin-readable only, see
+// firestore.rules) and hides that message for the reporter straight away.
+let _blocked = {};      // uid -> label shown in the "Blocked users" list
+let _hiddenMsgs = {};   // message id -> 1, messages this viewer reported
+let _lastComments = null;
+try { _blocked = JSON.parse(localStorage.getItem('ax_blocked') || '{}') || {}; } catch(e) {}
+try { _hiddenMsgs = JSON.parse(localStorage.getItem('ax_hidden_msgs') || '{}') || {}; } catch(e) {}
+
+function isHiddenMsg(m) { return !!(m && (_blocked[m.uid] || _hiddenMsgs[m.id])); }
+function _saveBlocked() { try { localStorage.setItem('ax_blocked', JSON.stringify(_blocked)); } catch(e) {} }
+function _syncBlockedFromProfile() {
+  if (userProfile && userProfile.blocked && typeof userProfile.blocked === 'object') {
+    _blocked = { ..._blocked, ...userProfile.blocked };
+    _saveBlocked();
+  }
+}
+function _rerenderThreads() {
+  if (typeof renderChat === 'function') renderChat();
+  if (_lastComments && document.getElementById('chat-messages')) renderComments(_lastComments);
+}
+function _findMsg(collection, id) {
+  const list = collection === 'globalChat' ? _chatItems : (_lastComments || []);
+  return list.find(x => x.id === id) || null;
+}
+
+async function reportMessage(collection, id) {
+  if (!currentUser || !db) { showToast('Sign in to report a message'); return; }
+  const m = _findMsg(collection, id);
+  if (!m) return;
+  if (!confirm('Report this message as abusive or inappropriate?\n\nIt will be hidden for you and sent to us for review.')) return;
+  try {
+    await window._fbAddDoc(window._fbCollection(db, 'reports'), {
+      collection, msgId: id,
+      reportedUid: m.uid || '',
+      reportedName: m.username || m.displayName || '',
+      text: String(m.text || '').slice(0, 600),
+      reporterUid: currentUser.uid,
+      status: 'open',
+      createdAt: window._fbServerTimestamp(),
+    });
+  } catch(e) {
+    showToast('Couldn’t send that report. Try again.');
+    return;
+  }
+  _hiddenMsgs[id] = 1;
+  try { localStorage.setItem('ax_hidden_msgs', JSON.stringify(_hiddenMsgs)); } catch(e) {}
+  _rerenderThreads();
+  showToast('Reported. Thanks for flagging it.');
+}
+
+async function blockUser(uid) {
+  if (!uid || (currentUser && uid === currentUser.uid)) return;
+  const m = _chatItems.find(x => x.uid === uid) || (_lastComments || []).find(x => x.uid === uid);
+  const label = m ? (m.username ? '@' + m.username : (m.displayName || 'Trader')) : 'Trader';
+  if (!confirm('Block ' + label + '?\n\nYou won’t see their messages. You can unblock them from your Profile.')) return;
+  _blocked[uid] = label;
+  _saveBlocked();
+  _rerenderThreads();
+  showToast('Blocked ' + label);
+  if (currentUser && db) {
+    try { await window._fbUpdateDoc(window._fbDoc(db, 'users', currentUser.uid), { ['blocked.' + uid]: label }); } catch(e) {}
+  }
+}
+
+async function unblockUser(uid) {
+  const label = _blocked[uid];
+  delete _blocked[uid];
+  _saveBlocked();
+  _rerenderThreads();
+  if (currentUser && db) {
+    try { await window._fbUpdateDoc(window._fbDoc(db, 'users', currentUser.uid), { ['blocked.' + uid]: window._fbDeleteField() }); } catch(e) {}
+  }
+  if (userProfile && userProfile.blocked) delete userProfile.blocked[uid];
+  showToast('Unblocked ' + (label || 'user'));
+  if (typeof renderProfileView === 'function') renderProfileView();
+}
+
+function manageBlockedUsers() {
+  const uids = Object.keys(_blocked);
+  if (!uids.length) { showToast('You haven’t blocked anyone'); return; }
+  const list = uids.map((u, i) => (i + 1) + '. ' + _blocked[u]).join('\n');
+  const pick = prompt('Blocked users:\n' + list + '\n\nType a number to unblock.');
+  const n = parseInt(pick, 10);
+  if (n >= 1 && n <= uids.length) unblockUser(uids[n - 1]);
+}
+
+// ── Delete account ───────────────────────────────────────────────────────────
+// Order matters. Firebase will only remove a login that signed in within the
+// last few minutes, so that is settled FIRST (re-asking for Google if needed);
+// otherwise the data could be wiped and the login left behind. Then the
+// payments worker deletes the data (it can remove documents the rules stop a
+// client from deleting, and refuses while a paid challenge or redemption is
+// still in flight), then the login itself goes, then local state is cleared.
+async function deleteAccount() {
+  if (!currentUser || !auth) return;
+  if (!confirm('Delete your Breakout account?\n\nThis permanently removes your profile, username, portfolio, Coins, friends and chat messages. It can’t be undone.')) return;
+  const typed = prompt('Type DELETE to confirm.');
+  if ((typed || '').trim().toUpperCase() !== 'DELETE') { showToast('Account not deleted'); return; }
+
+  const lastSignIn = Date.parse(currentUser.metadata?.lastSignInTime || '') || 0;
+  if (Date.now() - lastSignIn > 4 * 60 * 1000) {
+    try {
+      await window._fbReauthWithPopup(currentUser, new window._fbGoogleAuthProvider());
+    } catch(e) {
+      showToast('To confirm it’s you: sign out, sign back in, then delete your account.');
+      return;
+    }
+  }
+
+  window._deletingAccount = true;
+  showToast('Deleting your account…');
+  try {
+    await paymentsWorkerFetch('/account/delete', { method: 'POST' });
+  } catch(e) {
+    window._deletingAccount = false;
+    showToast(e.message || 'Couldn’t delete your account. Try again.');
+    return;
+  }
+  try { await window._fbDeleteUser(currentUser); }
+  catch(e) { try { await window._fbSignOut(auth); } catch(_) {} }
+  try { Object.keys(localStorage).filter(k => k.startsWith('ax_')).forEach(k => localStorage.removeItem(k)); } catch(e) {}
+  alert('Your account has been deleted.');
+  location.reload();
 }
 
 async function deleteChatMessage(msgId) {
@@ -15072,6 +15274,8 @@ var _replyingTo = null;
 
 function renderComments(comments) {
   const el = document.getElementById('chat-messages');
+  _lastComments = comments;
+  comments = comments.filter(c => !isHiddenMsg(c));
   if (!comments.length) {
     el.innerHTML = `<div style="text-align:center;padding:32px 16px;color:var(--muted);font-family:var(--font-mono);font-size:10px;">No takes yet - be the first</div>`;
     return;
@@ -15109,7 +15313,8 @@ function renderComments(comments) {
             ${likedByMe?'♥':'♡'} ${c.likes||0}
           </span>
           <span class="comment-reply" onclick="startReply('${c.id}')">Reply${replyCount?' ('+replyCount+')':''}</span>
-          ${isOwn ? `<span class="comment-delete" onclick="deleteComment('${c.id}',${selRank})">delete</span>` : ''}
+          ${isOwn ? `<span class="comment-delete" onclick="deleteComment('${c.id}',${selRank})">Delete</span>`
+                  : `<span class="comment-delete" onclick="reportMessage('comments','${c.id}')">Report</span><span class="comment-delete" onclick="blockUser('${c.uid}')">Block</span>`}
         </div>
       </div>`;
   };
@@ -17580,7 +17785,7 @@ window.addEventListener('appinstalled', () => {
   import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
   import { getAuth, onAuthStateChanged,
            GoogleAuthProvider, signInWithPopup, signInWithRedirect,
-           signOut, getRedirectResult,
+           signOut, getRedirectResult, deleteUser, reauthenticateWithPopup,
            setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
   import { getFirestore, initializeFirestore, serverTimestamp, doc, getDoc, getDocFromServer, setDoc, updateDoc, collection, getDocs, getDocsFromServer, limit, query, orderBy, where, onSnapshot, addDoc, deleteDoc, deleteField, increment, arrayUnion, arrayRemove }  from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
   import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-messaging.js";
@@ -17621,6 +17826,8 @@ window.addEventListener('appinstalled', () => {
   window._fbSignInWithRedirect  = signInWithRedirect;
   window._fbGetRedirectResult   = getRedirectResult;
   window._fbSignOut             = signOut;
+  window._fbDeleteUser          = deleteUser;
+  window._fbReauthWithPopup     = reauthenticateWithPopup;
   window._fbOnAuthStateChanged  = onAuthStateChanged;
   window._fbServerTimestamp     = serverTimestamp;
   window._fbDoc        = doc;
@@ -17725,7 +17932,7 @@ window.addEventListener('appinstalled', () => {
           <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path></svg>
           Sign in with Google
         </button>
-        <div style="font-size:11px;color:var(--muted);margin-top:12px;text-align:center;">By continuing you agree to our <a href="/privacy.html" target="_blank" rel="noopener" style="color:var(--green);">Privacy Policy</a>.</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:12px;text-align:center;">By continuing you agree to our <a href="/terms.html" target="_blank" rel="noopener" style="color:var(--text);">Terms</a> and <a href="/privacy.html" target="_blank" rel="noopener" style="color:var(--text);">Privacy Policy</a>.</div>
       </div>
 
     </div><!-- /ob-slides -->
