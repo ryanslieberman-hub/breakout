@@ -490,11 +490,15 @@ async function tickNflDay(env, today, carryover) {
   // mlb.js's fetchBoxscores (see its header comment) - ported that pattern
   // here instead of reproducing the global-flag version for a second sport.
   const finalByRank = {};
+  const lineByRank = {}; // raw stat line per player, for config/lastNight - see the write below
   for (const ev of relevant) {
     const frac = nfl.gameFrac(ev.status);
     const isEventFinal = !!ev.status?.type?.completed;
     const summary = await nfl.fetchSummary(ev.id);
     const points = nfl.extractNflFantasyPoints(summary);
+    for (const [name, line] of Object.entries(nfl.extractNflRawLines(summary))) {
+      if (byName[name]) lineByRank[byName[name].rank] = line;
+    }
     for (const [name, pts] of Object.entries(points)) {
       const player = byName[name];
       if (!player) continue;
@@ -561,8 +565,40 @@ async function tickNflDay(env, today, carryover) {
       console.error('config/prices NFL close mirror failed:', e.message);
     }
   }
+  // Publish each finished game's stat line to config/lastNight - the doc every
+  // client restores its "Last game" tiles from. Until now ONLY a signed-in
+  // browser that happened to be open on game day ever wrote there (nflTick
+  // reads today's scoreboard and nothing else), so a week nobody had the app
+  // open on Sunday left every NFL player with no stat display at all - and,
+  // with no "played recently" record, nothing to clear a wrong OUT tag either.
+  // Confirmed live 2026-11-16: the doc held no NFL game later than 11-01,
+  // two full weeks stale. Same reasoning as the closes mirror above: this
+  // cron already has the box score in hand every 15 minutes.
+  // Only players whose stored entry isn't already this game's final are
+  // written, so a settled slate costs one read and no writes per tick.
+  let lastNightWritten = 0;
+  try {
+    const stored = (await firestoreGetDoc(env, 'config/lastNight').catch(() => null))?.data || {};
+    const lnWrites = [];
+    for (const player of toProcess) {
+      const line = lineByRank[player.rank];
+      if (!finalByRank[player.rank] || !line) continue;
+      const cur = stored[String(player.rank)];
+      if (cur && cur.date === today && cur.live === false) continue;
+      if (cur && cur.date > today) continue; // never replace a newer game with an older one
+      lnWrites.push({ segments: ['data', String(player.rank)], value: nfl.lastNightEntry(line, today) });
+    }
+    if (lnWrites.length) {
+      lnWrites.push({ segments: ['updatedAt'], value: Date.now() });
+      await firestoreSetDeepFields(env, 'config/lastNight', lnWrites);
+      lastNightWritten = lnWrites.length - 1;
+    }
+  } catch (e) {
+    console.error('config/lastNight NFL write failed:', e.message);
+  }
+
   const notified = await announceMovers(env, movers);
-  return { league: 'nfl', games: relevant.length, processed: toProcess.length, finalized, movers: movers.length, notified };
+  return { league: 'nfl', games: relevant.length, processed: toProcess.length, finalized, movers: movers.length, notified, lastNightWritten };
 }
 
 export async function runGameDayTick(env) {

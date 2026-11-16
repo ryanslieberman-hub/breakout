@@ -86,6 +86,80 @@ function fumblePoints(labels, stats) {
   return -lost * 2;
 }
 
+// Raw per-player stat line for one game, in exactly the shape the client's
+// _nflRawLine()/nflTick() write to lastNight (index.html) - the hero panel's
+// "Last game" tiles and the Last 10 log read these individual fields. Keep in
+// sync with the client; a field renamed on one side blanks a tile on the other.
+function mergeRawLine(cat, labels, stats, into) {
+  const n = i => parseFloat((stats[i] || '0').toString().replace(/[^0-9.\-]/g, '')) || 0;
+  const byLabel = name => {
+    const idx = (labels || []).findIndex(l => (l || '').toUpperCase() === name);
+    return idx >= 0 ? (stats[idx] || '0').toString() : null;
+  };
+  const num = v => (v == null ? 0 : parseFloat(v.replace(/[^0-9.\-]/g, '')) || 0);
+  if (cat === 'passing') {
+    into.py = (into.py || 0) + n(1); into.ptd = (into.ptd || 0) + n(3); into.ints = (into.ints || 0) + n(4);
+  } else if (cat === 'rushing') {
+    into.car = (into.car || 0) + n(0); into.ry = (into.ry || 0) + n(1); into.rtd = (into.rtd || 0) + n(3);
+  } else if (cat === 'receiving') {
+    into.rec = (into.rec || 0) + n(0); into.recy = (into.recy || 0) + n(1);
+    into.rectd = (into.rectd || 0) + n(3); into.tgt = (into.tgt || 0) + n(5);
+  } else if (cat === 'defensive' || cat === 'interceptions') {
+    const get = names => { for (const nm of names) { const v = byLabel(nm); if (v != null) return num(v); } return 0; };
+    into.tkl = (into.tkl || 0) + (get(['TOT', 'TACK', 'TCKL']) || get(['SOLO']));
+    into.sack = (into.sack || 0) + get(['SACK', 'SCK']);
+    into.defint = (into.defint || 0) + (cat === 'interceptions' ? get(['INT']) : 0);
+    into.ffum = (into.ffum || 0) + get(['FF']);
+    into.deftd = (into.deftd || 0) + get(['TD']);
+  } else if (cat === 'fumbles') {
+    into.fuml = (into.fuml || 0) + num(byLabel('LOST'));
+  } else if (cat === 'kicking') {
+    const frac = name => {
+      const [m, a] = (byLabel(name) || '0/0').split('/').map(x => parseInt(x) || 0);
+      return { m: m || 0, a: a || (m || 0) };
+    };
+    const fg = frac('FG'), xp = frac('XP');
+    into.fgm = (into.fgm || 0) + fg.m; into.fga = (into.fga || 0) + fg.a;
+    into.xpm = (into.xpm || 0) + xp.m; into.xpa = (into.xpa || 0) + xp.a;
+  }
+  return into;
+}
+
+// The DISPLAY fantasy score shown beside that line - the client's
+// _nflFptsFromRaw weights, not this worker's pricing weights above.
+export function displayFpts(s) {
+  const v = (s.py || 0) * 0.04 + (s.ptd || 0) * 4 - (s.ints || 0) * 2
+    + (s.ry || 0) * 0.1 + (s.rtd || 0) * 6
+    + (s.rec || 0) * 0.5 + (s.recy || 0) * 0.1 + (s.rectd || 0) * 6
+    - (s.fuml || 0) * 2
+    + (s.tkl || 0) * 1 + (s.sack || 0) * 2 + (s.defint || 0) * 3 + (s.ffum || 0) * 2 + (s.deftd || 0) * 6
+    + (s.fgm || 0) * 3 + (s.xpm || 0) * 1;
+  return Math.round(v * 10) / 10;
+}
+
+// Returns { normalizedName -> rawStatLine } from an ESPN summary response.
+export function extractNflRawLines(summary) {
+  const out = {};
+  for (const tm of summary?.boxscore?.players || []) {
+    for (const cat of tm.statistics || []) {
+      if (!['passing', 'rushing', 'receiving', 'defensive', 'interceptions', 'kicking', 'fumbles'].includes(cat.name)) continue;
+      for (const a of cat.athletes || []) {
+        const nm = a.athlete?.displayName;
+        if (!nm) continue;
+        const key = normalizeName(nm);
+        mergeRawLine(cat.name, cat.labels, a.stats || [], out[key] || (out[key] = {}));
+      }
+    }
+  }
+  return out;
+}
+
+// The config/lastNight entry for one finished game.
+export function lastNightEntry(line, date) {
+  return { played: true, date, live: false, nfl: true, fpts: displayFpts(line),
+    ts: Date.parse(date + 'T20:00:00-05:00'), ...line };
+}
+
 // Returns { normalizedName -> totalFantasyPointsThisGame } from an ESPN
 // summary response, summed across all offense/defense stat categories.
 export function extractNflFantasyPoints(summary) {

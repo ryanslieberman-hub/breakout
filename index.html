@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<!-- saved from url=(0046)https://incandescent-torte-faa963.netlify.app/ -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -2034,6 +2033,90 @@ body{font-variant-numeric:tabular-nums;}
    Photos keep their team-colour ring. */
 .hav{background:var(--card2) !important;color:var(--muted) !important;}
 .pav{background:var(--card2) !important;color:var(--muted) !important;border-color:var(--border2) !important;}
+
+/* ════════════════════════════════════════════════════════════════════════
+   CRAFT PASS
+   The parts that make a web app feel built rather than assembled: its own
+   dialogs, placeholders shaped like the content that is loading, feedback
+   under the finger, and a toast you can read.
+   ════════════════════════════════════════════════════════════════════════ */
+html{-webkit-tap-highlight-color:transparent;}
+button,[role="button"],.nav-tab,.prow{touch-action:manipulation;}
+::selection{background:rgba(255,255,255,.18);color:var(--text);}
+*{scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+
+/* Press feedback: every button answers the touch */
+.es-btn,.ob-btn,.mbtn,.wc-btn,.auth-btn,.ui-dlg-btn,.ui-dlg-optbtn{transition:transform .12s cubic-bezier(.2,.8,.2,1),background-color .15s,filter .15s,opacity .15s;}
+.es-btn:active,.ob-btn:active,.mbtn:active,.wc-btn:active,.auth-btn:active,.ui-dlg-btn:active,.ui-dlg-optbtn:active{transform:scale(.97);}
+.pl-row{transition:background-color .12s;}
+button.pl-row:active{background:rgba(255,255,255,.05);}
+@media (hover:hover){ button.pl-row:hover{background:rgba(255,255,255,.03);} }
+
+/* Tab change: the incoming view fades in. Opacity only - a transform here
+   would re-anchor position:fixed children (chat input, trade bar) mid-fade. */
+@keyframes viewIn{from{opacity:0}to{opacity:1}}
+#view-portfolio,#view-leaderboard,#view-schedule,#view-chat,#view-profile{animation:viewIn .18s ease-out;}
+
+/* Toast: readable size, wraps instead of clipping, rises into place */
+.toast{font-family:var(--font-body);font-size:13px;font-weight:500;line-height:1.35;padding:10px 16px;border-radius:12px;
+  background:#2a2a2f;border:1px solid var(--hairline);box-shadow:0 10px 30px -10px rgba(0,0,0,.7);
+  white-space:normal;text-align:center;width:max-content;max-width:calc(100vw - 32px);z-index:3000;
+  transform:translate(-50%,8px);transition:opacity .18s ease-out,transform .22s cubic-bezier(.2,.8,.2,1);}
+.toast.show{transform:translate(-50%,0);}
+
+/* Offline banner */
+.net-banner{position:fixed;top:calc(env(safe-area-inset-top) + 58px);left:50%;transform:translateX(-50%);z-index:2900;
+  background:#2a2a2f;border:1px solid var(--hairline);color:var(--text);font-size:13px;font-weight:500;line-height:1.35;
+  padding:8px 14px;border-radius:999px;width:max-content;max-width:calc(100vw - 32px);text-align:center;
+  box-shadow:0 10px 30px -10px rgba(0,0,0,.7);}
+.net-banner[hidden]{display:none;}
+
+/* Skeletons: loading lists show the shape of what is coming - avatar, two
+   lines, a value - instead of the word "Loading". The text stays in the DOM
+   for screen readers (aria-busy is set alongside the class). */
+@keyframes skelPulse{0%,100%{opacity:1}50%{opacity:.45}}
+.g10-loading.skel{--sk:var(--card2);font-size:0;color:transparent;padding:0;margin:8px 16px;min-height:232px;text-align:left;
+  background:
+    radial-gradient(circle at 16px 29px,var(--sk) 15px,transparent 16px) 0 0/32px 58px repeat-y,
+    linear-gradient(transparent 17px,var(--sk) 17px,var(--sk) 27px,transparent 27px) 44px 0/42% 58px repeat-y,
+    linear-gradient(transparent 33px,var(--sk) 33px,var(--sk) 41px,transparent 41px) 44px 0/26% 58px repeat-y,
+    linear-gradient(transparent 21px,var(--sk) 21px,var(--sk) 33px,transparent 33px) 100% 0/52px 58px repeat-y;
+  -webkit-mask-image:linear-gradient(#000 45%,transparent);mask-image:linear-gradient(#000 45%,transparent);
+  animation:skelPulse 1.4s ease-in-out infinite;}
+
+/* Chat initials: quiet, like the player-list fallback */
+.comment-ava-init{background:var(--card2) !important;color:var(--text);}
+
+/* Dialogs (uiDialog): centred card on desktop, bottom sheet on phones */
+@keyframes dlgIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+.ui-dlg{border:1px solid var(--hairline);background:var(--card);color:var(--text);border-radius:16px;padding:0;margin:auto; /* the global margin reset removes the browser's own centring */
+  width:min(400px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;
+  box-shadow:0 24px 60px -12px rgba(0,0,0,.75);font-family:var(--font-body);
+  animation:dlgIn .2s cubic-bezier(.2,.8,.2,1);}
+.ui-dlg::backdrop{background:rgba(0,0,0,.6);animation:viewIn .2s ease-out;}
+.ui-dlg.closing{opacity:0;transform:translateY(6px);transition:opacity .15s ease-in,transform .15s ease-in;}
+.ui-dlg.closing::backdrop{opacity:0;transition:opacity .18s;}
+.ui-dlg-body{padding:24px;margin:0;}
+.ui-dlg-title{font-size:18px;font-weight:700;letter-spacing:-0.01em;line-height:1.3;margin:0;text-wrap:balance;}
+.ui-dlg-text{font-size:14px;line-height:1.55;color:var(--muted);margin:8px 0 0;}
+.ui-dlg-input{width:100%;margin-top:16px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-size:16px;padding:12px 14px;outline:none;}
+.ui-dlg-input:focus,.ui-dlg-input:focus-visible{border-color:var(--text);outline:none;}
+.ui-dlg-err{min-height:18px;font-size:12px;color:var(--red);margin-top:6px;}
+.ui-dlg-list{margin-top:14px;border-top:1px solid var(--border);max-height:50vh;overflow:auto;}
+.ui-dlg-opt{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;}
+.ui-dlg-optbtn{background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;}
+.ui-dlg-btns{display:flex;gap:10px;margin-top:22px;}
+.ui-dlg-err + .ui-dlg-btns{margin-top:10px;}
+.ui-dlg-btn{flex:1;min-height:46px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;border:1px solid transparent;}
+.ui-dlg-btn.ghost{background:transparent;border-color:var(--border2);color:var(--text);}
+.ui-dlg-btn.primary{background:var(--text);color:var(--ink);}
+.ui-dlg.danger .ui-dlg-btn.primary{background:var(--red);color:#fff;}
+@media (max-width:768px){
+  .ui-dlg{width:100%;max-width:100%;margin:auto 0 0;border-radius:18px 18px 0 0;border-bottom:none;
+    animation:sheet-in .32s cubic-bezier(.32,.72,0,1);}
+  .ui-dlg.closing{opacity:1;transform:translateY(100%);transition:transform .22s cubic-bezier(.32,.72,0,1);}
+  .ui-dlg-body{padding:22px 20px calc(20px + env(safe-area-inset-bottom));}
+}
 </style>
 </head>
 <body>
@@ -2465,6 +2548,7 @@ function defaultLeague(now = new Date()) {
   </div>
 </div>
 
+<div class="net-banner" id="net-banner" role="status" hidden>You’re offline. Prices will update when you’re back.</div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true">Live · 45 played · Leonard Miller +10.6%</div>
 
 
@@ -4320,7 +4404,7 @@ async function openPortfolioDrawer(){
       </div>`;
     return;
   }
-  list.innerHTML = `<div class="g10-loading">Loading…</div>`;
+  list.innerHTML = `<div class="g10-loading skel" aria-busy="true">Loading…</div>`;
   // Practice Portfolio ('regular') is dormant - Coins ('gold') is the
   // default/only portfolio now. Breakout Bucks ('sweeps') stays out of this
   // list, same "not legally reviewed yet, hide the display, keep the code"
@@ -4744,11 +4828,22 @@ async function _fetchLeagueInjuries(espnUrl, idMap, leaguePlayers) {
       // Harrison Jr. (all genuinely "out", unrelated players) false-matched
       // Brian Thomas Jr. and Marvin Harrison Jr. (both genuinely Active) via
       // the surname-only check before the first-initial requirement existed.
+      // The name fallback is ONLY for roster players we hold no ESPN id for.
+      // If the feed gave this injured athlete an id and it matched nobody
+      // above, then any roster player who DOES have an id is by definition a
+      // different person, however similar the name. Confirmed live
+      // 2026-11-16: Brian Robinson Jr. (Falcons, injured reserve, not on our
+      // roster) passed the "same surname + same first initial" test against
+      // Bijan Robinson (Falcons, Active, played the day before) and tagged
+      // him OUT - even though the feed's id for Brian (4241474) and our id
+      // for Bijan (4430807) plainly disagree.
       if (name) {
         const nameTokens = name.replace(/\./g,'').split(' ').filter(Boolean);
         const firstInitial = nameTokens[0]?.[0] || '';
-        const p = leaguePlayers.find(p2 => p2.name.toLowerCase() === name)
+        const isSomeoneElse = p2 => !!(espnId && idMap && idMap[p2.rank] != null);
+        const p = leaguePlayers.find(p2 => !isSomeoneElse(p2) && p2.name.toLowerCase() === name)
                || leaguePlayers.find(p2 => {
+                    if (isSomeoneElse(p2)) return false;
                     const tok = _injurySurnameToken(p2.name);
                     if (!tok || !nameTokens.includes(tok)) return false;
                     return p2.name.toLowerCase()[0] === firstInitial;
@@ -4887,10 +4982,10 @@ function _loadLastNight() {
       localStorage.setItem('athletex_lastNight', JSON.stringify(obj));
     }
     const now = new Date();
-    const cutoff = new Date(now); cutoff.setDate(now.getDate() - 3);
     const result = {};
     for (const [rank, val] of Object.entries(obj)) {
       if (!val || !val.date) continue;
+      const cutoff = new Date(now); cutoff.setDate(now.getDate() - (val.nfl ? 8 : 3)); // see _lnKeepDays
       const d = new Date(val.date);
       if (d >= cutoff) {
         if (!result[rank] || val.live || val.date >= result[rank].date) {
@@ -4904,6 +4999,10 @@ function _loadLastNight() {
     return result;
   } catch(e) { return {}; }
 }
+// How many days a finished game's box score stays on screen and in sync.
+// Daily leagues turn over fast; an NFL player's last game is still his most
+// recent one until the following week, so it stays until just past then.
+function _lnKeepDays(ln) { return ln && ln.nfl ? 8 : 3; }
 function _saveLastNight() {
   try {
     localStorage.setItem('athletex_lastNight', JSON.stringify(lastNight));
@@ -9387,7 +9486,7 @@ function updateHero(){
     }
     // Hide any non-live box score older than 3 days - stale data should never
     // render as if it were a recent result.
-    if (ln.date && ln.date < threeDays && !ln.live) {
+    if (ln.date && ln.date < localDateStr(_lnKeepDays(ln)) && !ln.live) {
       lnWrap.style.display = 'none';
       lnDnp.style.display  = 'none';
       return;
@@ -10134,9 +10233,8 @@ function syncPricesToFirestore() {
       // that was online during the game shares box scores with all others. Same
       // per-rank field-path fix as above (was `data: lastNightSnap`).
       const lastNightSnap = {};
-      const lnCutoff = localDateStr(3);
       Object.entries(lastNight).forEach(([rank, ln]) => {
-        if (!ln || !ln.date || ln.date < lnCutoff) return;
+        if (!ln || !ln.date || ln.date < localDateStr(_lnKeepDays(ln))) return;
         // Never share a malformed MLB record upstream - see the matching guard on
         // the read side below for why (this is the other half of the same fix).
         if (ln.mlbRole !== undefined && (ln.fg === undefined || ln.h === undefined)) return;
@@ -10339,10 +10437,9 @@ async function loadPricesFromFirestore() {
     // Restore lastNight box scores - fills in display data on devices that were offline during games
     const lnSnap = await window._fbGetDoc(window._fbDoc(db, 'config', 'lastNight')).catch(() => null);
     if (lnSnap?.exists() && lnSnap.data().data) {
-      const cutoff = localDateStr(3);
       Object.entries(lnSnap.data().data).forEach(([rank, val]) => {
         const r = parseInt(rank);
-        if (!val || !val.date || val.date < cutoff) return;
+        if (!val || !val.date || val.date < localDateStr(_lnKeepDays(val))) return;
         // An MLB record missing fg/h is a malformed write (a stale cached client
         // running old code, a partial API response, etc.) - the "H/AB", "HR" and
         // AB tiles read ln.fg/fg3/min directly with no fallback, so adopting a
@@ -10618,6 +10715,25 @@ function updateMovers(){
 // Chart hover state
 let _chartHover = null; // { x (canvas px), idx }
 
+// Multi-day charts are built from one close per game. Joining those points
+// with straight lines turns a week between NFL games into a slow ramp, and
+// two games a week apart read as a single drift. A price here only moves when
+// a game is played, so hold it flat until the day of the next close and let
+// the move happen there - each game becomes its own visible step.
+function _stepHold(pts) {
+  const out = [];
+  pts.forEach((p, i) => {
+    if (i > 0) {
+      const prev = pts[i-1];
+      if (p.day - prev.day > 1.5 && Math.abs(p.price - prev.price) > 0.005) {
+        out.push({ day: Math.max(prev.day, p.day - 0.5), price: prev.price });
+      }
+    }
+    out.push(p);
+  });
+  return out;
+}
+
 function drawMain(hoverX){
   const canvas=document.getElementById('mainChart');
   const wrap=canvas.parentElement;
@@ -10765,7 +10881,6 @@ function drawMain(hoverX){
     // Real closes within the window (excluding ones that already match the
     // live price) - just for the line's shape between the anchor and now.
     const closePts = allCloseDates
-      .filter(ds => Math.abs(c[ds] - liveP[selRank]) > 0.01)
       .map(ds => ({ day: dateToDayNum(new Date(ds + 'T12:00:00')), price: c[ds] }))
       .filter(h => h.day >= cutoffDay);
     // The anchor PRICE comes straight from ENGINE.pct(rank, chartRange) - the
@@ -10783,13 +10898,13 @@ function drawMain(hoverX){
     const anchorPrice = liveP[selRank] / (1 + rangePct / 100);
     hx = [{ day: cutoffDay, price: anchorPrice }, ...closePts, { day: _nowDay, price: liveP[selRank] }];
     hx = hx.filter((h, i) => i === 0 || Math.abs(h.day - hx[i-1].day) > 0.01);
+    hx = _stepHold(hx);
   } else if (chartRange === 0) {
     const seasonStart = dateToDayNum(new Date('2026-03-26T12:00:00'));
     const todayStr = localDateStr();
     const c = closes[selRank] || {};
     const allCloseDates = Object.keys(c).filter(ds => c[ds] > 0 && ds < todayStr).sort();
     const closePts = allCloseDates
-      .filter(ds => Math.abs(c[ds] - liveP[selRank]) > 0.01)
       .map(ds => ({ day: dateToDayNum(new Date(ds + 'T12:00:00')), price: c[ds] }));
     // Same reasoning as chartRange>1 above: derive the anchor price from
     // ENGINE.pct(rank, 0) itself (which already handles the outlier guard
@@ -10799,6 +10914,7 @@ function drawMain(hoverX){
     const anchorPrice = liveP[selRank] / (1 + rangePct / 100);
     hx = [{ day: seasonStart, price: anchorPrice }, ...closePts, { day: _nowDay, price: liveP[selRank] }];
     hx = hx.filter((h, i) => i === 0 || Math.abs(h.day - hx[i-1].day) > 0.01);
+    hx = _stepHold(hx);
   }
 
   // Every branch above assembles hx by concatenating anchor points with real
@@ -10855,17 +10971,27 @@ function drawMain(hoverX){
   const showTime = (daySpan < 2); // 1D shows time, multi-day shows date
   const labelCount = Math.min(5, hx.length);
   ctx.fillStyle='#8e8e96'; ctx.font=`500 10px 'Fira Sans'`; ctx.textAlign='center';
-  for (let i = 0; i < labelCount; i++) {
+  // Both ends first, then the ones in between - and never two labels on top
+  // of each other. Points bunch up around a game (the flat hold, then the
+  // move), so evenly spaced targets can land on neighbours a few pixels
+  // apart and print "Nov 15Nov 16" as one smear.
+  const _drawn = [];   // [left, right] of every label already on the axis
+  const _labelOrder = [0, labelCount - 1];
+  for (let i = 1; i < labelCount - 1; i++) _labelOrder.push(i);
+  for (const i of _labelOrder) {
+    if (i < 0 || (i === labelCount - 1 && i === 0 && _drawn.length)) continue;
     // Pick the point whose day is closest to the evenly-spaced time target
     const targetDay = dayMin + (i / (labelCount - 1)) * daySpan;
     let best = 0;
     hx.forEach((h, j) => { if (Math.abs(h.day - targetDay) < Math.abs(hx[best].day - targetDay)) best = j; });
-    const x = px(best);
     const label = showTime ? dayToTime(hx[best].day) : dayToDate(hx[best].day);
     // Keep the first and last labels inside the canvas (the first date used
     // to lose its leading letter off the left edge).
     const half = ctx.measureText(label).width / 2;
-    ctx.fillText(label, Math.max(half + 1, Math.min(W - half - 1, x)), H - 2);
+    const cx = Math.max(half + 1, Math.min(W - half - 1, px(best)));
+    if (_drawn.some(([l, r]) => cx - half < r + 8 && cx + half > l - 8)) continue;
+    ctx.fillText(label, cx, H - 2);
+    _drawn.push([cx - half, cx + half]);
   }
 
   // avg buy line - always visible since price range is expanded to include it
@@ -11986,7 +12112,7 @@ function renderTrending(){
 
   let sorted = [];
   if(activeTrendTab === 'volume'){
-    if (!cached) { grid.innerHTML = '<div class="g10-loading">Loading trades…</div>'; return; }
+    if (!cached) { grid.innerHTML = '<div class="g10-loading skel" aria-busy="true">Loading trades…</div>'; return; }
     sorted = players.map(row).filter(p => p.vol > 0).sort((a,b)=>b.vol - a.vol).slice(0,limit);
     if (!sorted.length) {
       grid.innerHTML = emptyState(`No trades ${rangeWords}`, 'Be the first: pick a player in the Market and buy in.', `<button class="es-btn es-sm" onclick="goToMarketTop()">Go to Market</button>`);
@@ -12752,6 +12878,97 @@ function dismissCharge(confirmed) {
     if (_pendingCharge) { _pendingCharge(confirmed); _pendingCharge = null; }
   });
 }
+
+// ── In-app dialogs ───────────────────────────────────────────────────────────
+// Replaces the browser's own confirm()/prompt()/alert() boxes, which show the
+// site's address, can't be styled, and look nothing like the rest of the app.
+// Built on the native <dialog> element so focus trapping, Escape-to-close and
+// the backdrop come from the browser instead of being re-implemented here.
+// A centred card on desktop, a bottom sheet on phones (see .ui-dlg in the CSS).
+//
+//   await uiConfirm(title, body, opts)        -> true | false
+//   await uiPrompt(title, body, opts)         -> string | null (cancelled)
+//   await uiAlert(title, body)                -> undefined
+//   await uiChoose(title, body, options, lbl) -> option.value | null
+//
+// opts: confirmLabel, cancelLabel, danger (red confirm button), and for
+// prompts: value, placeholder, maxLength, validate(v) -> error text or ''.
+function uiDialog(o) {
+  const kind = o.kind || 'confirm';
+  const cancelled = kind === 'confirm' ? false : (kind === 'alert' ? undefined : null);
+  const probe = document.createElement('dialog');
+  if (typeof probe.showModal !== 'function') {
+    // Very old browsers only: fall back to the native boxes.
+    const text = o.title + (o.body ? '\n\n' + o.body : '');
+    if (kind === 'alert') { alert(text); return Promise.resolve(); }
+    if (kind === 'prompt') return Promise.resolve(prompt(text, o.value || ''));
+    if (kind === 'choose') return Promise.resolve(null);
+    return Promise.resolve(confirm(text));
+  }
+  return new Promise(resolve => {
+    const d = probe;
+    const esc = s => escHtml(String(s == null ? '' : s)).replace(/\n/g, '<br>');
+    d.className = 'ui-dlg' + (o.danger ? ' danger' : '');
+    d.setAttribute('aria-labelledby', 'ui-dlg-title');
+    d.innerHTML = `
+      <form method="dialog" class="ui-dlg-body" novalidate>
+        <h2 class="ui-dlg-title" id="ui-dlg-title">${esc(o.title)}</h2>
+        ${o.body ? `<p class="ui-dlg-text">${esc(o.body)}</p>` : ''}
+        ${kind === 'prompt' ? `<input class="ui-dlg-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+            value="${esc(o.value || '')}" placeholder="${esc(o.placeholder || '')}" ${o.maxLength ? `maxlength="${o.maxLength}"` : ''} aria-label="${esc(o.title)}">
+          <div class="ui-dlg-err" aria-live="polite"></div>` : ''}
+        ${kind === 'choose' ? `<div class="ui-dlg-list">${(o.options || []).map((op, i) =>
+          `<div class="ui-dlg-opt"><span>${esc(op.label)}</span><button type="button" class="ui-dlg-optbtn" data-i="${i}">${esc(o.optionLabel || 'Select')}</button></div>`).join('')}</div>` : ''}
+        <div class="ui-dlg-btns">
+          ${kind !== 'alert' ? `<button type="button" class="ui-dlg-btn ghost" data-cancel>${esc(o.cancelLabel || (kind === 'choose' ? 'Done' : 'Cancel'))}</button>` : ''}
+          ${kind !== 'choose' ? `<button type="submit" class="ui-dlg-btn primary">${esc(o.confirmLabel || 'OK')}</button>` : ''}
+        </div>
+      </form>`;
+    let result = cancelled, done = false;
+    const finish = () => {
+      if (done) return; done = true;
+      d.classList.add('closing');
+      setTimeout(() => { try { d.close(); } catch(e) {} d.remove(); resolve(result); }, 220);
+    };
+    const input = d.querySelector('.ui-dlg-input');
+    d.querySelector('form').addEventListener('submit', e => {
+      e.preventDefault();
+      if (kind === 'prompt') {
+        const v = input.value.trim();
+        const err = o.validate ? o.validate(v) : '';
+        if (err) { d.querySelector('.ui-dlg-err').textContent = err; input.focus(); return; }
+        result = v;
+      } else if (kind === 'confirm') {
+        result = true;
+      }
+      finish();
+    });
+    d.querySelector('[data-cancel]')?.addEventListener('click', finish);
+    d.querySelectorAll('.ui-dlg-optbtn').forEach(b => b.addEventListener('click', () => {
+      result = o.options[Number(b.dataset.i)].value; finish();
+    }));
+    d.addEventListener('cancel', e => { e.preventDefault(); finish(); });   // Escape / Android back
+    d.addEventListener('click', e => { if (e.target === d) finish(); });     // tap on the backdrop
+    document.body.appendChild(d);
+    d.showModal();
+    if (input) { input.focus(); input.select(); }
+  });
+}
+function uiConfirm(title, body, opts) { return uiDialog({ ...(opts || {}), kind: 'confirm', title, body }); }
+function uiPrompt(title, body, opts)  { return uiDialog({ ...(opts || {}), kind: 'prompt', title, body }); }
+function uiAlert(title, body, opts)   { return uiDialog({ ...(opts || {}), kind: 'alert', title, body }); }
+function uiChoose(title, body, options, optionLabel) { return uiDialog({ kind: 'choose', title, body, options, optionLabel }); }
+
+// ── Connection banner ────────────────────────────────────────────────────────
+// Prices silently stop moving when the phone drops signal; say so instead of
+// leaving a frozen market that looks like a bug.
+function _syncNetBanner() {
+  const b = document.getElementById('net-banner');
+  if (b) b.hidden = navigator.onLine !== false;
+}
+window.addEventListener('offline', _syncNetBanner);
+window.addEventListener('online', () => { _syncNetBanner(); showToast('Back online'); });
+window.addEventListener('load', _syncNetBanner);
 
 function showToast(msg){
   const t=document.getElementById('toast');
@@ -13618,7 +13835,7 @@ function initFirebase() {
       setTimeout(() => {
         // Give onAuthStateChanged a moment; only warn if still signed out.
         if (!currentUser) {
-          try { alert('Sign-in didn\u2019t complete on return.\n\nThis is usually iOS blocking cross-site sign-in. In Settings \u2192 Safari, turn OFF "Prevent Cross-Site Tracking", then try again. Or use Chrome.'); } catch(_) {}
+          try { uiAlert('Sign-in didn\u2019t complete', 'This is usually iOS blocking cross-site sign-in. In Settings \u2192 Safari, turn OFF "Prevent Cross-Site Tracking", then try again. Or use Chrome.'); } catch(_) {}
         }
       }, 1500);
     }
@@ -14066,7 +14283,7 @@ async function openPublicProfile(uid){
   const modal = document.getElementById('public-profile-modal');
   const content = document.getElementById('public-profile-content');
   if (!modal || !content) return;
-  content.innerHTML = `<div class="g10-loading">Loading…</div>`;
+  content.innerHTML = `<div class="g10-loading skel" aria-busy="true">Loading…</div>`;
   modal.classList.add('open');
   try {
     const snap = await window._fbGetDoc(window._fbDoc(db, 'users', uid));
@@ -14342,7 +14559,7 @@ async function signInWithGoogle() {
     if (popupBlocked && isIOS) {
       // iOS blocked the popup AND redirect is unreliable here → guide the user.
       const msg = 'Safari blocked the sign-in popup.\n\nTap the sign-in button again (it works on the second tap), or in Settings → Apps → Safari, turn OFF "Block Pop-ups" for this to work first try.';
-      try { alert(msg); } catch(_) { showToast('Safari blocked the popup - tap sign in again'); }
+      try { uiAlert('Safari blocked the sign-in popup', msg.split('\n\n').slice(1).join('\n\n')); } catch(_) { showToast('Safari blocked the popup - tap sign in again'); }
       return;
     }
 
@@ -14388,7 +14605,7 @@ async function enablePushNotifications() {
       || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (isIOS && !isStandalone) {
-      alert('To get notifications on iPhone:\n\n1. Tap the Share button in Safari\n2. Tap "Add to Home Screen"\n3. Open Breakout from your Home Screen\n4. Then enable notifications\n\n(Apple only allows notifications for home-screen apps.)');
+      uiAlert('Notifications on iPhone', '1. Tap the Share button in Safari\n2. Tap "Add to Home Screen"\n3. Open Breakout from your Home Screen\n4. Then enable notifications\n\n(Apple only allows notifications for home-screen apps.)');
       return;
     }
 
@@ -14448,7 +14665,7 @@ window.enablePushNotifications = enablePushNotifications;
 // Fixes the case where repeated/compounded moves inflated prices (e.g. a hitter up
 // 20%+ that no single game could produce).
 async function resetPriceData() {
-  if (!confirm('Reset all prices to their baseline? This fixes corrupted prices and wrong %. Your holdings, cash, and portfolio are kept. Prices rebuild from live data.')) return;
+  if (!await uiConfirm('Reset all prices?', 'This fixes corrupted prices and wrong %. Your holdings, cash, and portfolio are kept. Prices rebuild from live data.', { confirmLabel: 'Reset prices' })) return;
   try {
     isGameLive = false;
     window._liveTeamIds = null;
@@ -14771,7 +14988,7 @@ async function reportMessage(collection, id) {
   if (!currentUser || !db) { showToast('Sign in to report a message'); return; }
   const m = _findMsg(collection, id);
   if (!m) return;
-  if (!confirm('Report this message as abusive or inappropriate?\n\nIt will be hidden for you and sent to us for review.')) return;
+  if (!await uiConfirm('Report this message?', 'It will be hidden for you and sent to us for review.', { confirmLabel: 'Report', danger: true })) return;
   try {
     await window._fbAddDoc(window._fbCollection(db, 'reports'), {
       collection, msgId: id,
@@ -14796,7 +15013,7 @@ async function blockUser(uid) {
   if (!uid || (currentUser && uid === currentUser.uid)) return;
   const m = _chatItems.find(x => x.uid === uid) || (_lastComments || []).find(x => x.uid === uid);
   const label = m ? (m.username ? '@' + m.username : (m.displayName || 'Trader')) : 'Trader';
-  if (!confirm('Block ' + label + '?\n\nYou won’t see their messages. You can unblock them from your Profile.')) return;
+  if (!await uiConfirm('Block ' + label + '?', 'You won’t see their messages. You can unblock them from your Profile.', { confirmLabel: 'Block', danger: true })) return;
   _blocked[uid] = label;
   _saveBlocked();
   _rerenderThreads();
@@ -14819,13 +15036,11 @@ async function unblockUser(uid) {
   if (typeof renderProfileView === 'function') renderProfileView();
 }
 
-function manageBlockedUsers() {
+async function manageBlockedUsers() {
   const uids = Object.keys(_blocked);
   if (!uids.length) { showToast('You haven’t blocked anyone'); return; }
-  const list = uids.map((u, i) => (i + 1) + '. ' + _blocked[u]).join('\n');
-  const pick = prompt('Blocked users:\n' + list + '\n\nType a number to unblock.');
-  const n = parseInt(pick, 10);
-  if (n >= 1 && n <= uids.length) unblockUser(uids[n - 1]);
+  const uid = await uiChoose('Blocked users', '', uids.map(u => ({ label: _blocked[u], value: u })), 'Unblock');
+  if (uid) unblockUser(uid);
 }
 
 // ── Delete account ───────────────────────────────────────────────────────────
@@ -14837,9 +15052,10 @@ function manageBlockedUsers() {
 // still in flight), then the login itself goes, then local state is cleared.
 async function deleteAccount() {
   if (!currentUser || !auth) return;
-  if (!confirm('Delete your Breakout account?\n\nThis permanently removes your profile, username, portfolio, Coins, friends and chat messages. It can’t be undone.')) return;
-  const typed = prompt('Type DELETE to confirm.');
-  if ((typed || '').trim().toUpperCase() !== 'DELETE') { showToast('Account not deleted'); return; }
+  if (!await uiConfirm('Delete your Breakout account?', 'This permanently removes your profile, username, portfolio, Coins, friends and chat messages. It can’t be undone.', { confirmLabel: 'Continue', danger: true })) return;
+  const typed = await uiPrompt('Type DELETE to confirm', '', { confirmLabel: 'Delete account', danger: true, placeholder: 'DELETE',
+    validate: v => v.toUpperCase() === 'DELETE' ? '' : 'Type DELETE to continue.' });
+  if (typed == null) { showToast('Account not deleted'); return; }
 
   const lastSignIn = Date.parse(currentUser.metadata?.lastSignInTime || '') || 0;
   if (Date.now() - lastSignIn > 4 * 60 * 1000) {
@@ -14863,13 +15079,13 @@ async function deleteAccount() {
   try { await window._fbDeleteUser(currentUser); }
   catch(e) { try { await window._fbSignOut(auth); } catch(_) {} }
   try { Object.keys(localStorage).filter(k => k.startsWith('ax_')).forEach(k => localStorage.removeItem(k)); } catch(e) {}
-  alert('Your account has been deleted.');
+  await uiAlert('Account deleted', 'Your account and data have been removed.');
   location.reload();
 }
 
 async function deleteChatMessage(msgId) {
   if (!currentUser || !db) return;
-  if (!confirm('Delete this message?')) return;
+  if (!await uiConfirm('Delete this message?', '', { confirmLabel: 'Delete', danger: true })) return;
   try {
     await window._fbDeleteDoc(window._fbDoc(db, 'globalChat', msgId));
   } catch(e) { showToast('Couldn’t delete that. Try again.'); }
@@ -15450,7 +15666,7 @@ async function likeComment(commentId, rank) {
 
 async function deleteComment(commentId, rank) {
   if (!currentUser || !db) return;
-  if (!confirm('Delete this comment?')) return;
+  if (!await uiConfirm('Delete this comment?', '', { confirmLabel: 'Delete', danger: true })) return;
   try {
     await window._fbDeleteDoc(window._fbDoc(db, 'comments', commentId));
   } catch(e) { showToast('Couldn’t delete that. Try again.'); }
@@ -15509,8 +15725,8 @@ async function claimUsername(rawInput){
   }
 }
 
-function promptChangeUsername(){
-  const next = prompt('New username (3-20 chars, letters/numbers/_):', userProfile?.username || '');
+async function promptChangeUsername(){
+  const next = await uiPrompt('Change username', '3-20 characters: letters, numbers and underscores.', { value: userProfile?.username || '', confirmLabel: 'Save', maxLength: 20 });
   if (next == null) return;   // cancelled
   claimUsername(next);
 }
@@ -15673,7 +15889,7 @@ function searchFriendCandidates(qstr){
   const q = _normalizeUsername(qstr.replace(/^@/, ''));
   if (!q) { el.innerHTML = ''; return; }
   _friendSearchDebounce = setTimeout(async () => {
-    el.innerHTML = '<div class="g10-loading">Searching…</div>';
+    el.innerHTML = '<div class="g10-loading skel" aria-busy="true">Searching…</div>';
     try {
       const qq = window._fbQuery(
         window._fbCollection(db, 'users'),
@@ -15759,7 +15975,7 @@ async function renderFriendsLeaderboard(){
       <div id="friend-search-results" style="margin-top:6px;"></div>
     </div>
     <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-bottom:20px;">Ranked by % return - you and your friends only</div>
-    <div id="friends-lb-list"><div class="g10-loading">Loading…</div></div>`;
+    <div id="friends-lb-list"><div class="g10-loading skel" aria-busy="true">Loading…</div></div>`;
 
   renderFriendsRequestsPanel();
   await _renderFriendsLbList();
@@ -16182,7 +16398,7 @@ async function renderCoinsTab() {
     el.innerHTML = `<div class="g10-loading">Sign in to buy coins.</div>`;
     return;
   }
-  el.innerHTML = `<div class="g10-loading">Loading…</div>`;
+  el.innerHTML = `<div class="g10-loading skel" aria-busy="true">Loading…</div>`;
 
   let balance = null;
   try { balance = await paymentsWorkerFetch('/coins/balance'); } catch(e) {
@@ -16259,7 +16475,7 @@ async function renderGlobalLeaderboard() {
       <span class="lb-updated" id="lb-updated"></span>
     </div>
     <div id="ulb-me"></div>
-    <div id="ulb-list" class="ulb-list"><div class="g10-loading">Loading traders…</div></div>
+    <div id="ulb-list" class="ulb-list"><div class="g10-loading skel" aria-busy="true">Loading traders…</div></div>
 
     <section class="lb-section">
       <div class="lb-head">
@@ -16795,7 +17011,7 @@ function adminCreateChallengeBtn() {
 async function renderChallengeList() {
   const el = document.getElementById('lb-tab-content');
   if (!el) return;
-  el.innerHTML = `<div class="g10-loading">Loading challenges…</div>`;
+  el.innerHTML = `<div class="g10-loading skel" aria-busy="true">Loading challenges…</div>`;
 
   await refreshAdminClaim();
   const adminBtn = adminCreateChallengeBtn();
@@ -16849,7 +17065,7 @@ async function renderChallengeList() {
 async function renderChallengeDetail(challengeId) {
   const el = document.getElementById('lb-tab-content');
   if (!el) return;
-  el.innerHTML = `<div class="g10-loading">Loading challenge…</div>`;
+  el.innerHTML = `<div class="g10-loading skel" aria-busy="true">Loading challenge…</div>`;
 
   // Admin button - only rendered for users with the Firebase custom "admin" claim
   await refreshAdminClaim();
@@ -17235,7 +17451,7 @@ async function loadLast10(rank) {
   const el = document.getElementById('g10-content');
   if (g10Cache[rank]) { renderG10(rank, g10Cache[rank]); return; }
 
-  el.innerHTML = '<div class="g10-loading">Scanning recent games…</div>';
+  el.innerHTML = '<div class="g10-loading skel" aria-busy="true">Scanning recent games…</div>';
   const p = players.find(x => x.rank === rank);
   const pNameLower = p.name.toLowerCase();
   const isGolfPlayer = rank >= 2001 && rank < 3001;
@@ -18258,7 +18474,7 @@ window.addEventListener('DOMContentLoaded', function() {
     <span>Trading In</span>
     <button class="drawer-close" onclick="closePortfolioDrawer()" aria-label="Close" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
   </div>
-  <div id="portfolio-drawer-list"><div class="g10-loading">Loading…</div></div>
+  <div id="portfolio-drawer-list"><div class="g10-loading skel" aria-busy="true">Loading…</div></div>
 </div>
 
 </body></html>
