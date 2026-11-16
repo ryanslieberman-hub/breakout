@@ -34,7 +34,7 @@
 <meta name="apple-touch-fullscreen" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Fira+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg:#06070a; --surface:#0d0f14; --card:#101318; --card2:#171b22;
@@ -2117,6 +2117,119 @@ button.pl-row:active{background:rgba(255,255,255,.05);}
   .ui-dlg.closing{opacity:1;transform:translateY(100%);transition:transform .22s cubic-bezier(.32,.72,0,1);}
   .ui-dlg-body{padding:22px 20px calc(20px + env(safe-area-inset-bottom));}
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   PLAYER PAGE
+   The page people buy from. Until now it was a 40px avatar beside a name -
+   swap the name for a ticker and it was any trading app. Now the player and
+   his team ARE the header: the team's colour fills it, the photo stands in
+   it at full size, and the name and price are set in a condensed display
+   face, the way a broadcast graphic or a scoreboard sets them.
+   Markup: .hero > .hero-band (.hero-id + .hero-photo) + .hinfo.
+   ════════════════════════════════════════════════════════════════════════ */
+:root{ --font-sport:'Big Shoulders Display','Fira Sans',sans-serif; }
+
+.hero{display:block !important;padding:0 !important;gap:0;--team:var(--green);border-bottom:1px solid var(--border);
+  max-height:none !important;overflow:visible !important;}
+
+/* The band. Team colour, darkened so white type always holds, with a scrim on
+   the left where the text sits. Not decoration: it is how you know whose page
+   this is before you have read a word. */
+.hero-band{position:relative;overflow:hidden;display:flex;min-height:172px;
+  background:
+    linear-gradient(90deg,rgba(0,0,0,.46) 0%,rgba(0,0,0,.20) 48%,rgba(0,0,0,0) 78%),
+    linear-gradient(135deg,color-mix(in srgb,var(--team) 64%,#000) 0%,color-mix(in srgb,var(--team) 36%,#0a0a0b) 100%);}
+.hero-id{position:relative;z-index:1;display:flex;flex-direction:column;justify-content:flex-end;
+  width:100%;min-width:0;padding:16px 16px 14px;}
+
+.hero .hsub{order:0;margin:0 0 6px;max-width:60%;font-family:var(--font-body);font-size:12px;font-weight:600;
+  letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.80);
+  white-space:normal;overflow:visible;line-height:1.3;}
+.hero .hname{order:1;max-width:60%;margin:0;font-family:var(--font-sport);font-weight:800;font-size:40px;line-height:.92;
+  letter-spacing:.005em;text-transform:uppercase;color:#fff;white-space:normal;overflow:visible;text-overflow:clip;
+  text-wrap:balance;text-shadow:0 1px 12px rgba(0,0,0,.35);}
+.hero .hright{order:2;display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:12px 0 0;width:auto;text-align:left;}
+/* Price is white here: green or red digits on a team-coloured band would
+   fight it (red on the Chiefs, green on the Celtics). Direction lives in the
+   chip beside it, on its own dark ground. */
+.hero .hprice,.hero .hprice.dn,.hero .hprice.flat{font-family:var(--font-sport);font-weight:800;font-size:46px;line-height:.95;
+  letter-spacing:0;color:#fff;text-shadow:0 1px 12px rgba(0,0,0,.35);}
+.hero .hchg{font-family:var(--font-body);font-size:13px;font-weight:600;line-height:1;padding:5px 8px;border-radius:6px;
+  background:rgba(0,0,0,.50);color:rgba(255,255,255,.85);}
+.hero .hchg.up{color:#3ee79b;}
+.hero .hchg.dn{color:#ff7a8f;}
+.hero .etag{float:none;clear:none;margin:0;}
+.hero .inj-badge,.hero .q-badge{vertical-align:1px;}
+
+/* The photo: a cut-out standing in the band, not a thumbnail in a ring */
+.hero-photo{position:absolute;right:-10px;bottom:0;height:100%;width:56%;display:flex;align-items:flex-end;justify-content:flex-end;pointer-events:none;}
+.hero-photo .hav-img{width:auto !important;height:104% !important;max-width:none;flex-shrink:0;border:none;border-radius:0;background:none;
+  object-fit:contain;object-position:bottom right;filter:drop-shadow(0 8px 20px rgba(0,0,0,.35));}
+/* No photo: the initials, huge and quiet, hold the same space */
+.hero-photo .hav{width:auto !important;height:auto !important;border:none;border-radius:0;box-shadow:none;
+  background:none !important;color:rgba(255,255,255,.16) !important;
+  font-family:var(--font-sport);font-weight:800;font-size:120px;line-height:.8;letter-spacing:-.02em;margin:0 22px -6px 0;}
+
+/* Below the band: season line, market sentence, last game */
+.hero .hinfo{display:block !important;padding:14px 16px 12px;max-height:none !important;overflow:visible !important;min-width:0;}
+.hero .hstats{display:flex;gap:0;margin:0;flex-wrap:nowrap;}
+.hero .hs{flex:1 1 0;min-width:0;gap:3px;padding:0 14px;border-left:1px solid var(--border);}
+.hero .hs:first-child{padding-left:0;border-left:none;}
+.hero .hs-v{font-family:var(--font-sport);font-weight:700;font-size:28px;line-height:.95;letter-spacing:.01em;}
+.hero .hs-l{font-size:11px;color:var(--muted);}
+.hero .hmarket{margin-top:14px;}
+
+#last-night-wrap{margin-top:14px !important;padding-top:14px;border-top:1px solid var(--border);}
+#last-night-wrap > div:first-child{font-size:12px !important;margin-bottom:10px !important;letter-spacing:.05em;text-transform:uppercase;}
+#ln-chip-row{display:grid !important;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:12px 8px !important;}
+#ln-chip-row .ln-stat{flex-direction:column;align-items:flex-start;gap:3px;margin:0;}
+#ln-chip-row .ln-v{font-family:var(--font-sport);font-weight:700;font-size:24px;line-height:.95;letter-spacing:.01em;}
+#ln-chip-row .ln-l{font-size:11px;white-space:nowrap;}
+#last-night-dnp{margin-top:14px !important;padding-top:12px;border-top:1px solid var(--border);
+  font-family:var(--font-body) !important;font-size:12px !important;}
+
+/* Section titles share the face, so the page above and the tabs around it agree */
+.lb-title{font-family:var(--font-sport);font-weight:800;text-transform:uppercase;letter-spacing:.01em;line-height:.95;}
+
+/* Phones: the chart has to stay in reach under all this, so the header is
+   kept compact and the last-game line becomes one row you can swipe along
+   (most important stats first) instead of wrapping to two or three. An older
+   rule capped this row at 60px tall and scrolled it vertically - undone here. */
+#ln-chip-row{max-height:none !important;overflow:visible;}
+@media (max-width:768px){
+  .hero-band{min-height:156px;}
+  .hero-id{padding:14px 16px 12px;}
+  .hero .hname{font-size:36px;}
+  .hero .hprice,.hero .hprice.dn,.hero .hprice.flat{font-size:42px;}
+  .hero .hright{margin-top:10px;}
+  .hero .hinfo{padding:12px 16px 10px;}
+  .hero .hs-v{font-size:24px;}
+  .hero .hmarket{margin-top:10px;}
+  #last-night-wrap{margin-top:12px !important;padding-top:12px;}
+  #last-night-wrap > div:first-child{margin-bottom:8px !important;}
+  #ln-chip-row{display:flex !important;flex-wrap:nowrap !important;gap:0 20px !important;overflow-x:auto !important;overflow-y:hidden !important;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch;margin-right:-16px;padding-right:16px;
+    -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);}
+  #ln-chip-row::-webkit-scrollbar{display:none;}
+  #ln-chip-row .ln-stat{flex:0 0 auto;}
+  #ln-chip-row .ln-v{font-size:22px;}
+}
+
+@media (min-width:769px){
+  .hero-band{min-height:208px;}
+  .hero-id{padding:22px 24px 20px;}
+  .hero .hsub{font-size:13px;margin-bottom:8px;}
+  .hero .hname{font-size:60px;max-width:62%;}
+  .hero .hprice,.hero .hprice.dn,.hero .hprice.flat{font-size:60px;}
+  .hero .hchg{font-size:14px;}
+  .hero-photo{width:44%;right:8px;}
+  .hero-photo .hav-img{height:108% !important;}
+  .hero-photo .hav{font-size:170px;}
+  .hero .hinfo{padding:16px 24px 14px;}
+  .hero .hstats{max-width:420px;}
+  .hero .hs-v{font-size:32px;}
+  #ln-chip-row{grid-template-columns:repeat(auto-fill,minmax(72px,1fr));max-width:760px;}
+}
 </style>
 </head>
 <body>
@@ -2250,10 +2363,21 @@ function defaultLeague(now = new Date()) {
 
       <!-- Hero -->
       <div class="hero" id="hero-block">
-        <img id="hav-photo" class="hav-img" alt="" style="display:none;"><div class="hav" id="hav" style="background: rgb(10, 24, 53); color: rgb(61, 155, 255);">—</div>
+        <!-- The band: who this is, what he costs, and his photo at full size.
+             Everything else about him sits below it in .hinfo. -->
+        <div class="hero-band">
+          <div class="hero-id">
+            <div class="hsub" id="hsub"></div>
+            <div class="hname" id="hname"></div>
+            <div class="hright">
+              <div class="hprice" id="hprice">—</div>
+              <div class="hchg flat" id="hchg">0.0%</div>
+              <div class="etag" id="etag"></div>
+            </div>
+          </div>
+          <div class="hero-photo"><img id="hav-photo" class="hav-img" alt="" style="display:none;"><div class="hav" id="hav">—</div></div>
+        </div>
         <div class="hinfo">
-          <div class="hname" id="hname">Jaylen Brown</div>
-          <div class="hsub" id="hsub">Boston Celtics · SG · TIER A</div>
           <div class="hstats">
             <div class="hs"><div class="hs-v" id="h-ppg">28.5</div><div class="hs-l">PPG</div></div>
             <div class="hs"><div class="hs-v" id="h-rpg">7</div><div class="hs-l">RPG</div></div>
@@ -2286,11 +2410,6 @@ function defaultLeague(now = new Date()) {
             </div>
           </div>
           <div id="last-night-dnp" style="display: block; margin-top: 8px; font-family: var(--font-mono); font-size: 9px; color: var(--muted);">Did not play last night</div>
-        </div>
-        <div class="hright">
-          <div class="hprice" id="hprice">—</div>
-          <div class="hchg flat" id="hchg">0.0%</div>
-          <div class="etag" id="etag"></div>
         </div>
       </div>
 
@@ -9052,6 +9171,35 @@ function renderList(){
   }).join('');
 }
 
+// Photo for the player header, where it is shown large. Same source as the
+// list avatar except MLB: the list uses MLB's 120px round "spot", which is
+// both tiny and pre-cropped to a circle - the header wants the full cut-out.
+function heroPhotoUrl(rank){
+  if (rank >= 1001 && rank < 2001) {
+    const mlbId = window._mlbPlayerIds && window._mlbPlayerIds[rank];
+    if (mlbId) return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:silo:current.png/w_426,q_auto:best/v1/people/${mlbId}/headshot/silo/current`;
+  }
+  return headshotUrl(rank);
+}
+
+// The header name is set large and may wrap to two lines. A long one
+// ("Shai Gilgeous-Alexander") steps down in size until it fits rather than
+// breaking mid-word or running under the photo. Cached per name and width,
+// because updateHero runs on every price tick.
+function _fitHeroName(force){
+  const el = document.getElementById('hname');
+  if (!el) return;
+  const key = el.textContent + '|' + el.clientWidth;
+  if (!force && el.dataset.fit === key) return;
+  el.style.fontSize = '';
+  let size = parseFloat(getComputedStyle(el).fontSize) || 40;
+  const tooBig = () => el.scrollWidth > el.clientWidth + 1 || el.offsetHeight > size * 0.92 * 2 + 3;
+  while (size > 22 && tooBig()) { size -= 2; el.style.fontSize = size + 'px'; }
+  el.dataset.fit = key;
+}
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => _fitHeroName(true));
+window.addEventListener('resize', () => _fitHeroName(true));
+
 function updateHero(){
   const p=players.find(x=>x.rank===selRank);
   if (!p) {
@@ -9079,7 +9227,7 @@ function updateHero(){
   // Show headshot if NBA ID available
   const havEl = document.getElementById('hav');
   const nbaId = NBA_IDS[p.rank];
-  const imgSrc = headshotUrl(p.rank);
+  const imgSrc = heroPhotoUrl(p.rank);
   if(imgSrc){
     let imgEl = document.getElementById('hav-photo');
     if(!imgEl){
@@ -9088,18 +9236,26 @@ function updateHero(){
       imgEl.className = 'hav-img';
       havEl.parentNode.insertBefore(imgEl, havEl);
     }
-    imgEl.src = imgSrc;
-    imgEl.alt = p.name;
-    imgEl.onerror = ()=>{ imgEl.style.display='none'; havEl.style.display='flex'; };
-    imgEl.onload = ()=>{ imgEl.style.display=''; havEl.style.display='none'; };
-    imgEl.style.display='';
-    havEl.style.display='none';
+    // Only when the photo actually changes (updateHero also runs on every
+    // price tick): show the initials until the new photo has loaded, so a
+    // slow or failed image never leaves the header with an empty space - or
+    // the previous player's face under the new player's name.
+    if (imgEl.dataset.src !== imgSrc) {
+      imgEl.dataset.src = imgSrc;
+      imgEl.style.display='none';
+      havEl.style.display='flex';
+      imgEl.onerror = ()=>{ imgEl.style.display='none'; havEl.style.display='flex'; };
+      imgEl.onload = ()=>{ imgEl.style.display=''; havEl.style.display='none'; };
+      imgEl.alt = p.name;
+      imgEl.src = imgSrc;
+    }
   } else {
     const imgEl = document.getElementById('hav-photo');
-    if(imgEl){ imgEl.style.display='none'; }
+    if(imgEl){ imgEl.style.display='none'; imgEl.dataset.src=''; imgEl.removeAttribute('src'); }
     havEl.style.display='flex';
   }
   document.getElementById('hname').textContent=p.name;
+  _fitHeroName();
   // Team identity: the hero picks up this player's team colour (photo ring,
   // top rule, a faint wash) - falls back to the app green for golfers.
   document.getElementById('hero-block').style.setProperty('--team', teamColor(p) || 'var(--green)');
