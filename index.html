@@ -2378,6 +2378,48 @@ button.pl-row:active{background:rgba(255,255,255,.05);}
 .tlcard-amt{font-family:var(--font-sport) !important;font-weight:700 !important;font-size:20px !important;}
 .port-section-title{font-family:var(--font-sport) !important;font-weight:800 !important;font-size:24px !important;text-transform:uppercase;letter-spacing:.01em;}
 .port-section-title span{font-family:var(--font-body) !important;font-size:14px !important;text-transform:none;}
+
+/* ════════════════════════════════════════════════════════════════════════
+   LEADERS
+   The top three get a podium: bigger faces, their number in the display
+   face, and a stand whose height is the finishing order. Everyone else
+   is the ranked list below it, same as before.
+   ════════════════════════════════════════════════════════════════════════ */
+.podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;align-items:end;gap:8px;margin:6px 0 18px;}
+.pod{--medal:#b8b8c0;display:flex;flex-direction:column;align-items:center;min-width:0;cursor:pointer;text-align:center;}
+.pod.p1{--medal:#f2b843;}
+.pod.p2{--medal:#c9ced6;}
+.pod.p3{--medal:#d08a4c;}
+.pod-face{position:relative;width:64px;height:64px;border-radius:50%;overflow:hidden;flex-shrink:0;
+  box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--medal);background:var(--card2);
+  display:flex;align-items:center;justify-content:center;font-family:var(--font-sport);font-weight:800;font-size:28px;color:#fff;}
+.pod.p1 .pod-face{width:84px;height:84px;font-size:36px;}
+.pod-face img{width:100%;height:100%;object-fit:cover;}
+.pod-name{margin-top:12px;max-width:100%;font-size:14px;font-weight:600;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pod-name.you{color:var(--green);}
+.pod-val{font-family:var(--font-sport);font-weight:800;font-size:24px;line-height:1;margin-top:4px;font-variant-numeric:tabular-nums;}
+.pod.p1 .pod-val{font-size:30px;}
+.pod-sub{font-size:12px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums;}
+.pod-sub.pos{color:var(--green);} .pod-sub.neg{color:var(--red);}
+.pod-stand{width:100%;margin-top:12px;border-radius:12px 12px 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:10px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--medal) 26%,var(--card2)) 0%,var(--card) 100%);
+  border:1px solid color-mix(in srgb,var(--medal) 30%,transparent);border-bottom:none;}
+.pod-stand span{font-family:var(--font-sport);font-weight:800;font-size:34px;line-height:1;color:var(--medal);}
+.pod.p1 .pod-stand{height:104px;}
+.pod.p2 .pod-stand{height:78px;}
+.pod.p3 .pod-stand{height:60px;}
+.pod.p1 .pod-stand span{font-size:44px;}
+
+/* Your standing above it: the one number a player opens this tab for */
+.ulb-me{align-items:center;}
+.ulb-me-rank span{font-family:var(--font-body);font-size:14px;font-weight:500;color:var(--muted);margin-left:6px;}
+
+/* ── Top bar wordmark in the display face ─────────────────────────────── */
+.logo{font-family:var(--font-sport) !important;font-weight:800 !important;font-size:26px !important;letter-spacing:.01em !important;text-transform:uppercase;}
+.nav-tab{font-weight:600;}
+@media (min-width:769px){
+  .nav-tab.active{border-bottom-width:3px;}
+}
 </style>
 </head>
 <body>
@@ -16896,10 +16938,41 @@ async function renderGlobalLeaderboard() {
 // redraw just the rows - instantly, from the already-fetched _globalLbUsers - instead
 // of waiting on the friendships listener's network round-trip before the button
 // updates, or worse, a full leaderboard refetch.
+// The top three as a podium: order 2-1-3 so first place stands in the
+// middle and tallest. Shows the stat the board is sorted by, with the other
+// one underneath. Only once there are at least three traders.
+function _lbPodiumHtml(users){
+  if (users.length < 3) return '';
+  const cell = (u, place) => {
+    const isYou = currentUser && u.uid === currentUser.uid;
+    const ret = u.returnPct || 0;
+    const coins = Math.round(u.portfolioValue || 0).toLocaleString();
+    const main = _lbSortMode === 'gain' ? fmtP(ret) : coins;
+    const sub = _lbSortMode === 'gain' ? coins + ' Coins' : fmtP(ret);
+    const subCls = _lbSortMode === 'gain' ? '' : pctDir(ret, 'pos', 'neg');
+    const name = u.username ? '@' + u.username : (u.displayName || 'Trader');
+    const face = u.photoURL
+      ? `<img src="${u.photoURL}" alt="" onerror="this.remove()">`
+      : escHtml((u.displayName || '?')[0].toUpperCase());
+    return `<div class="pod p${place}" role="button" tabindex="0" onclick="openPublicProfile('${u.uid}')"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPublicProfile('${u.uid}');}"
+        aria-label="Number ${place}, ${escHtml(name)}, ${main}">
+      <div class="pod-face" style="${u.photoURL ? '' : 'background:' + (u.avatarColor || '#3a3a40')}">${face}</div>
+      <div class="pod-name${isYou ? ' you' : ''}">${escHtml(name)}</div>
+      <div class="pod-val">${main}</div>
+      <div class="pod-sub ${subCls}">${sub}</div>
+      <div class="pod-stand"><span>${place}</span></div>
+    </div>`;
+  };
+  return `<div class="podium">${cell(users[1], 2)}${cell(users[0], 1)}${cell(users[2], 3)}</div>`;
+}
+
 function _renderGlobalLbRows(){
   const el = document.getElementById('ulb-list');
   if (!el) return;
+  const _podium = _lbPodiumHtml(_globalLbUsers);
   el.innerHTML = _globalLbUsers.map((u, i) => {
+    if (_podium && i < 3) return '';
     const isYou = currentUser && u.uid === currentUser.uid;
     const rankCls = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
     const ret = u.returnPct || 0;
@@ -16932,7 +17005,7 @@ function _renderGlobalLbRows(){
     </div>`;
   }).join('');
   const sortLbl = _lbSortMode === 'gain' ? ['Return', 'Coins'] : ['Coins', 'Return'];
-  el.insertAdjacentHTML('afterbegin', `<div class="ulb-head"><span>#</span><span>Trader</span><span>${sortLbl[0]}</span><span>${sortLbl[1]}</span><span></span></div>`);
+  el.insertAdjacentHTML('afterbegin', _podium + `<div class="ulb-head"><span>#</span><span>Trader</span><span>${sortLbl[0]}</span><span>${sortLbl[1]}</span><span></span></div>`);
   _fitUlbNames(el);
 
   // Where you stand, above the table - the one number a player opens this tab for.
