@@ -4323,7 +4323,6 @@ function getLeaguePlayers() {
 }
 
 function switchLeague(league) {
-  window._moverCards = null; window._moverCardsKey = null;
   if (league === currentLeague) { closeLeagueDrawer(); return; }
   currentLeague = league;
   localStorage.setItem('ax_league', league);
@@ -9285,6 +9284,13 @@ function _lastGameDayMovers(){
 
 function _moverCardsHtml(){
   let mv = window._moverCards;
+  if (!mv || mv.league !== currentLeague) {
+    mv = null;
+    if (!window._moverCardsPending) {
+      window._moverCardsPending = true;
+      setTimeout(() => { window._moverCardsPending = false; try { updateMovers(); } catch(e) {} }, 0);
+    }
+  }
   if ((!mv || !mv.list || !mv.list.length) && currentLeague === 'NFL') mv = _lastGameDayMovers();
   if (!mv || !mv.list || !mv.list.length) return '';
   const _lastCount = {};
@@ -11013,10 +11019,10 @@ function updateMovers(){
   });
   const label = leagueIsLive ? 'Today' : _todayMovers ? 'Today' : 'Last Night';
   // Same list feeds the movers cards at the top of the board (_moverCardsHtml).
-  const _cardsKey = label + '|' + sorted.map(m => m.rank + ':' + m.pct.toFixed(2)).join(',');
+  const _cardsKey = currentLeague + '|' + label + '|' + sorted.map(m => m.rank + ':' + m.pct.toFixed(2)).join(',');
   if (_cardsKey !== window._moverCardsKey) {
     window._moverCardsKey = _cardsKey;
-    window._moverCards = { label, list: sorted.slice(0, 10) };
+    window._moverCards = { league: currentLeague, label, list: sorted.slice(0, 10) };
     if (typeof renderList === 'function') { try { renderList(); } catch(e) {} }
   }
   const moversHeader = document.getElementById('movers-header');
