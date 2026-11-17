@@ -18,7 +18,8 @@
 <meta name="twitter:description" content="Buy and sell athletes like stocks. Prices move with real games. Free Coins every day.">
 
 <!-- Favicon (inline SVG as data URI) -->
-<link rel="icon" href="data:image/svg+xml,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; viewBox=&#39;0 0 32 32&#39;&gt;&lt;rect width=&#39;32&#39; height=&#39;32&#39; rx=&#39;6&#39; fill=&#39;%2304070e&#39;/&gt;&lt;line x1=&#39;5&#39; y1=&#39;16&#39; x2=&#39;27&#39; y2=&#39;16&#39; stroke=&#39;%232a2f3a&#39; stroke-width=&#39;1.8&#39; stroke-dasharray=&#39;2.6 3.2&#39;/&gt;&lt;path d=&#39;M5 26 L10 20 L14 23 L18 16 L27 6&#39; fill=&#39;none&#39; stroke=&#39;%2312d47e&#39; stroke-width=&#39;2.6&#39; stroke-linecap=&#39;round&#39; stroke-linejoin=&#39;round&#39;/&gt;&lt;circle cx=&#39;18&#39; cy=&#39;16&#39; r=&#39;2.3&#39; fill=&#39;%2312d47e&#39;/&gt;&lt;/svg&gt;">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="alternate icon" href="/icon-192.png">
 
 <!-- PWA. iOS ignores manifest.json for its home-screen icon and reads
      apple-touch-icon directly - a manifest with icons was not enough on its
@@ -2420,6 +2421,39 @@ button.pl-row:active{background:rgba(255,255,255,.05);}
 @media (min-width:769px){
   .nav-tab.active{border-bottom-width:3px;}
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   PROFILE AND CHAT
+   Profile gets the same band as the player page, in the trader's own
+   colour. Chat headings use the display face, and a shared trade shows
+   the player's face on his team colour.
+   ════════════════════════════════════════════════════════════════════════ */
+.pf-head{--team:#3a3a40;position:relative;overflow:hidden;border-radius:16px;margin:4px 0 22px !important;padding:22px 18px;gap:18px !important;
+  background:
+    linear-gradient(90deg,rgba(0,0,0,.40),rgba(0,0,0,0) 70%),
+    linear-gradient(135deg,color-mix(in srgb,var(--team) 64%,#000) 0%,color-mix(in srgb,var(--team) 34%,#0a0a0b) 100%);}
+.pf-head .profile-ava{width:84px !important;height:84px !important;border:none !important;box-shadow:0 0 0 3px rgba(255,255,255,.9);
+  font-family:var(--font-sport) !important;font-weight:800 !important;font-size:38px !important;}
+.pf-head .pf-name{font-family:var(--font-sport) !important;font-weight:800 !important;font-size:34px !important;line-height:.95 !important;
+  text-transform:uppercase;letter-spacing:.01em !important;color:#fff;white-space:normal !important;text-wrap:balance;}
+.pf-head .pf-handle{color:rgba(255,255,255,.8);margin-top:6px;font-weight:600;}
+.pf-head .pf-link{color:rgba(255,255,255,.75);}
+#profile-global-rank,#profile-friends-rank,#profile-friends-count{font-family:var(--font-sport) !important;font-weight:700;font-size:20px;}
+.signin-title{font-family:var(--font-sport) !important;font-weight:800 !important;font-size:40px !important;text-transform:uppercase;line-height:.95;letter-spacing:.01em !important;margin-bottom:10px !important;}
+
+/* Chat */
+.chat-title{font-family:var(--font-sport);font-weight:800;font-size:30px;line-height:1;text-transform:uppercase;letter-spacing:.01em;}
+.comment-ava,.comment-ava-init{width:32px !important;height:32px !important;}
+.comment-ava-init{background:var(--card2) !important;font-family:var(--font-sport) !important;font-weight:800;font-size:16px !important;}
+.comment-body{margin-top:-10px !important;}
+.chat-trade-card{margin:6px 0 2px !important;padding:8px 12px 8px 8px !important;border-radius:12px !important;background:var(--card) !important;gap:10px !important;}
+.chat-trade-card .pface{width:36px;height:36px;}
+.chat-trade-name{font-family:var(--font-sport) !important;font-weight:800 !important;font-size:18px !important;text-transform:uppercase;line-height:1;}
+.chat-trade-sub{font-family:var(--font-body) !important;font-size:12px !important;}
+.chat-trade-pct{font-family:var(--font-body) !important;font-size:12px !important;}
+
+/* Small brand mark everywhere picks up the new icon's weight */
+.brand-mark path{stroke-width:2.8;}
 </style>
 </head>
 <body>
@@ -2801,7 +2835,7 @@ function defaultLeague(now = new Date()) {
 <!-- CHAT VIEW -->
 <div id="view-chat" class="view" style="display:none;flex-direction:column;overflow:hidden;max-width:640px;margin:0 auto;width:100%;box-sizing:border-box;">
   <div style="padding:20px 20px 12px;border-bottom:1px solid var(--border2);flex-shrink:0;">
-    <div style="font-family:var(--font-heading);font-weight:700;font-size:22px;letter-spacing:-0.3px;">Chat</div>
+    <div class="chat-title">Chat</div>
     <div style="font-size:13px;color:var(--muted);margin-top:2px;">Talk trades and games with everyone playing <span class="chat-live"><i></i>Live</span></div>
   </div>
   <div id="gchat-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;">
@@ -14557,7 +14591,7 @@ function renderProfileView() {
     // settings-list shape players already know, instead of a wall of
     // equal-weight stat cards.
     inner.innerHTML = `
-      <div class="pf-head">
+      <div class="pf-head" style="--team:${p.avatarColor || '#3a3a40'}">
         <div class="pf-ava-wrap">
           ${p.photoURL
             ? `<img class="profile-ava" src="${p.photoURL}" alt="">`
@@ -15243,7 +15277,12 @@ function renderChat() {
     const isOwn = currentUser && m.uid === currentUser.uid;
     const ts = m.createdAt?.toMillis ? m.createdAt.toMillis() : (m.ts || 0);
     const tradeCard = (m.kind === 'trade' && m.trade) ? `
-      <div class="chat-trade-card" onclick="goMarket(${m.trade.rank})">
+      <div class="chat-trade-card" onclick="goMarket(${m.trade.rank})">${(() => {
+        const tp = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].find(x => x.rank === m.trade.rank);
+        if (!tp) return '';
+        const u = headshotUrl(tp.rank);
+        return `<span class="pface" style="--team:${teamColor(tp) || '#3a3a40'}">${u ? `<img src="${u}" alt="" loading="lazy" onerror="this.remove()">` : ''}<span class="pinit">${tp.initials}</span></span>`;
+      })()}
         <span class="chat-trade-type ${m.trade.type}">${m.trade.type === 'buy' ? 'Bought' : 'Sold'}</span>
         <span class="chat-trade-name">${escHtml(m.trade.playerName||'')}</span>
         <span class="chat-trade-sub">${fmtShares(m.trade.shares)} sh @ ${fmt(Number(m.trade.price||0))}</span>

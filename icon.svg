@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Breakout mark: a price line breaking up through a dashed resistance
+       line, with a ring where it breaks. Green tile so it stands out on a
+       home screen. Full-bleed square (iOS and Android apply their own mask);
+       every stroke sits inside the maskable safe circle (radius 205). -->
+  <rect width="512" height="512" fill="#12d47e"/>
+  <line x1="91" y1="226" x2="421" y2="226" stroke="#0a0a0b" stroke-opacity=".32" stroke-width="16" stroke-linecap="round" stroke-dasharray="22 28"/>
+  <path d="M91 376 L151 316 L196 346 L248.5 226 L391 136" fill="none" stroke="#0a0a0b" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="248.5" cy="226" r="36" fill="#0a0a0b"/>
+  <circle cx="248.5" cy="226" r="14" fill="#12d47e"/>
+</svg>
