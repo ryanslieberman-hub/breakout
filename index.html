@@ -12115,26 +12115,20 @@ function showView(v,el){
   if(v==='profile') renderProfileView();
 }
 
+// Opens a player from anywhere (Portfolio, Chat, Leaders, a mover card),
+// switching to his league first. This used to handle only NBA, MLB and golf:
+// an NFL player opened from another league's market wasn't found there, so
+// the market fell back to its first player - tapping Jaxon Smith-Njigba with
+// NBA showing opened Shai Gilgeous-Alexander, Bijan Robinson with MLB showing
+// opened Shohei Ohtani. Uses switchLeague so filters, the Last 10 tab label
+// and the league's own data load the same way as a manual switch.
 function goMarket(rank){
-  const isMLB = mlbPlayers.some(p => p.rank === rank);
-  const isNBA = nbaPlayers.some(p => p.rank === rank);
-  const isGolf = golfPlayers.some(p => p.rank === rank);
-  if (isMLB && currentLeague !== 'MLB') {
-    currentLeague = 'MLB';
-    localStorage.setItem('ax_league', 'MLB');
-    players.length = 0; mlbPlayers.forEach(p => players.push(p));
-    updateLeagueDrawerUI(); updatePosFilters(); updateMovers();
-  } else if (isNBA && currentLeague !== 'NBA') {
-    currentLeague = 'NBA';
-    localStorage.setItem('ax_league', 'NBA');
-    players.length = 0; nbaPlayers.forEach(p => players.push(p));
-    updateLeagueDrawerUI(); updatePosFilters(); updateMovers();
-  } else if (isGolf && currentLeague !== 'GOLF') {
-    currentLeague = 'GOLF';
-    localStorage.setItem('ax_league', 'GOLF');
-    players.length = 0; golfPlayers.forEach(p => players.push(p));
-    updateLeagueDrawerUI(); updatePosFilters(); updateMovers();
-  }
+  rank = Number(rank);
+  const league = nbaPlayers.some(p => p.rank === rank) ? 'NBA'
+               : mlbPlayers.some(p => p.rank === rank) ? 'MLB'
+               : golfPlayers.some(p => p.rank === rank) ? 'GOLF'
+               : nflPlayers.some(p => p.rank === rank) ? 'NFL' : null;
+  if (league && league !== currentLeague) switchLeague(league);
   if (rank) selRank = rank;
   showView('market', document.querySelectorAll('.nav-tab')[0]);
   if (rank) selectPlayerFromList(rank);
