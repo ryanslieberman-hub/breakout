@@ -2239,6 +2239,12 @@ button.pl-row:active{background:rgba(255,255,255,.05);}
    colour, and the slate's biggest moves lead the page as cards.
    ════════════════════════════════════════════════════════════════════════ */
 
+/* The old one-line movers ticker under the top bar is retired: the Biggest
+   moves cards at the top of the board show the same list (updateMovers still
+   computes it - it feeds the cards). Hidden rather than deleted so that
+   function's DOM writes stay harmless. */
+.movers-bar{display:none !important;}
+
 /* ── Movers: the front page of the market ─────────────────────────────── */
 .mvc-wrap{padding:14px 0 6px;border-bottom:1px solid var(--border);}
 .mvc-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 16px 10px;}

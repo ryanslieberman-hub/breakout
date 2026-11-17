@@ -163,7 +163,21 @@ async function loadStatesBatch(env, league, players) {
 }
 
 // ── NBA ──
+// Late games (West Coast tips at 9:30-10:30pm ET) go final after midnight ET,
+// when `today` has already rolled over and today's scoreboard no longer lists
+// them - so their close was never written. Confirmed live 2026-11-17: every
+// Golden State game tipping 9:30pm ET or later this season (10 of 14) had no
+// close, and Yaxel Lendeborg's chart showed 4 moves for 14 games. Same fix
+// tickNfl already has: before 6am ET also sweep yesterday's scoreboard,
+// finals only, skipping anyone already closed for that date.
 async function tickNba(env, today) {
+  const today_ = await tickNbaDay(env, today, false);
+  if (easternHour() >= 6) return today_;
+  const carryover = await tickNbaDay(env, easternDateStr(1), true);
+  return { ...today_, carryover };
+}
+
+async function tickNbaDay(env, today, carryover) {
   const dateCompact = today.replaceAll('-', '');
   const sb = await espnNba.fetchScoreboard(dateCompact);
   const events = sb.events || [];
@@ -176,6 +190,7 @@ async function tickNba(env, today) {
     const state = ev.status?.type?.state;
     if (state === 'pre') continue;
     const isFinal = !!ev.status?.type?.completed;
+    if (carryover && !isFinal) continue; // yesterday's still-live game: today's tick owns it once it's final
     const summary = await espnNba.fetchSummary(ev.id);
     const stats = espnNba.extractNbaBoxScoreStats(summary);
     for (const [name, stat] of Object.entries(stats)) {
@@ -186,8 +201,14 @@ async function tickNba(env, today) {
   if (!toProcess.length) return { league: 'nba', games: events.length, processed: 0, finalized: 0 };
 
   // Phase 2: one batched read.
-  const states = await loadStatesBatch(env, 'nba', toProcess.map(t => t.player));
   const clientCloses = (await firestoreGetDoc(env, 'config/prices').catch(() => null))?.closes || {};
+  if (carryover) {
+    for (let i = toProcess.length - 1; i >= 0; i--) {
+      if (clientCloses[String(toProcess[i].player.rank)]?.[today] !== undefined) toProcess.splice(i, 1);
+    }
+    if (!toProcess.length) return { league: 'nba', date: today, games: events.length, processed: 0, finalized: 0 };
+  }
+  const states = await loadStatesBatch(env, 'nba', toProcess.map(t => t.player));
 
   // Phase 3: compute every update in memory.
   const updates = [];
