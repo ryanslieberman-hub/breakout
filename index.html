@@ -2520,7 +2520,7 @@ function defaultLeague(now = new Date()) {
 (function(){
   const lg = localStorage.getItem('ax_league') || defaultLeague();
   document.addEventListener('DOMContentLoaded', function() {
-    const lgText = lg === 'MLB' ? 'MLB' : lg === 'GOLF' ? 'Golf' : lg === 'NFL' ? 'NFL' : 'NBA';
+    const lgText = lg === 'MLB' ? 'MLB' : lg === 'GOLF' ? 'Golf' : lg === 'NFL' ? 'NFL' : lg === 'NHL' ? 'NHL' : 'NBA';
     const lbl = document.getElementById('league-label');
     if (lbl) lbl.textContent = lgText;
     const lblSched = document.getElementById('league-label-compact-sched');
@@ -11447,10 +11447,9 @@ function playerLastName(name){
 }
 
 function updateMovers(){
-  const leaguePlayers = currentLeague === 'MLB' ? mlbPlayers
-                      : currentLeague === 'GOLF' ? golfPlayers
-                      : currentLeague === 'NFL' ? nflPlayers
-                      : nbaPlayers;
+  // Same list the market shows - this had no NHL case, so NHL fell back to
+  // NBA players and the NHL movers cards showed nothing.
+  const leaguePlayers = getLeaguePlayers();
   let sorted = [];
 
   const todayStr = localDateStr();
