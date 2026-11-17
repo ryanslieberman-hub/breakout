@@ -2325,6 +2325,57 @@ button.pl-row:active{background:rgba(255,255,255,.05);}
 .ulb-ret{font-family:var(--font-sport) !important;font-weight:700 !important;font-size:19px !important;}
 .sched-team-name{font-family:var(--font-sport) !important;font-weight:800 !important;font-size:30px !important;letter-spacing:.02em !important;line-height:1;}
 .sched-score{font-family:var(--font-sport) !important;font-weight:800 !important;font-size:34px !important;}
+
+/* ════════════════════════════════════════════════════════════════════════
+   PORTFOLIO
+   Same language again: the total in the display face, your players as cards
+   on their team colours, and one bar that shows where your Coins actually
+   are - each team's colour for its share, grey for unspent Coins.
+   ════════════════════════════════════════════════════════════════════════ */
+.pchart-val{font-family:var(--font-sport) !important;font-weight:800 !important;font-size:56px !important;line-height:.95 !important;letter-spacing:0 !important;}
+.pchart-chg{font-size:14px !important;font-weight:600 !important;margin-top:6px !important;}
+.port-stats b{font-family:var(--font-sport) !important;font-weight:700 !important;font-size:24px !important;line-height:1;}
+.port-stats b small{font-family:var(--font-body);font-size:12px;font-weight:600;}
+
+/* Allocation: one bar, every holding at its share of the total */
+.alloc{margin:-8px 0 28px;}
+.alloc-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;background:var(--card2);}
+.alloc-bar > span{display:block;height:100%;min-width:3px;background:var(--seg);}
+.alloc-bar > span.cash{background:#3a3a40;}
+.alloc-key{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12px;color:var(--muted);}
+.alloc-key i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:0;background:var(--seg);}
+.alloc-key b{color:var(--text);font-weight:600;margin-left:4px;font-variant-numeric:tabular-nums;}
+
+/* Holdings: cards on every screen size (the old table is retired) */
+.holdings-table{display:none !important;}
+.holds{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:28px;}
+.hold{--team:#3a3a40;position:relative;display:grid;grid-template-columns:84px 1fr auto;align-items:stretch;min-height:96px;
+  border-radius:14px;overflow:hidden;cursor:pointer;background:var(--card);border:1px solid var(--hairline);
+  transition:transform .14s cubic-bezier(.2,.8,.2,1),border-color .15s;}
+.hold:active{transform:scale(.985);}
+@media (hover:hover){ .hold:hover{border-color:var(--border2);} }
+.hold-face{position:relative;overflow:hidden;
+  background:linear-gradient(160deg,color-mix(in srgb,var(--team) 70%,#000),color-mix(in srgb,var(--team) 36%,#0a0a0b));}
+.hold-face img{position:absolute;left:50%;bottom:0;height:92%;width:auto;max-width:none;transform:translateX(-50%);}
+.hold-face .hold-init{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-sport);font-weight:800;font-size:34px;color:rgba(255,255,255,.7);}
+.hold-face img + .hold-init{display:none;}
+.hold-mid{min-width:0;padding:12px 10px 12px 14px;display:flex;flex-direction:column;justify-content:center;gap:4px;}
+.hold-name{font-family:var(--font-sport);font-weight:800;font-size:22px;line-height:.95;text-transform:uppercase;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;}
+.hold-sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hold-right{padding:12px 14px 12px 0;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:5px;}
+.hold-val{font-family:var(--font-sport);font-weight:700;font-size:24px;line-height:1;font-variant-numeric:tabular-nums;}
+.hold-ret{font-size:12px;font-weight:700;line-height:1;padding:4px 6px;border-radius:6px;white-space:nowrap;}
+.hold-ret.up{background:rgba(18,212,126,.12);color:var(--green);}
+.hold-ret.down{background:rgba(245,68,95,.12);color:var(--red);}
+.hold-ret.flat{color:var(--muted);padding-left:0;padding-right:0;}
+.hold-today{font-size:11px;color:var(--muted);}
+
+/* Trade history: the amount in the display face */
+.tlcard-amt{font-family:var(--font-sport) !important;font-weight:700 !important;font-size:20px !important;}
+.port-section-title{font-family:var(--font-sport) !important;font-weight:800 !important;font-size:24px !important;text-transform:uppercase;letter-spacing:.01em;}
+.port-section-title span{font-family:var(--font-body) !important;font-size:14px !important;text-transform:none;}
 </style>
 </head>
 <body>
@@ -12526,6 +12577,21 @@ function buildPortfolio(){
     </div>`;
 
   const held=Object.entries(holdings).filter(([,h])=>h.shares>0);
+  // Where the Coins are: one bar, each holding at its share of the total in
+  // its team colour, unspent Coins in grey. The key names the biggest few.
+  if (held.length && total > 0) {
+    const _all = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers];
+    const segs = held.map(([rk,h]) => {
+      const p = _all.find(x => x.rank === +rk);
+      return { name: p ? playerLastName(p.name) : '#'+rk, color: (p && teamColor(p)) || '#8e8e96', val: h.shares * activePrice(rk) };
+    }).filter(s => s.val > 0).sort((a,b) => b.val - a.val);
+    if (cash > 0) segs.push({ name: 'Coins', color: null, val: cash });
+    const pctOf = v => v / total * 100;
+    html += `<div class="alloc" aria-label="Portfolio allocation">
+      <div class="alloc-bar">${segs.map(s => `<span class="${s.color ? '' : 'cash'}" style="width:${pctOf(s.val).toFixed(2)}%;${s.color ? '--seg:'+s.color : ''}" title="${escHtml(s.name)} ${pctOf(s.val).toFixed(0)}%"></span>`).join('')}</div>
+      <div class="alloc-key">${segs.slice(0, 5).map(s => `<span><i style="--seg:${s.color || '#3a3a40'}"></i>${escHtml(s.name)}<b>${pctOf(s.val).toFixed(0)}%</b></span>`).join('')}${segs.length > 5 ? `<span>+${segs.length - 5} more</span>` : ''}</div>
+    </div>`;
+  }
   if(!held.length){
     html+=emptyState('No players yet', 'Pick someone you believe in, buy a few shares, and track them here.', `<button class="es-btn" onclick="goToMarketTop()">Go to Market</button>`);
   }else{
@@ -12533,7 +12599,7 @@ function buildPortfolio(){
       <h3 class="port-section-title">Holdings <span>${held.length}</span></h3>
       <button class="es-btn ghost es-sm danger" onclick="sellAllPositions()">Sell all</button>
     </div>
-    <div class="dtable-wrap">
+    <div class="dtable-wrap holdings-table">
     <table class="dtable"><thead><tr>
       <th>Player</th><th>Shares</th><th>Avg cost</th><th>Price</th><th>Value</th><th>Today</th><th>Return</th><th>Return %</th><th></th>
     </tr></thead><tbody>`;
@@ -12565,8 +12631,22 @@ function buildPortfolio(){
         </tr>`;
         // Mobile card equivalent of the row above - see .hcard, shown instead
         // of the table below the mobile breakpoint (no horizontal scroll).
-        const hs = headshotUrl(r);
-        cardsHtml += `<div class="hrow" role="button" tabindex="0" onclick="goMarket(${rank})">
+        const hs = heroPhotoUrl(r);
+        const _dir = n => isFlatPct(n) ? 'flat' : n > 0 ? 'up' : 'down';
+        cardsHtml += `<div class="hold" style="--team:${teamColor(p) || '#3a3a40'}" role="button" tabindex="0"
+            onclick="goMarket(${rank})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goMarket(${rank});}">
+          <div class="hold-face">${hs ? `<img src="${hs}" alt="" loading="lazy" onerror="this.remove()">` : ''}<span class="hold-init">${p.initials}</span></div>
+          <div class="hold-mid">
+            <div class="hold-name">${escHtml(p.name)}</div>
+            <div class="hold-sub">${fmtShares(h.shares)} shares · avg ${fmt(avg)}</div>
+            ${isFlatPct(todayPp) ? '' : `<div class="hold-today">Today ${fmtS(todayH)}</div>`}
+          </div>
+          <div class="hold-right">
+            <div class="hold-val">${fmt(h.shares*cur)}</div>
+            <div class="hold-ret ${_dir(ppH)}">${fmtS(pnlH)} · ${fmtP(ppH)}</div>
+          </div>
+        </div>`;
+        if (false) cardsHtml += `<div class="hrow" role="button" tabindex="0" onclick="goMarket(${rank})">
           <div class="mv-av">${hs ? `<img src="${hs}" alt="" onerror="this.style.display='none'">` : `<div class="mv-init" style="background:${p.cols[0]};color:${p.cols[1]};">${p.initials}</div>`}</div>
           <div class="mv-info">
             <div class="mv-name">${p.name}</div>
@@ -12579,7 +12659,7 @@ function buildPortfolio(){
         </div>`;
       });
     html+='</tbody></table></div>';
-    html+=`<div class="mobile-cards">${cardsHtml}</div>`;
+    html+=`<div class="holds">${cardsHtml}</div>`;
   }
 
   if(logs.length){
