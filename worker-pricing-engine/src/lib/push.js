@@ -12,7 +12,12 @@ import { getAccessToken } from './firestore.js';
 // firebase-messaging-sw.js's onBackgroundMessage, showing every push twice.
 // title/body ride inside `data` instead, and the SW is the only thing that
 // ever calls showNotification().
-export async function sendPush(env, token, { title, body, data } = {}) {
+//
+// Native iOS tokens (platform === 'ios', written by the Capacitor app) are the
+// exception: there is no service worker to turn data into a banner, so they get
+// a `notification` block and APNs displays it itself. Native Android tokens get
+// one too, so the system tray shows it while the app is closed.
+export async function sendPush(env, token, { title, body, data, platform } = {}) {
   const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT);
   const accessToken = await getAccessToken(env);
   const message = {
@@ -21,6 +26,10 @@ export async function sendPush(env, token, { title, body, data } = {}) {
       Object.entries({ title, body, ...data }).map(([k, v]) => [k, String(v)])
     ),
   };
+  if (platform === 'ios' || platform === 'android') {
+    message.notification = { title: String(title ?? 'Breakout'), body: String(body ?? '') };
+    if (platform === 'ios') message.apns = { payload: { aps: { sound: 'default' } } };
+  }
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`,
     {

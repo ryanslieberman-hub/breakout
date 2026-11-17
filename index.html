@@ -15667,7 +15667,8 @@ async function enablePushNativeApp() {
       window._nativePushWired = true;
       plug.addListener('notificationReceived', (ev) => {
         const d = (ev.notification && ev.notification.data) || {};
-        showToast(`${d.title || 'Breakout'}: ${d.body || ''}`);
+        const n = ev.notification || {};
+        showToast(`${n.title || d.title || 'Breakout'}: ${n.body || d.body || ''}`);
       });
       // Tapping a mover alert opens that player, same as the web notificationclick.
       plug.addListener('notificationActionPerformed', (ev) => {

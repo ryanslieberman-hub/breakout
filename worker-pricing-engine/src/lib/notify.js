@@ -6,9 +6,9 @@
 import { firestoreQuery, firestoreListCollection, firestoreDeleteDoc } from './firestore.js';
 import { sendPush } from './push.js';
 
-async function sendToToken(env, token, notification, data) {
+async function sendToToken(env, token, notification, data, platform) {
   try {
-    await sendPush(env, token, { ...notification, data });
+    await sendPush(env, token, { ...notification, data, platform });
     return true;
   } catch (e) {
     if (e.unregistered) {
@@ -28,12 +28,12 @@ export async function notifyAllTokens(env, notification, data) {
   const tokens = await firestoreListCollection(env, 'pushTokens');
   let sent = 0;
   for (const t of tokens) {
-    if (await sendToToken(env, t.id, notification, data)) sent++;
+    if (await sendToToken(env, t.id, notification, data, t.platform)) sent++;
   }
   return sent;
 }
 
 export async function notifyUid(env, uid, notification, data) {
   const tokens = await firestoreQuery(env, 'pushTokens', [{ field: 'uid', op: 'EQUAL', value: uid }]);
-  for (const t of tokens) await sendToToken(env, t.id, notification, data);
+  for (const t of tokens) await sendToToken(env, t.id, notification, data, t.platform);
 }
