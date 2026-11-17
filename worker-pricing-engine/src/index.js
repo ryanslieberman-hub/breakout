@@ -3,6 +3,7 @@ import mlbRaw from '../data/mlb-raw.json' assert { type: 'json' };
 import golfRaw from '../data/golf-raw.json' assert { type: 'json' };
 import nflRaw from '../data/nfl-raw.json' assert { type: 'json' };
 import nhlRaw from '../data/nhl-raw.json' assert { type: 'json' };
+import nhlIds from '../data/nhl-ids.json' assert { type: 'json' };
 
 import {
   statPriceFor, nbaPerf, mlbHitterPerf, mlbPitcherPerf, nflPerf, nhlPerf,
@@ -694,6 +695,7 @@ async function tickNhlDay(env, today, carryover) {
   if (!toProcess.length) return { league: 'nhl', date: today, games: relevant.length, processed: 0, finalized: 0 };
 
   const states = await loadStatesBatch(env, 'nhl', toProcess);
+  const seasonRates = (await firestoreGetDoc(env, 'config/nhlSeason').catch(() => null))?.data || {};
   const updates = [], movers = [], configWrites = [];
   const now = Date.now();
   let finalized = 0;
@@ -701,7 +703,8 @@ async function tickNhlDay(env, today, carryover) {
     const st = states[player.rank];
     // Roster is the source of truth for scale, same as tickNfl (see there).
     const statPrice = statPriceFor('nhl', player);
-    const p = { rank: player.rank, tier: player.tier, fpts: player.fpts, statPrice };
+    // Judge the game against the daily-refreshed rate when there is one.
+    const p = { rank: player.rank, tier: player.tier, fpts: seasonRates[String(player.rank)]?.fpts ?? player.fpts, statPrice };
     const line = lineByRank[player.rank];
     const perf = nhlPerf(p, { fpts: nhl.fpts(line), gameFrac: fracByRank[player.rank] });
     const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
@@ -885,9 +888,25 @@ async function pruneStaleHistory(env) {
   return { ranksTouched: entries.length, intradayPruned, todayHxPruned };
 }
 
+// NHL season stats, refreshed daily. Writes config/nhlSeason (a small doc
+// this function owns outright) with each player's line for the app's header
+// - goals/assists/points, or wins/GAA/SV% - and a refreshed expected rate
+// (fpts) that tickNhl and the app's live pricing judge games against:
+// the roster's rate blended with this season's, trusting this season more as
+// games pile up (same blend the NBA refresh uses). statPrice (the price band)
+// stays on the roster value so prices don't jump on a refresh.
+export async function runNhlDailyRefresh(env) {
+  const season = nhl.seasonLabel();
+  const stats = await nhl.fetchSeasonStats(season);
+  const data = nhl.buildSeasonData(nhlRaw, nhlIds, stats);
+  if (!Object.keys(data).length) return { league: 'nhl', updated: 0 };
+  await firestorePatchDoc(env, 'config/nhlSeason', { season, updatedAt: Date.now(), data });
+  return { league: 'nhl', season, updated: Object.keys(data).length, totalPlayers: nhlRaw.length };
+}
+
 export async function runDailyRefresh(env) {
   const results = [];
-  for (const fn of [runNbaDailyRefresh, runMlbDailyRefresh]) {
+  for (const fn of [runNbaDailyRefresh, runMlbDailyRefresh, runNhlDailyRefresh]) {
     try {
       results.push(await fn(env));
     } catch (e) {

@@ -8509,7 +8509,7 @@ function _nhlRawLine(labels, stats) {
 }
 function _nhlFpts(l) {
   if (l.goalie) return (l.sv || 0) * 0.2 - (l.ga || 0) + (l.win ? 3 : 0) + (l.so ? 2 : 0);
-  return (l.g || 0) * 3 + (l.a || 0) * 2 + (l.sog || 0) * 0.5 + (l.blk || 0) * 0.5;
+  return (l.g || 0) * 3 + (l.a || 0) * 2 + (l.sog || 0) * 0.5; // same as the season baseline (no blocks - see worker nhl.js)
 }
 function _nhlLines(sum) {
   const out = {};
@@ -11316,6 +11316,21 @@ async function loadPricesFromFirestore() {
         }
       });
       _saveLastNight();
+    }
+
+    // NHL season lines, refreshed daily by the pricing worker
+    // (runNhlDailyRefresh): updates the header stats and the expected rate
+    // live pricing judges games against. statPrice (the price band) is left
+    // on the roster value, same as the worker.
+    const nhlSeasonSnap = await window._fbGetDoc(window._fbDoc(db, 'config', 'nhlSeason')).catch(() => null);
+    if (nhlSeasonSnap?.exists() && nhlSeasonSnap.data().data) {
+      const sd = nhlSeasonSnap.data().data;
+      nhlPlayers.forEach(p => {
+        const s = sd[String(p.rank)];
+        if (!s) return;
+        ['gp','g','a','pts','w','gaa','svpct','fpts'].forEach(k => { if (s[k] != null) p[k] = s[k]; });
+      });
+      if (currentLeague === 'NHL') { try { renderAll(); } catch(e) {} }
     }
 
     // Restore golf headshot IDs - fills in headshots on a device that never

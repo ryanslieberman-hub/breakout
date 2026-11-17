@@ -51,7 +51,10 @@ export function rawLine(labels, stats) {
 // Fantasy points for a line. Goalie win/shutout come from the game result.
 export function fpts(line) {
   if (line.goalie) return (line.sv || 0) * 0.2 - (line.ga || 0) * 1 + (line.win ? 3 : 0) + (line.so ? 2 : 0);
-  return (line.g || 0) * 3 + (line.a || 0) * 2 + (line.sog || 0) * 0.5 + (line.blk || 0) * 0.5;
+  // Same formula as the season baseline (build-nhl-roster.mjs): ESPN's season
+  // stats have no blocked shots, so counting them here made every defenseman
+  // look like he beat expectations every night.
+  return (line.g || 0) * 3 + (line.a || 0) * 2 + (line.sog || 0) * 0.5;
 }
 
 // { normalizedName -> line } from an ESPN summary, with goalie win/shutout filled in.
@@ -85,6 +88,57 @@ export function extractNhlLines(summary) {
     teamGoalies.forEach(g => { if (g.win !== true) g.win = false; });
   }
   return out;
+}
+
+// This season's line for every NHL player ESPN has stats for, keyed by ESPN
+// athlete id. ESPN labels a season by the year it ends (2026-27 = 2027).
+export function seasonLabel(d = new Date()) {
+  return d.getUTCMonth() >= 8 ? d.getUTCFullYear() + 1 : d.getUTCFullYear();
+}
+export async function fetchSeasonStats(season) {
+  const STATS = 'https://site.web.api.espn.com/apis/common/v3/sports/hockey/nhl/statistics/byathlete';
+  const out = {};
+  let page = 1, pages = 1;
+  do {
+    const res = await fetch(`${STATS}?region=us&lang=en&contentorigin=espn&isqualified=false&page=${page}&limit=100&season=${season}&seasontype=2`);
+    if (!res.ok) throw new Error(`ESPN NHL season stats fetch failed: ${res.status}`);
+    const j = await res.json();
+    pages = j.pagination?.pages || 1;
+    const idx = {};
+    for (const c of j.categories || []) (c.names || []).forEach((n, i) => { idx[`${c.name}.${n}`] = i; });
+    for (const row of j.athletes || []) {
+      const cat = n => (row.categories || []).find(c => c.name === n)?.values || [];
+      const gen = cat('general'), off = cat('offensive'), def = cat('defensive');
+      const v = (arr, key) => +(arr[idx[key]] ?? 0) || 0;
+      out[String(row.athlete?.id)] = {
+        gp: v(gen, 'general.games'), w: v(gen, 'general.wins'),
+        g: v(off, 'offensive.goals'), a: v(off, 'offensive.assists'), pts: v(off, 'offensive.points'), sog: v(off, 'offensive.shotsTotal'),
+        ga: v(def, 'defensive.goalsAgainst'), sv: v(def, 'defensive.saves'), so: v(def, 'defensive.shutouts'),
+        svpct: v(def, 'defensive.savePct'), gaa: v(def, 'defensive.avgGoalsAgainst'),
+      };
+    }
+    page++;
+  } while (page <= pages);
+  return out;
+}
+
+// config/nhlSeason's data map: each roster player's line for the app header
+// plus a refreshed expected rate (roster rate blended with this season's,
+// trusting this season more as games pile up).
+export function buildSeasonData(roster, ids, stats, priorGames = 8) {
+  const data = {};
+  for (const p of roster) {
+    const s = stats[String(ids[p.rank])];
+    if (!s || !s.gp) continue;
+    const goalie = p.role === 'GK';
+    const rate = goalie ? (s.w * 3 + s.sv * 0.2 - s.ga + s.so * 2) / s.gp : (s.g * 3 + s.a * 2 + s.sog * 0.5) / s.gp;
+    const w = s.gp / (s.gp + priorGames);
+    const fpts = Math.round((p.fpts * (1 - w) + rate * w) * 10) / 10;
+    data[String(p.rank)] = goalie
+      ? { gp: s.gp, w: s.w, gaa: Math.round(s.gaa * 100) / 100, svpct: Math.round(s.svpct * 1000) / 1000, fpts }
+      : { gp: s.gp, g: s.g, a: s.a, pts: s.pts, fpts };
+  }
+  return data;
 }
 
 // The config/lastNight entry for one finished game.
