@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "breakout-static",
-      "runtimeExecutable": "python",
+      "runtimeExecutable": "py",
       "runtimeArgs": ["-m", "http.server", "8766"],
       "port": 8766
     },
@@ -12,6 +12,18 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "worker-payments", "run", "dev", "--", "--port", "8787"],
       "port": 8787
+    },
+    {
+      "name": "retro-arcade-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "retro-arcade/app", "run", "web", "--", "--port", "8081"],
+      "port": 8081
+    },
+    {
+      "name": "thematic-momentum-dashboard",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8935", "--directory", "../thematic-momentum-bot/dashboard"],
+      "port": 8935
     }
   ]
 }
