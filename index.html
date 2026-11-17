@@ -2466,6 +2466,7 @@ const LEAGUE_SEASONS = {
   NBA: [915, 520],  // Oct 15 - Jun 20 (opening night lands ~Oct 20-22; 2026 tipped Oct 20)
   MLB: [225, 1005], // Mar 25 - Nov 5 (includes postseason / World Series)
   NFL: [805, 112],  // Sep 5 - Feb 12
+  NHL: [905, 320],  // Oct 5 - Apr 20 (regular season)
 };
 function leagueInSeason(lg, now = new Date()) {
   if (lg === 'GOLF') return true;
@@ -3099,6 +3100,15 @@ const TEAM_COLORS = {
   'Minnesota Vikings':'#8A63C9','New England Patriots':'#D5213E','New Orleans Saints':'#D3BC8D','New York Giants':'#3C6DD6',
   'New York Jets':'#2E8B5E','Philadelphia Eagles':'#2A8C95','Pittsburgh Steelers':'#FFB612','San Francisco 49ers':'#D5213E',
   'Seattle Seahawks':'#69BE28','Tampa Bay Buccaneers':'#E0282B','Tennessee Titans':'#4B92DB','Washington Commanders':'#FFB612',
+  // NHL
+  'Anaheim Ducks':'#F47A38','Boston Bruins':'#FFB81C','Buffalo Sabres':'#1E5BC6','Calgary Flames':'#C8102E',
+  'Carolina Hurricanes':'#CE1126','Chicago Blackhawks':'#CF0A2C','Colorado Avalanche':'#8A2846','Columbus Blue Jackets':'#2B5BA7',
+  'Dallas Stars':'#0A8A5A','Detroit Red Wings':'#CE1126','Edmonton Oilers':'#FF4C00','Florida Panthers':'#C8102E',
+  'Los Angeles Kings':'#8D9093','Minnesota Wild':'#1F6B48','Montreal Canadiens':'#AF1E2D','Nashville Predators':'#FFB81C',
+  'New Jersey Devils':'#CE1126','New York Islanders':'#0E63B6','New York Rangers':'#1E56C8','Ottawa Senators':'#C52032',
+  'Philadelphia Flyers':'#F74902','Pittsburgh Penguins':'#FCB514','San Jose Sharks':'#00818B','Seattle Kraken':'#68A2B9',
+  'St. Louis Blues':'#1D5BC9','Tampa Bay Lightning':'#1A54B0','Toronto Maple Leafs':'#1E4FA0','Utah Mammoth':'#69B3E7',
+  'Vancouver Canucks':'#0B5CB5','Vegas Golden Knights':'#B4975A','Washington Capitals':'#C8102E','Winnipeg Jets':'#1D4E9E',
 };
 function teamColor(p) { return (p && TEAM_COLORS[p.team]) || null; }
 // Last price painted, so a re-render can tell a real tick from a redraw.
@@ -4359,19 +4369,309 @@ const nflPlayers = NFL_RAW.map(p => ({
   cols: COLS[p.rank % COLS.length],
 }));
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  NHL PLAYER DATA (ranks 4001+)
+//  Built from ESPN's team rosters and season stats by
+//  worker-pricing-engine/scripts/build-nhl-roster.mjs (same data as the
+//  worker's data/nhl-raw.json - rebuild both together). fpts = expected
+//  fantasy points per game (skater G*3 + A*2 + SOG*0.5, goalie W*3 + SV*0.2
+//  - GA + SO*2); g/a/pts or w/gaa/svpct are this season's line (last
+//  season's if fewer than 5 games), shown in the player header.
+// ═══════════════════════════════════════════════════════════════════════════
+const NHL_RAW = [
+  {"rank":4001,"name":"Connor McDavid","team":"Edmonton Oilers","pos":"C","role":"F","tier":"S","fpts":6.5,"gp":22,"g":12,"a":41,"pts":53,"season":2027},
+  {"rank":4002,"name":"Leon Draisaitl","team":"Edmonton Oilers","pos":"C","role":"F","tier":"S","fpts":6.1,"gp":22,"g":20,"a":21,"pts":41,"season":2027},
+  {"rank":4003,"name":"Nathan MacKinnon","team":"Colorado Avalanche","pos":"C","role":"F","tier":"S","fpts":5.5,"gp":20,"g":10,"a":20,"pts":30,"season":2027},
+  {"rank":4004,"name":"Kirill Kaprizov","team":"Minnesota Wild","pos":"LW","role":"F","tier":"S","fpts":5.4,"gp":22,"g":17,"a":20,"pts":37,"season":2027},
+  {"rank":4005,"name":"Cutter Gauthier","team":"Anaheim Ducks","pos":"LW","role":"F","tier":"S","fpts":5.2,"gp":20,"g":18,"a":7,"pts":25,"season":2027},
+  {"rank":4006,"name":"Kyle Connor","team":"Winnipeg Jets","pos":"LW","role":"F","tier":"S","fpts":5.1,"gp":21,"g":17,"a":9,"pts":26,"season":2027},
+  {"rank":4007,"name":"Macklin Celebrini","team":"San Jose Sharks","pos":"C","role":"F","tier":"S","fpts":5.1,"gp":21,"g":9,"a":18,"pts":27,"season":2027},
+  {"rank":4008,"name":"Nikita Kucherov","team":"Tampa Bay Lightning","pos":"RW","role":"F","tier":"S","fpts":5,"gp":20,"g":8,"a":20,"pts":28,"season":2027},
+  {"rank":4009,"name":"Jack Hughes","team":"New Jersey Devils","pos":"C","role":"F","tier":"S","fpts":4.9,"gp":21,"g":10,"a":17,"pts":27,"season":2027},
+  {"rank":4010,"name":"David Pastrnak","team":"Boston Bruins","pos":"RW","role":"F","tier":"S","fpts":4.8,"gp":20,"g":9,"a":17,"pts":26,"season":2027},
+  {"rank":4011,"name":"Brandon Hagel","team":"Tampa Bay Lightning","pos":"LW","role":"F","tier":"A","fpts":4.8,"gp":20,"g":13,"a":11,"pts":24,"season":2027},
+  {"rank":4012,"name":"Evan Bouchard","team":"Edmonton Oilers","pos":"D","role":"D","tier":"A","fpts":4.8,"gp":22,"g":12,"a":24,"pts":36,"season":2027},
+  {"rank":4013,"name":"Tage Thompson","team":"Buffalo Sabres","pos":"C","role":"F","tier":"A","fpts":4.5,"gp":20,"g":12,"a":9,"pts":21,"season":2027},
+  {"rank":4014,"name":"Auston Matthews","team":"Toronto Maple Leafs","pos":"C","role":"F","tier":"A","fpts":4.5,"gp":22,"g":12,"a":17,"pts":29,"season":2027},
+  {"rank":4015,"name":"Matt Boldy","team":"Minnesota Wild","pos":"LW","role":"F","tier":"A","fpts":4.4,"gp":22,"g":10,"a":11,"pts":21,"season":2027},
+  {"rank":4016,"name":"Jason Robertson","team":"Dallas Stars","pos":"LW","role":"F","tier":"A","fpts":4.4,"gp":20,"g":10,"a":12,"pts":22,"season":2027},
+  {"rank":4017,"name":"Sebastian Aho","team":"Carolina Hurricanes","pos":"C","role":"F","tier":"A","fpts":4.4,"gp":21,"g":12,"a":17,"pts":29,"season":2027},
+  {"rank":4018,"name":"Jack Eichel","team":"Vegas Golden Knights","pos":"C","role":"F","tier":"A","fpts":4.3,"gp":22,"g":9,"a":18,"pts":27,"season":2027},
+  {"rank":4019,"name":"Brady Tkachuk","team":"Florida Panthers","pos":"LW","role":"F","tier":"A","fpts":4.3,"gp":22,"g":11,"a":12,"pts":23,"season":2027},
+  {"rank":4020,"name":"Connor Bedard","team":"Chicago Blackhawks","pos":"C","role":"F","tier":"A","fpts":4.3,"gp":14,"g":6,"a":11,"pts":17,"season":2027},
+  {"rank":4021,"name":"Artemi Panarin","team":"Los Angeles Kings","pos":"LW","role":"F","tier":"A","fpts":4.2,"gp":17,"g":8,"a":11,"pts":19,"season":2027},
+  {"rank":4022,"name":"Jake Guentzel","team":"Tampa Bay Lightning","pos":"C","role":"F","tier":"A","fpts":4.2,"gp":20,"g":11,"a":13,"pts":24,"season":2027},
+  {"rank":4023,"name":"Quinn Hughes","team":"Minnesota Wild","pos":"D","role":"D","tier":"A","fpts":4.1,"gp":22,"g":7,"a":23,"pts":30,"season":2027},
+  {"rank":4024,"name":"Cole Caufield","team":"Montreal Canadiens","pos":"RW","role":"F","tier":"A","fpts":4.1,"gp":21,"g":12,"a":7,"pts":19,"season":2027},
+  {"rank":4025,"name":"Bo Horvat","team":"New York Islanders","pos":"C","role":"F","tier":"A","fpts":4.1,"gp":19,"g":9,"a":11,"pts":20,"season":2027},
+  {"rank":4026,"name":"Clayton Keller","team":"Utah Mammoth","pos":"RW","role":"F","tier":"A","fpts":4.1,"gp":22,"g":5,"a":23,"pts":28,"season":2027},
+  {"rank":4027,"name":"Matthew Tkachuk","team":"Florida Panthers","pos":"LW","role":"F","tier":"A","fpts":4,"gp":22,"g":5,"a":25,"pts":30,"season":2027},
+  {"rank":4028,"name":"Nick Suzuki","team":"Montreal Canadiens","pos":"C","role":"F","tier":"A","fpts":4,"gp":15,"g":8,"a":9,"pts":17,"season":2027},
+  {"rank":4029,"name":"Sam Reinhart","team":"Florida Panthers","pos":"C","role":"F","tier":"A","fpts":4,"gp":22,"g":12,"a":10,"pts":22,"season":2027},
+  {"rank":4030,"name":"Tim Stutzle","team":"Ottawa Senators","pos":"C","role":"F","tier":"A","fpts":4,"gp":21,"g":11,"a":14,"pts":25,"season":2027},
+  {"rank":4031,"name":"Martin Necas","team":"Colorado Avalanche","pos":"C","role":"F","tier":"A","fpts":4,"gp":21,"g":10,"a":14,"pts":24,"season":2027},
+  {"rank":4032,"name":"Mark Scheifele","team":"Winnipeg Jets","pos":"C","role":"F","tier":"A","fpts":4,"gp":21,"g":7,"a":19,"pts":26,"season":2027},
+  {"rank":4033,"name":"Beckett Sennecke","team":"Anaheim Ducks","pos":"RW","role":"F","tier":"A","fpts":3.9,"gp":21,"g":12,"a":14,"pts":26,"season":2027},
+  {"rank":4034,"name":"Cale Makar","team":"Colorado Avalanche","pos":"D","role":"D","tier":"A","fpts":3.9,"gp":19,"g":5,"a":18,"pts":23,"season":2027},
+  {"rank":4035,"name":"Matthew Schaefer","team":"New York Islanders","pos":"D","role":"D","tier":"A","fpts":3.9,"gp":19,"g":6,"a":15,"pts":21,"season":2027},
+  {"rank":4036,"name":"William Nylander","team":"Toronto Maple Leafs","pos":"RW","role":"F","tier":"A","fpts":3.9,"gp":22,"g":11,"a":11,"pts":22,"season":2027},
+  {"rank":4037,"name":"Andrei Svechnikov","team":"Carolina Hurricanes","pos":"LW","role":"F","tier":"A","fpts":3.9,"gp":21,"g":11,"a":10,"pts":21,"season":2027},
+  {"rank":4038,"name":"Filip Forsberg","team":"Nashville Predators","pos":"LW","role":"F","tier":"A","fpts":3.8,"gp":21,"g":7,"a":16,"pts":23,"season":2027},
+  {"rank":4039,"name":"Alex DeBrincat","team":"Detroit Red Wings","pos":"RW","role":"F","tier":"A","fpts":3.8,"gp":21,"g":7,"a":9,"pts":16,"season":2027},
+  {"rank":4040,"name":"Mitch Marner","team":"Vegas Golden Knights","pos":"RW","role":"F","tier":"A","fpts":3.8,"gp":20,"g":3,"a":23,"pts":26,"season":2027},
+  {"rank":4041,"name":"Steven Stamkos","team":"Nashville Predators","pos":"C","role":"F","tier":"B","fpts":3.7,"gp":21,"g":12,"a":10,"pts":22,"season":2027},
+  {"rank":4042,"name":"Wyatt Johnston","team":"Dallas Stars","pos":"C","role":"F","tier":"B","fpts":3.7,"gp":18,"g":5,"a":13,"pts":18,"season":2027},
+  {"rank":4043,"name":"Nick Schmaltz","team":"Utah Mammoth","pos":"C","role":"F","tier":"B","fpts":3.7,"gp":19,"g":9,"a":11,"pts":20,"season":2027},
+  {"rank":4044,"name":"Leo Carlsson","team":"Anaheim Ducks","pos":"C","role":"F","tier":"B","fpts":3.7,"gp":21,"g":6,"a":21,"pts":27,"season":2027},
+  {"rank":4045,"name":"Lucas Raymond","team":"Detroit Red Wings","pos":"LW","role":"F","tier":"B","fpts":3.7,"gp":21,"g":8,"a":13,"pts":21,"season":2027},
+  {"rank":4046,"name":"Brad Marchand","team":"Florida Panthers","pos":"LW","role":"F","tier":"B","fpts":3.7,"gp":52,"g":27,"a":27,"pts":54,"season":2026},
+  {"rank":4047,"name":"Mikko Rantanen","team":"Dallas Stars","pos":"RW","role":"F","tier":"B","fpts":3.7,"gp":20,"g":9,"a":13,"pts":22,"season":2027},
+  {"rank":4048,"name":"Zach Werenski","team":"Columbus Blue Jackets","pos":"D","role":"D","tier":"B","fpts":3.7,"gp":18,"g":2,"a":13,"pts":15,"season":2027},
+  {"rank":4049,"name":"Kirill Marchenko","team":"Toronto Maple Leafs","pos":"RW","role":"F","tier":"B","fpts":3.6,"gp":14,"g":6,"a":8,"pts":14,"season":2027},
+  {"rank":4050,"name":"Adrian Kempe","team":"Los Angeles Kings","pos":"RW","role":"F","tier":"B","fpts":3.6,"gp":17,"g":6,"a":7,"pts":13,"season":2027},
+  {"rank":4051,"name":"Roman Josi","team":"Nashville Predators","pos":"D","role":"D","tier":"B","fpts":3.5,"gp":21,"g":2,"a":21,"pts":23,"season":2027},
+  {"rank":4052,"name":"Artturi Lehkonen","team":"Colorado Avalanche","pos":"LW","role":"F","tier":"B","fpts":3.5,"gp":21,"g":15,"a":6,"pts":21,"season":2027},
+  {"rank":4053,"name":"Mark Stone","team":"Vegas Golden Knights","pos":"RW","role":"F","tier":"B","fpts":3.5,"gp":22,"g":11,"a":10,"pts":21,"season":2027},
+  {"rank":4054,"name":"Logan Cooley","team":"Utah Mammoth","pos":"C","role":"F","tier":"B","fpts":3.5,"gp":19,"g":11,"a":11,"pts":22,"season":2027},
+  {"rank":4055,"name":"Evgeni Malkin","team":"Pittsburgh Penguins","pos":"C","role":"F","tier":"B","fpts":3.5,"gp":18,"g":6,"a":11,"pts":17,"season":2027},
+  {"rank":4056,"name":"Jack Quinn","team":"Buffalo Sabres","pos":"RW","role":"F","tier":"B","fpts":3.4,"gp":20,"g":9,"a":10,"pts":19,"season":2027},
+  {"rank":4057,"name":"Logan Stankoven","team":"Carolina Hurricanes","pos":"C","role":"F","tier":"B","fpts":3.4,"gp":21,"g":11,"a":9,"pts":20,"season":2027},
+  {"rank":4058,"name":"Mikael Granlund","team":"Anaheim Ducks","pos":"C","role":"F","tier":"B","fpts":3.4,"gp":20,"g":7,"a":17,"pts":24,"season":2027},
+  {"rank":4059,"name":"Drake Batherson","team":"Ottawa Senators","pos":"RW","role":"F","tier":"B","fpts":3.4,"gp":21,"g":10,"a":9,"pts":19,"season":2027},
+  {"rank":4060,"name":"Mikhail Sergachev","team":"Utah Mammoth","pos":"D","role":"D","tier":"B","fpts":3.3,"gp":22,"g":6,"a":16,"pts":22,"season":2027},
+  {"rank":4061,"name":"Seth Jarvis","team":"Carolina Hurricanes","pos":"C","role":"F","tier":"B","fpts":3.3,"gp":10,"g":2,"a":7,"pts":9,"season":2027},
+  {"rank":4062,"name":"Victor Olofsson","team":"Vegas Golden Knights","pos":"LW","role":"F","tier":"B","fpts":3.3,"gp":9,"g":7,"a":4,"pts":11,"season":2027},
+  {"rank":4063,"name":"Jackson Blake","team":"Carolina Hurricanes","pos":"RW","role":"F","tier":"B","fpts":3.3,"gp":21,"g":6,"a":15,"pts":21,"season":2027},
+  {"rank":4064,"name":"Alexis Lafreniere","team":"New York Rangers","pos":"LW","role":"F","tier":"B","fpts":3.3,"gp":22,"g":10,"a":12,"pts":22,"season":2027},
+  {"rank":4065,"name":"Alex Tuch","team":"Washington Capitals","pos":"RW","role":"F","tier":"B","fpts":3.3,"gp":18,"g":11,"a":2,"pts":13,"season":2027},
+  {"rank":4066,"name":"Jack Roslovic","team":"Toronto Maple Leafs","pos":"C","role":"F","tier":"B","fpts":3.3,"gp":21,"g":9,"a":11,"pts":20,"season":2027},
+  {"rank":4067,"name":"Joel Eriksson Ek","team":"Minnesota Wild","pos":"C","role":"F","tier":"B","fpts":3.3,"gp":22,"g":6,"a":11,"pts":17,"season":2027},
+  {"rank":4068,"name":"Nikolaj Ehlers","team":"Carolina Hurricanes","pos":"LW","role":"F","tier":"B","fpts":3.3,"gp":21,"g":5,"a":15,"pts":20,"season":2027},
+  {"rank":4069,"name":"Carter Verhaeghe","team":"Florida Panthers","pos":"C","role":"F","tier":"B","fpts":3.3,"gp":22,"g":10,"a":10,"pts":20,"season":2027},
+  {"rank":4070,"name":"Jesper Bratt","team":"New Jersey Devils","pos":"LW","role":"F","tier":"B","fpts":3.2,"gp":21,"g":4,"a":17,"pts":21,"season":2027},
+  {"rank":4071,"name":"Mathew Barzal","team":"New York Islanders","pos":"C","role":"F","tier":"B","fpts":3.2,"gp":81,"g":19,"a":53,"pts":72,"season":2026},
+  {"rank":4072,"name":"Dylan Guenther","team":"Utah Mammoth","pos":"RW","role":"F","tier":"B","fpts":3.2,"gp":18,"g":6,"a":6,"pts":12,"season":2027},
+  {"rank":4073,"name":"Cole Perfetti","team":"Winnipeg Jets","pos":"C","role":"F","tier":"B","fpts":3.2,"gp":21,"g":8,"a":11,"pts":19,"season":2027},
+  {"rank":4074,"name":"Ryan O'Reilly","team":"Nashville Predators","pos":"C","role":"F","tier":"B","fpts":3.2,"gp":21,"g":9,"a":11,"pts":20,"season":2027},
+  {"rank":4075,"name":"Roope Hintz","team":"Dallas Stars","pos":"C","role":"F","tier":"B","fpts":3.2,"gp":20,"g":8,"a":11,"pts":19,"season":2027},
+  {"rank":4076,"name":"Will Smith","team":"San Jose Sharks","pos":"C","role":"F","tier":"B","fpts":3.2,"gp":23,"g":8,"a":10,"pts":18,"season":2027},
+  {"rank":4077,"name":"Nazem Kadri","team":"Colorado Avalanche","pos":"C","role":"F","tier":"B","fpts":3.2,"gp":21,"g":5,"a":12,"pts":17,"season":2027},
+  {"rank":4078,"name":"Viktor Arvidsson","team":"Detroit Red Wings","pos":"LW","role":"F","tier":"B","fpts":3.2,"gp":21,"g":8,"a":7,"pts":15,"season":2027},
+  {"rank":4079,"name":"Jakob Chychrun","team":"Washington Capitals","pos":"D","role":"D","tier":"B","fpts":3.1,"gp":18,"g":2,"a":11,"pts":13,"season":2027},
+  {"rank":4080,"name":"Tomas Hertl","team":"Vegas Golden Knights","pos":"C","role":"F","tier":"B","fpts":3.1,"gp":22,"g":9,"a":8,"pts":17,"season":2027},
+  {"rank":4081,"name":"Brayden Point","team":"Tampa Bay Lightning","pos":"C","role":"F","tier":"B","fpts":3.1,"gp":17,"g":5,"a":11,"pts":16,"season":2027},
+  {"rank":4082,"name":"Mika Zibanejad","team":"New York Rangers","pos":"C","role":"F","tier":"B","fpts":3.1,"gp":22,"g":5,"a":14,"pts":19,"season":2027},
+  {"rank":4083,"name":"Seth Jones","team":"Florida Panthers","pos":"D","role":"D","tier":"B","fpts":3.1,"gp":22,"g":3,"a":20,"pts":23,"season":2027},
+  {"rank":4084,"name":"Erik Karlsson","team":"Pittsburgh Penguins","pos":"D","role":"D","tier":"B","fpts":3.1,"gp":20,"g":3,"a":16,"pts":19,"season":2027},
+  {"rank":4085,"name":"Pavel Dorofeyev","team":"New York Rangers","pos":"RW","role":"F","tier":"B","fpts":3.1,"gp":21,"g":6,"a":6,"pts":12,"season":2027},
+  {"rank":4086,"name":"John Carlson","team":"Tampa Bay Lightning","pos":"D","role":"D","tier":"B","fpts":3.1,"gp":20,"g":6,"a":10,"pts":16,"season":2027},
+  {"rank":4087,"name":"Rasmus Dahlin","team":"Buffalo Sabres","pos":"D","role":"D","tier":"B","fpts":3.1,"gp":17,"g":3,"a":8,"pts":11,"season":2027},
+  {"rank":4088,"name":"Ryan Leonard","team":"Washington Capitals","pos":"RW","role":"F","tier":"B","fpts":3,"gp":18,"g":7,"a":7,"pts":14,"season":2027},
+  {"rank":4089,"name":"Brock Boeser","team":"Vancouver Canucks","pos":"RW","role":"F","tier":"B","fpts":3,"gp":23,"g":8,"a":15,"pts":23,"season":2027},
+  {"rank":4090,"name":"Bryan Rust","team":"Pittsburgh Penguins","pos":"RW","role":"F","tier":"B","fpts":3,"gp":7,"g":3,"a":2,"pts":5,"season":2027},
+  {"rank":4091,"name":"Timo Meier","team":"New Jersey Devils","pos":"RW","role":"F","tier":"B","fpts":3,"gp":21,"g":4,"a":5,"pts":9,"season":2027},
+  {"rank":4092,"name":"Jared McCann","team":"Seattle Kraken","pos":"LW","role":"F","tier":"B","fpts":3,"gp":11,"g":3,"a":5,"pts":8,"season":2027},
+  {"rank":4093,"name":"Adam Fox","team":"New York Rangers","pos":"D","role":"D","tier":"B","fpts":3,"gp":22,"g":2,"a":22,"pts":24,"season":2027},
+  {"rank":4094,"name":"Dylan Holloway","team":"St. Louis Blues","pos":"LW","role":"F","tier":"B","fpts":3,"gp":20,"g":4,"a":10,"pts":14,"season":2027},
+  {"rank":4095,"name":"Nico Hischier","team":"New Jersey Devils","pos":"C","role":"F","tier":"B","fpts":3,"gp":21,"g":9,"a":5,"pts":14,"season":2027},
+  {"rank":4096,"name":"Alex Laferriere","team":"Los Angeles Kings","pos":"RW","role":"F","tier":"B","fpts":3,"gp":18,"g":3,"a":10,"pts":13,"season":2027},
+  {"rank":4097,"name":"Jimmy Snuggerud","team":"St. Louis Blues","pos":"RW","role":"F","tier":"B","fpts":3,"gp":20,"g":10,"a":4,"pts":14,"season":2027},
+  {"rank":4098,"name":"Kent Johnson","team":"Columbus Blue Jackets","pos":"C","role":"F","tier":"B","fpts":3,"gp":18,"g":8,"a":10,"pts":18,"season":2027},
+  {"rank":4099,"name":"Joel Farabee","team":"Calgary Flames","pos":"LW","role":"F","tier":"B","fpts":2.9,"gp":21,"g":7,"a":10,"pts":17,"season":2027},
+  {"rank":4100,"name":"Sidney Crosby","team":"Pittsburgh Penguins","pos":"C","role":"F","tier":"B","fpts":2.9,"gp":20,"g":6,"a":7,"pts":13,"season":2027},
+  {"rank":4101,"name":"Lane Hutson","team":"Montreal Canadiens","pos":"D","role":"D","tier":"C","fpts":2.9,"gp":21,"g":3,"a":16,"pts":19,"season":2027},
+  {"rank":4102,"name":"Zach Hyman","team":"Edmonton Oilers","pos":"LW","role":"F","tier":"C","fpts":2.9,"gp":11,"g":4,"a":1,"pts":5,"season":2027},
+  {"rank":4103,"name":"Dylan Strome","team":"Washington Capitals","pos":"C","role":"F","tier":"C","fpts":2.9,"gp":18,"g":3,"a":13,"pts":16,"season":2027},
+  {"rank":4104,"name":"Ryan Nugent-Hopkins","team":"Edmonton Oilers","pos":"C","role":"F","tier":"C","fpts":2.9,"gp":12,"g":4,"a":7,"pts":11,"season":2027},
+  {"rank":4105,"name":"Shane Pinto","team":"Ottawa Senators","pos":"C","role":"F","tier":"C","fpts":2.9,"gp":21,"g":9,"a":8,"pts":17,"season":2027},
+  {"rank":4106,"name":"Arseny Gritsyuk","team":"New Jersey Devils","pos":"RW","role":"F","tier":"C","fpts":2.9,"gp":21,"g":8,"a":9,"pts":17,"season":2027},
+  {"rank":4107,"name":"Troy Terry","team":"Anaheim Ducks","pos":"RW","role":"F","tier":"C","fpts":2.9,"gp":61,"g":19,"a":38,"pts":57,"season":2026},
+  {"rank":4108,"name":"Cole Hutson","team":"Washington Capitals","pos":"D","role":"D","tier":"C","fpts":2.8,"gp":18,"g":5,"a":10,"pts":15,"season":2027},
+  {"rank":4109,"name":"Rickard Rakell","team":"Pittsburgh Penguins","pos":"RW","role":"F","tier":"C","fpts":2.8,"gp":20,"g":6,"a":5,"pts":11,"season":2027},
+  {"rank":4110,"name":"Oliver Bonk","team":"Philadelphia Flyers","pos":"D","role":"D","tier":"C","fpts":2.8,"gp":16,"g":1,"a":6,"pts":7,"season":2027},
+  {"rank":4111,"name":"Elias Lindholm","team":"Boston Bruins","pos":"C","role":"F","tier":"C","fpts":2.8,"gp":20,"g":7,"a":10,"pts":17,"season":2027},
+  {"rank":4112,"name":"John Tavares","team":"Toronto Maple Leafs","pos":"C","role":"F","tier":"C","fpts":2.8,"gp":12,"g":2,"a":5,"pts":7,"season":2027},
+  {"rank":4113,"name":"Pavel Zacha","team":"Boston Bruins","pos":"C","role":"F","tier":"C","fpts":2.8,"gp":19,"g":5,"a":10,"pts":15,"season":2027},
+  {"rank":4114,"name":"Jake Sanderson","team":"Ottawa Senators","pos":"D","role":"D","tier":"C","fpts":2.8,"gp":13,"g":1,"a":9,"pts":10,"season":2027},
+  {"rank":4115,"name":"Elias Pettersson","team":"Vancouver Canucks","pos":"C","role":"F","tier":"C","fpts":2.8,"gp":23,"g":6,"a":17,"pts":23,"season":2027},
+  {"rank":4116,"name":"Sam Bennett","team":"Florida Panthers","pos":"C","role":"F","tier":"C","fpts":2.8,"gp":22,"g":7,"a":4,"pts":11,"season":2027},
+  {"rank":4117,"name":"Kevin Fiala","team":"Los Angeles Kings","pos":"LW","role":"F","tier":"C","fpts":2.8,"gp":56,"g":18,"a":22,"pts":40,"season":2026},
+  {"rank":4118,"name":"Pierre-Luc Dubois","team":"Washington Capitals","pos":"LW","role":"F","tier":"C","fpts":2.7,"gp":13,"g":5,"a":7,"pts":12,"season":2027},
+  {"rank":4119,"name":"J.T. Miller","team":"New York Rangers","pos":"LW","role":"F","tier":"C","fpts":2.7,"gp":22,"g":4,"a":13,"pts":17,"season":2027},
+  {"rank":4120,"name":"Zach Benson","team":"Buffalo Sabres","pos":"LW","role":"F","tier":"C","fpts":2.7,"gp":20,"g":2,"a":13,"pts":15,"season":2027},
+  {"rank":4121,"name":"Tristan Luneau","team":"Anaheim Ducks","pos":"D","role":"D","tier":"C","fpts":2.7,"gp":21,"g":4,"a":10,"pts":14,"season":2027},
+  {"rank":4122,"name":"Juraj Slafkovsky","team":"Montreal Canadiens","pos":"LW","role":"F","tier":"C","fpts":2.7,"gp":21,"g":2,"a":11,"pts":13,"season":2027},
+  {"rank":4123,"name":"Anton Lundell","team":"Florida Panthers","pos":"C","role":"F","tier":"C","fpts":2.7,"gp":21,"g":7,"a":4,"pts":11,"season":2027},
+  {"rank":4124,"name":"Shayne Gostisbehere","team":"Carolina Hurricanes","pos":"D","role":"D","tier":"C","fpts":2.7,"gp":21,"g":3,"a":13,"pts":16,"season":2027},
+  {"rank":4125,"name":"Ivan Demidov","team":"Montreal Canadiens","pos":"RW","role":"F","tier":"C","fpts":2.7,"gp":82,"g":19,"a":43,"pts":62,"season":2026},
+  {"rank":4126,"name":"Luke Evangelista","team":"New Jersey Devils","pos":"RW","role":"F","tier":"C","fpts":2.7,"gp":18,"g":4,"a":7,"pts":11,"season":2027},
+  {"rank":4127,"name":"Mason McTavish","team":"St. Louis Blues","pos":"C","role":"F","tier":"C","fpts":2.7,"gp":20,"g":7,"a":5,"pts":12,"season":2027},
+  {"rank":4128,"name":"Morgan Geekie","team":"Boston Bruins","pos":"C","role":"F","tier":"C","fpts":2.7,"gp":20,"g":5,"a":10,"pts":15,"season":2027},
+  {"rank":4129,"name":"Josh Morrissey","team":"Winnipeg Jets","pos":"D","role":"D","tier":"C","fpts":2.7,"gp":7,"g":0,"a":5,"pts":5,"season":2027},
+  {"rank":4130,"name":"Darren Raddysh","team":"Toronto Maple Leafs","pos":"D","role":"D","tier":"C","fpts":2.7,"gp":22,"g":1,"a":12,"pts":13,"season":2027},
+  {"rank":4131,"name":"Jordan Eberle","team":"Seattle Kraken","pos":"RW","role":"F","tier":"C","fpts":2.7,"gp":18,"g":5,"a":7,"pts":12,"season":2027},
+  {"rank":4132,"name":"Adam Fantilli","team":"Columbus Blue Jackets","pos":"C","role":"F","tier":"C","fpts":2.7,"gp":18,"g":5,"a":2,"pts":7,"season":2027},
+  {"rank":4133,"name":"Matvei Michkov","team":"Philadelphia Flyers","pos":"RW","role":"F","tier":"C","fpts":2.7,"gp":23,"g":11,"a":6,"pts":17,"season":2027},
+  {"rank":4134,"name":"Gabriel Vilardi","team":"Winnipeg Jets","pos":"C","role":"F","tier":"C","fpts":2.7,"gp":21,"g":3,"a":11,"pts":14,"season":2027},
+  {"rank":4135,"name":"JJ Peterka","team":"Boston Bruins","pos":"RW","role":"F","tier":"C","fpts":2.7,"gp":20,"g":5,"a":9,"pts":14,"season":2027},
+  {"rank":4136,"name":"Trevor Zegras","team":"Philadelphia Flyers","pos":"C","role":"F","tier":"C","fpts":2.7,"gp":23,"g":5,"a":10,"pts":15,"season":2027},
+  {"rank":4137,"name":"Vasily Podkolzin","team":"Edmonton Oilers","pos":"RW","role":"F","tier":"C","fpts":2.7,"gp":22,"g":10,"a":6,"pts":16,"season":2027},
+  {"rank":4138,"name":"Simon Holmstrom","team":"New York Islanders","pos":"RW","role":"F","tier":"C","fpts":2.7,"gp":19,"g":9,"a":6,"pts":15,"season":2027},
+  {"rank":4139,"name":"Jake DeBrusk","team":"Vancouver Canucks","pos":"LW","role":"F","tier":"C","fpts":2.7,"gp":21,"g":6,"a":6,"pts":12,"season":2027},
+  {"rank":4140,"name":"Matt Coronato","team":"Calgary Flames","pos":"RW","role":"F","tier":"C","fpts":2.6,"gp":21,"g":4,"a":11,"pts":15,"season":2027},
+  {"rank":4141,"name":"Matt Duchene","team":"Dallas Stars","pos":"C","role":"F","tier":"C","fpts":2.6,"gp":57,"g":16,"a":29,"pts":45,"season":2026},
+  {"rank":4142,"name":"Anthony Cirelli","team":"Tampa Bay Lightning","pos":"C","role":"F","tier":"C","fpts":2.6,"gp":18,"g":5,"a":9,"pts":14,"season":2027},
+  {"rank":4143,"name":"Charlie Coyle","team":"Columbus Blue Jackets","pos":"C","role":"F","tier":"C","fpts":2.6,"gp":18,"g":3,"a":10,"pts":13,"season":2027},
+  {"rank":4144,"name":"Luke Hughes","team":"New Jersey Devils","pos":"D","role":"D","tier":"C","fpts":2.6,"gp":21,"g":6,"a":8,"pts":14,"season":2027},
+  {"rank":4145,"name":"Jordan Kyrou","team":"Washington Capitals","pos":"RW","role":"F","tier":"C","fpts":2.6,"gp":18,"g":5,"a":9,"pts":14,"season":2027},
+  {"rank":4146,"name":"Miro Heiskanen","team":"Dallas Stars","pos":"D","role":"D","tier":"C","fpts":2.6,"gp":15,"g":3,"a":8,"pts":11,"season":2027},
+  {"rank":4147,"name":"Brock Nelson","team":"Colorado Avalanche","pos":"C","role":"F","tier":"C","fpts":2.6,"gp":21,"g":6,"a":7,"pts":13,"season":2027},
+  {"rank":4148,"name":"Devon Toews","team":"Colorado Avalanche","pos":"D","role":"D","tier":"C","fpts":2.6,"gp":21,"g":6,"a":13,"pts":19,"season":2027},
+  {"rank":4149,"name":"Brock Faber","team":"Minnesota Wild","pos":"D","role":"D","tier":"C","fpts":2.6,"gp":80,"g":15,"a":36,"pts":51,"season":2026},
+  {"rank":4150,"name":"William Eklund","team":"Ottawa Senators","pos":"LW","role":"F","tier":"C","fpts":2.6,"gp":78,"g":15,"a":38,"pts":53,"season":2026},
+  {"rank":4151,"name":"Dylan Cozens","team":"Ottawa Senators","pos":"C","role":"F","tier":"C","fpts":2.6,"gp":21,"g":4,"a":8,"pts":12,"season":2027},
+  {"rank":4152,"name":"Brayden Schenn","team":"New York Islanders","pos":"C","role":"F","tier":"C","fpts":2.6,"gp":19,"g":6,"a":10,"pts":16,"season":2027},
+  {"rank":4153,"name":"Tommy Novak","team":"Pittsburgh Penguins","pos":"C","role":"F","tier":"C","fpts":2.6,"gp":20,"g":8,"a":7,"pts":15,"season":2027},
+  {"rank":4154,"name":"Travis Konecny","team":"Philadelphia Flyers","pos":"RW","role":"F","tier":"C","fpts":2.6,"gp":13,"g":2,"a":4,"pts":6,"season":2027},
+  {"rank":4155,"name":"Quinton Byfield","team":"Los Angeles Kings","pos":"RW","role":"F","tier":"C","fpts":2.5,"gp":16,"g":5,"a":2,"pts":7,"season":2027},
+  {"rank":4156,"name":"Brandon Montour","team":"Seattle Kraken","pos":"D","role":"D","tier":"C","fpts":2.5,"gp":17,"g":3,"a":9,"pts":12,"season":2027},
+  {"rank":4157,"name":"Frank Nazar","team":"Chicago Blackhawks","pos":"C","role":"F","tier":"C","fpts":2.5,"gp":18,"g":8,"a":2,"pts":10,"season":2027},
+  {"rank":4158,"name":"Patrick Kane","team":"Chicago Blackhawks","pos":"RW","role":"F","tier":"C","fpts":2.5,"gp":17,"g":1,"a":9,"pts":10,"season":2027},
+  {"rank":4159,"name":"Victor Eklund","team":"New York Islanders","pos":"RW","role":"F","tier":"C","fpts":2.5,"gp":19,"g":7,"a":4,"pts":11,"season":2027},
+  {"rank":4160,"name":"Jackson LaCombe","team":"Anaheim Ducks","pos":"D","role":"D","tier":"C","fpts":2.5,"gp":21,"g":1,"a":21,"pts":22,"season":2027},
+  {"rank":4161,"name":"Easton Cowan","team":"Toronto Maple Leafs","pos":"RW","role":"F","tier":"C","fpts":2.5,"gp":22,"g":7,"a":9,"pts":16,"season":2027},
+  {"rank":4162,"name":"Tyler Toffoli","team":"San Jose Sharks","pos":"C","role":"F","tier":"C","fpts":2.5,"gp":23,"g":6,"a":7,"pts":13,"season":2027},
+  {"rank":4163,"name":"Matvei Gridin","team":"Calgary Flames","pos":"RW","role":"F","tier":"C","fpts":2.5,"gp":21,"g":6,"a":7,"pts":13,"season":2027},
+  {"rank":4164,"name":"Robert Thomas","team":"St. Louis Blues","pos":"C","role":"F","tier":"C","fpts":2.5,"gp":20,"g":3,"a":11,"pts":14,"season":2027},
+  {"rank":4165,"name":"Taylor Hall","team":"Carolina Hurricanes","pos":"LW","role":"F","tier":"C","fpts":2.5,"gp":12,"g":3,"a":4,"pts":7,"season":2027},
+  {"rank":4166,"name":"Roman Kantserov","team":"Chicago Blackhawks","pos":"RW","role":"F","tier":"C","fpts":2.5,"gp":20,"g":9,"a":3,"pts":12,"season":2027},
+  {"rank":4167,"name":"Kailer Yamamoto","team":"Utah Mammoth","pos":"RW","role":"F","tier":"C","fpts":2.4,"gp":13,"g":3,"a":8,"pts":11,"season":2027},
+  {"rank":4168,"name":"Anton Frondell","team":"Chicago Blackhawks","pos":"C","role":"F","tier":"C","fpts":2.4,"gp":20,"g":4,"a":6,"pts":10,"season":2027},
+  {"rank":4169,"name":"Connor Brown","team":"New Jersey Devils","pos":"RW","role":"F","tier":"C","fpts":2.4,"gp":13,"g":5,"a":5,"pts":10,"season":2027},
+  {"rank":4170,"name":"Matias Maccelli","team":"New York Islanders","pos":"LW","role":"F","tier":"C","fpts":2.4,"gp":10,"g":2,"a":7,"pts":9,"season":2027},
+  {"rank":4171,"name":"Mackie Samoskevich","team":"Seattle Kraken","pos":"RW","role":"F","tier":"D","fpts":2.4,"gp":17,"g":6,"a":6,"pts":12,"season":2027},
+  {"rank":4172,"name":"Blake Coleman","team":"Minnesota Wild","pos":"LW","role":"F","tier":"D","fpts":2.4,"gp":22,"g":6,"a":6,"pts":12,"season":2027},
+  {"rank":4173,"name":"Mark Jankowski","team":"Carolina Hurricanes","pos":"C","role":"F","tier":"D","fpts":2.4,"gp":17,"g":10,"a":1,"pts":11,"season":2027},
+  {"rank":4174,"name":"Gabriel Landeskog","team":"Colorado Avalanche","pos":"LW","role":"F","tier":"D","fpts":2.4,"gp":21,"g":8,"a":5,"pts":13,"season":2027},
+  {"rank":4175,"name":"Dougie Hamilton","team":"New Jersey Devils","pos":"D","role":"D","tier":"D","fpts":2.4,"gp":21,"g":2,"a":8,"pts":10,"season":2027},
+  {"rank":4176,"name":"Trevor Connelly","team":"Vegas Golden Knights","pos":"LW","role":"F","tier":"D","fpts":2.4,"gp":22,"g":7,"a":5,"pts":12,"season":2027},
+  {"rank":4177,"name":"Fraser Minten","team":"Boston Bruins","pos":"C","role":"F","tier":"D","fpts":2.4,"gp":20,"g":7,"a":6,"pts":13,"season":2027},
+  {"rank":4178,"name":"Moritz Seider","team":"Detroit Red Wings","pos":"D","role":"D","tier":"D","fpts":2.4,"gp":21,"g":1,"a":12,"pts":13,"season":2027},
+  {"rank":4179,"name":"Ivar Stenberg","team":"San Jose Sharks","pos":"LW","role":"F","tier":"D","fpts":2.4,"gp":23,"g":7,"a":7,"pts":14,"season":2027},
+  {"rank":4180,"name":"James Hagens","team":"Boston Bruins","pos":"C","role":"F","tier":"D","fpts":2.4,"gp":17,"g":6,"a":6,"pts":12,"season":2027},
+  {"rank":4181,"name":"Charlie McAvoy","team":"Boston Bruins","pos":"D","role":"D","tier":"D","fpts":2.4,"gp":14,"g":1,"a":8,"pts":9,"season":2027},
+  {"rank":4182,"name":"Dawson Mercer","team":"Winnipeg Jets","pos":"C","role":"F","tier":"D","fpts":2.4,"gp":21,"g":5,"a":7,"pts":12,"season":2027},
+  {"rank":4183,"name":"Anthony Mantha","team":"New Jersey Devils","pos":"RW","role":"F","tier":"D","fpts":2.4,"gp":17,"g":5,"a":5,"pts":10,"season":2027},
+  {"rank":4184,"name":"Ivan Barbashev","team":"Vegas Golden Knights","pos":"LW","role":"F","tier":"D","fpts":2.4,"gp":22,"g":4,"a":12,"pts":16,"season":2027},
+  {"rank":4185,"name":"Porter Martone","team":"Philadelphia Flyers","pos":"RW","role":"F","tier":"D","fpts":2.3,"gp":23,"g":3,"a":6,"pts":9,"season":2027},
+  {"rank":4186,"name":"Jaden Schwartz","team":"Colorado Avalanche","pos":"C","role":"F","tier":"D","fpts":2.3,"gp":21,"g":7,"a":6,"pts":13,"season":2027},
+  {"rank":4187,"name":"Boone Jenner","team":"Washington Capitals","pos":"C","role":"F","tier":"D","fpts":2.3,"gp":18,"g":6,"a":2,"pts":8,"season":2027},
+  {"rank":4188,"name":"Kyle Palmieri","team":"New York Islanders","pos":"C","role":"F","tier":"D","fpts":2.3,"gp":19,"g":3,"a":5,"pts":8,"season":2027},
+  {"rank":4189,"name":"Neal Pionk","team":"Winnipeg Jets","pos":"D","role":"D","tier":"D","fpts":2.3,"gp":21,"g":4,"a":9,"pts":13,"season":2027},
+  {"rank":4190,"name":"Brandt Clarke","team":"Los Angeles Kings","pos":"D","role":"D","tier":"D","fpts":2.3,"gp":18,"g":3,"a":10,"pts":13,"season":2027},
+  {"rank":4191,"name":"Bobby McMann","team":"Seattle Kraken","pos":"C","role":"F","tier":"D","fpts":2.3,"gp":18,"g":3,"a":3,"pts":6,"season":2027},
+  {"rank":4192,"name":"Thomas Harley","team":"Dallas Stars","pos":"D","role":"D","tier":"D","fpts":2.3,"gp":20,"g":2,"a":12,"pts":14,"season":2027},
+  {"rank":4193,"name":"Vince Dunn","team":"Seattle Kraken","pos":"D","role":"D","tier":"D","fpts":2.3,"gp":18,"g":3,"a":7,"pts":10,"season":2027},
+  {"rank":4194,"name":"Matthew Knies","team":"Columbus Blue Jackets","pos":"LW","role":"F","tier":"D","fpts":2.3,"gp":18,"g":4,"a":5,"pts":9,"season":2027},
+  {"rank":4195,"name":"Vincent Trocheck","team":"Utah Mammoth","pos":"C","role":"F","tier":"D","fpts":2.3,"gp":22,"g":4,"a":7,"pts":11,"season":2027},
+  {"rank":4196,"name":"Jonathan Lekkerimaki","team":"Vancouver Canucks","pos":"RW","role":"F","tier":"D","fpts":2.3,"gp":23,"g":7,"a":11,"pts":18,"season":2027},
+  {"rank":4197,"name":"Gavin McKenna","team":"Toronto Maple Leafs","pos":"LW","role":"F","tier":"D","fpts":2.3,"gp":22,"g":6,"a":7,"pts":13,"season":2027},
+  {"rank":4198,"name":"Josh Anderson","team":"Montreal Canadiens","pos":"RW","role":"F","tier":"D","fpts":2.3,"gp":19,"g":8,"a":4,"pts":12,"season":2027},
+  {"rank":4199,"name":"Lenni Hameenaho","team":"New Jersey Devils","pos":"RW","role":"F","tier":"D","fpts":2.3,"gp":33,"g":2,"a":6,"pts":8,"season":2026},
+  {"rank":4200,"name":"Philip Broberg","team":"St. Louis Blues","pos":"D","role":"D","tier":"D","fpts":2.3,"gp":20,"g":4,"a":9,"pts":13,"season":2027},
+  {"rank":4201,"name":"Will Cuylle","team":"New York Rangers","pos":"LW","role":"F","tier":"D","fpts":2.3,"gp":22,"g":6,"a":5,"pts":11,"season":2027},
+  {"rank":4202,"name":"Thomas Chabot","team":"Ottawa Senators","pos":"D","role":"D","tier":"D","fpts":2.2,"gp":17,"g":2,"a":9,"pts":11,"season":2027},
+  {"rank":4203,"name":"Mikael Backlund","team":"Calgary Flames","pos":"C","role":"F","tier":"D","fpts":2.2,"gp":19,"g":3,"a":3,"pts":6,"season":2027},
+  {"rank":4204,"name":"Emmitt Finnie","team":"Detroit Red Wings","pos":"C","role":"F","tier":"D","fpts":2.2,"gp":21,"g":7,"a":4,"pts":11,"season":2027},
+  {"rank":4205,"name":"Morgan Frost","team":"Calgary Flames","pos":"C","role":"F","tier":"D","fpts":2.2,"gp":21,"g":5,"a":8,"pts":13,"season":2027},
+  {"rank":4206,"name":"Ben Kindel","team":"Pittsburgh Penguins","pos":"C","role":"F","tier":"D","fpts":2.2,"gp":17,"g":4,"a":5,"pts":9,"season":2027},
+  {"rank":4207,"name":"T.J. Hughes","team":"Colorado Avalanche","pos":"RW","role":"F","tier":"D","fpts":2.2,"gp":21,"g":2,"a":8,"pts":10,"season":2027},
+  {"rank":4208,"name":"Gabe Perreault","team":"New York Rangers","pos":"RW","role":"F","tier":"D","fpts":2.2,"gp":22,"g":7,"a":4,"pts":11,"season":2027},
+  {"rank":4209,"name":"Aliaksei Protas","team":"Washington Capitals","pos":"C","role":"F","tier":"D","fpts":2.2,"gp":18,"g":2,"a":8,"pts":10,"season":2027},
+  {"rank":4210,"name":"Casey Mittelstadt","team":"Boston Bruins","pos":"C","role":"F","tier":"D","fpts":2.2,"gp":20,"g":7,"a":5,"pts":12,"season":2027},
+  {"rank":4211,"name":"Owen Tippett","team":"Philadelphia Flyers","pos":"RW","role":"F","tier":"D","fpts":2.2,"gp":17,"g":2,"a":3,"pts":5,"season":2027},
+  {"rank":4212,"name":"Noah Ostlund","team":"Buffalo Sabres","pos":"C","role":"F","tier":"D","fpts":2.2,"gp":20,"g":4,"a":7,"pts":11,"season":2027},
+  {"rank":4213,"name":"Tom Wilson","team":"Washington Capitals","pos":"RW","role":"F","tier":"D","fpts":2.2,"gp":18,"g":2,"a":4,"pts":6,"season":2027},
+  {"rank":4214,"name":"Tye Kartye","team":"New York Rangers","pos":"LW","role":"F","tier":"D","fpts":2.2,"gp":22,"g":7,"a":7,"pts":14,"season":2027},
+  {"rank":4215,"name":"Evan Rodrigues","team":"New Jersey Devils","pos":"C","role":"F","tier":"D","fpts":2.1,"gp":21,"g":6,"a":5,"pts":11,"season":2027},
+  {"rank":4216,"name":"Linus Karlsson","team":"Vancouver Canucks","pos":"C","role":"F","tier":"D","fpts":2.1,"gp":23,"g":6,"a":6,"pts":12,"season":2027},
+  {"rank":4217,"name":"Berkly Catton","team":"Seattle Kraken","pos":"C","role":"F","tier":"D","fpts":2.1,"gp":18,"g":5,"a":9,"pts":14,"season":2027},
+  {"rank":4218,"name":"Maxim Shabanov","team":"Minnesota Wild","pos":"RW","role":"F","tier":"D","fpts":2.1,"gp":21,"g":8,"a":5,"pts":13,"season":2027},
+  {"rank":4219,"name":"Filip Chytil","team":"Vancouver Canucks","pos":"C","role":"F","tier":"D","fpts":2.1,"gp":10,"g":3,"a":2,"pts":5,"season":2027},
+  {"rank":4220,"name":"Sean Walker","team":"Carolina Hurricanes","pos":"D","role":"D","tier":"D","fpts":2.1,"gp":21,"g":3,"a":8,"pts":11,"season":2027},
+  {"rank":4221,"name":"Devon Levi","team":"Edmonton Oilers","pos":"G","role":"GK","tier":"S","fpts":5.2,"gp":10,"w":9,"gaa":2.48,"svpct":0.906,"season":2027},
+  {"rank":4222,"name":"Jesper Wallstedt","team":"Minnesota Wild","pos":"G","role":"GK","tier":"S","fpts":5,"gp":19,"w":14,"gaa":1.94,"svpct":0.926,"season":2027},
+  {"rank":4223,"name":"Jacob Fowler","team":"Montreal Canadiens","pos":"G","role":"GK","tier":"S","fpts":5,"gp":13,"w":9,"gaa":2.21,"svpct":0.923,"season":2027},
+  {"rank":4224,"name":"Joel Hofer","team":"St. Louis Blues","pos":"G","role":"GK","tier":"A","fpts":4.7,"gp":15,"w":8,"gaa":2.27,"svpct":0.921,"season":2027},
+  {"rank":4225,"name":"Pyotr Kochetkov","team":"Carolina Hurricanes","pos":"G","role":"GK","tier":"A","fpts":4.7,"gp":13,"w":12,"gaa":1.62,"svpct":0.92,"season":2027},
+  {"rank":4226,"name":"Linus Ullmark","team":"Ottawa Senators","pos":"G","role":"GK","tier":"A","fpts":4.7,"gp":10,"w":9,"gaa":1.47,"svpct":0.939,"season":2027},
+  {"rank":4227,"name":"Dylan Garand","team":"New York Rangers","pos":"G","role":"GK","tier":"A","fpts":4.7,"gp":15,"w":7,"gaa":2.37,"svpct":0.91,"season":2027},
+  {"rank":4228,"name":"Ilya Sorokin","team":"New York Islanders","pos":"G","role":"GK","tier":"A","fpts":4.5,"gp":13,"w":7,"gaa":2.53,"svpct":0.915,"season":2027},
+  {"rank":4229,"name":"Connor Hellebuyck","team":"New Jersey Devils","pos":"G","role":"GK","tier":"A","fpts":4.5,"gp":7,"w":7,"gaa":2.25,"svpct":0.915,"season":2027},
+  {"rank":4230,"name":"Jeremy Swayman","team":"Boston Bruins","pos":"G","role":"GK","tier":"A","fpts":4.3,"gp":15,"w":9,"gaa":2.6,"svpct":0.906,"season":2027},
+  {"rank":4231,"name":"Joonas Korpisalo","team":"New York Rangers","pos":"G","role":"GK","tier":"B","fpts":4.3,"gp":31,"w":14,"gaa":3.15,"svpct":0.894,"season":2026},
+  {"rank":4232,"name":"Jake Oettinger","team":"Dallas Stars","pos":"G","role":"GK","tier":"B","fpts":4.2,"gp":15,"w":10,"gaa":2.17,"svpct":0.902,"season":2027},
+  {"rank":4233,"name":"Mackenzie Blackwood","team":"Colorado Avalanche","pos":"G","role":"GK","tier":"B","fpts":4.2,"gp":16,"w":11,"gaa":2.52,"svpct":0.905,"season":2027},
+  {"rank":4234,"name":"Juuse Saros","team":"Nashville Predators","pos":"G","role":"GK","tier":"B","fpts":4.2,"gp":15,"w":7,"gaa":2.49,"svpct":0.917,"season":2027},
+  {"rank":4235,"name":"Igor Shesterkin","team":"New York Rangers","pos":"G","role":"GK","tier":"B","fpts":4.2,"gp":5,"w":3,"gaa":1.79,"svpct":0.927,"season":2027},
+  {"rank":4236,"name":"Tristan Jarry","team":"Edmonton Oilers","pos":"G","role":"GK","tier":"B","fpts":4,"gp":10,"w":6,"gaa":2.45,"svpct":0.912,"season":2027},
+  {"rank":4237,"name":"Alex Lyon","team":"Buffalo Sabres","pos":"G","role":"GK","tier":"B","fpts":3.9,"gp":36,"w":20,"gaa":2.77,"svpct":0.907,"season":2026},
+  {"rank":4238,"name":"Dennis Hildeby","team":"Tampa Bay Lightning","pos":"G","role":"GK","tier":"B","fpts":3.8,"gp":5,"w":4,"gaa":2.56,"svpct":0.899,"season":2027},
+  {"rank":4239,"name":"Daniil Tarasov","team":"Detroit Red Wings","pos":"G","role":"GK","tier":"B","fpts":3.8,"gp":9,"w":3,"gaa":1.84,"svpct":0.931,"season":2027},
+  {"rank":4240,"name":"Andrei Vasilevskiy","team":"Tampa Bay Lightning","pos":"G","role":"GK","tier":"B","fpts":3.8,"gp":15,"w":9,"gaa":2.74,"svpct":0.889,"season":2027},
+  {"rank":4241,"name":"Nico Daws","team":"Winnipeg Jets","pos":"G","role":"GK","tier":"B","fpts":3.8,"gp":8,"w":4,"gaa":2.58,"svpct":0.892,"season":2027},
+  {"rank":4242,"name":"Devin Cooley","team":"Calgary Flames","pos":"G","role":"GK","tier":"B","fpts":3.8,"gp":10,"w":5,"gaa":2.89,"svpct":0.906,"season":2027},
+  {"rank":4243,"name":"Logan Thompson","team":"Washington Capitals","pos":"G","role":"GK","tier":"C","fpts":3.7,"gp":13,"w":7,"gaa":3.17,"svpct":0.888,"season":2027},
+  {"rank":4244,"name":"Alex Nedeljkovic","team":"San Jose Sharks","pos":"G","role":"GK","tier":"C","fpts":3.7,"gp":8,"w":4,"gaa":3.08,"svpct":0.902,"season":2027},
+  {"rank":4245,"name":"Justus Annunen","team":"Nashville Predators","pos":"G","role":"GK","tier":"C","fpts":3.7,"gp":5,"w":4,"gaa":3.13,"svpct":0.886,"season":2027},
+  {"rank":4246,"name":"Clay Stevenson","team":"Winnipeg Jets","pos":"G","role":"GK","tier":"C","fpts":3.7,"gp":5,"w":1,"gaa":3.61,"svpct":0.87,"season":2027},
+  {"rank":4247,"name":"Anthony Stolarz","team":"Toronto Maple Leafs","pos":"G","role":"GK","tier":"C","fpts":3.6,"gp":9,"w":5,"gaa":2.69,"svpct":0.906,"season":2027},
+  {"rank":4248,"name":"Jacob Markstrom","team":"Florida Panthers","pos":"G","role":"GK","tier":"C","fpts":3.6,"gp":11,"w":6,"gaa":2.41,"svpct":0.906,"season":2027},
+  {"rank":4249,"name":"Jake Allen","team":"New Jersey Devils","pos":"G","role":"GK","tier":"C","fpts":3.5,"gp":10,"w":6,"gaa":3.19,"svpct":0.881,"season":2027},
+  {"rank":4250,"name":"Adin Hill","team":"Vegas Golden Knights","pos":"G","role":"GK","tier":"C","fpts":3.5,"gp":10,"w":7,"gaa":2.47,"svpct":0.908,"season":2027},
+  {"rank":4251,"name":"Casey DeSmith","team":"Dallas Stars","pos":"G","role":"GK","tier":"C","fpts":3.5,"gp":6,"w":2,"gaa":2.36,"svpct":0.906,"season":2027},
+  {"rank":4252,"name":"Joseph Woll","team":"Philadelphia Flyers","pos":"G","role":"GK","tier":"C","fpts":3.5,"gp":11,"w":3,"gaa":2.92,"svpct":0.902,"season":2027},
+  {"rank":4253,"name":"Brandon Bussi","team":"Carolina Hurricanes","pos":"G","role":"GK","tier":"D","fpts":3.4,"gp":8,"w":4,"gaa":2.96,"svpct":0.872,"season":2027},
+  {"rank":4254,"name":"Scott Wedgewood","team":"Colorado Avalanche","pos":"G","role":"GK","tier":"D","fpts":3.4,"gp":6,"w":1,"gaa":3.99,"svpct":0.863,"season":2027},
+  {"rank":4255,"name":"Cam Talbot","team":"Columbus Blue Jackets","pos":"G","role":"GK","tier":"D","fpts":3.3,"gp":9,"w":5,"gaa":2.51,"svpct":0.909,"season":2027},
+  {"rank":4256,"name":"Philipp Grubauer","team":"Seattle Kraken","pos":"G","role":"GK","tier":"D","fpts":3.3,"gp":12,"w":5,"gaa":3.11,"svpct":0.893,"season":2027},
+  {"rank":4257,"name":"Carter Hart","team":"Vegas Golden Knights","pos":"G","role":"GK","tier":"D","fpts":3.2,"gp":12,"w":6,"gaa":2.74,"svpct":0.888,"season":2027},
+  {"rank":4258,"name":"Colten Ellis","team":"Buffalo Sabres","pos":"G","role":"GK","tier":"D","fpts":3.2,"gp":8,"w":3,"gaa":3.39,"svpct":0.873,"season":2027},
+  {"rank":4259,"name":"Thatcher Demko","team":"Vancouver Canucks","pos":"G","role":"GK","tier":"D","fpts":3.2,"gp":20,"w":8,"gaa":2.9,"svpct":0.897,"season":2026},
+  {"rank":4260,"name":"Akira Schmid","team":"Florida Panthers","pos":"G","role":"GK","tier":"D","fpts":3.2,"gp":11,"w":6,"gaa":2.98,"svpct":0.885,"season":2027},
+];
+const NHL_IDS = {"4001":"3895074","4002":"3114727","4003":"3041969","4004":"3942335","4005":"5080145","4006":"3899952","4007":"5206628","4008":"2563060","4009":"4565222","4010":"3114778","4011":"4065019","4012":"4352722","4013":"4024988","4014":"4024123","4015":"4565233","4016":"4233875","4017":"3904173","4018":"3648002","4019":"4319858","4020":"5149125","4021":"3891952","4022":"3042083","4023":"4320548","4024":"4565236","4025":"3042002","4026":"4024857","4027":"4024854","4028":"4233594","4029":"3114722","4030":"4697384","4031":"4233586","4032":"2562632","4033":"5216858","4034":"4233563","4035":"5291933","4036":"3114736","4037":"4352683","4038":"2968772","4039":"4063433","4040":"3899937","4041":"5037","4042":"4874740","4043":"3114770","4044":"5149153","4045":"4697385","4046":"3852","4047":"3899938","4048":"3899972","4049":"4587996","4050":"3114802","4051":"5436","4052":"3042050","4053":"5545","4054":"5080143","4055":"3124","4056":"4697389","4057":"4874899","4058":"5831","4059":"4271734","4060":"4024868","4061":"4697396","4062":"3151096","4063":"5103645","4064":"4697382","4065":"3114766","4066":"3904098","4067":"3904091","4068":"3114741","4069":"3042088","4070":"4268771","4071":"3899946","4072":"4874723","4073":"4697392","4074":"5208","4075":"3904183","4076":"5149155","4077":"5349","4078":"3120307","4079":"4024950","4080":"2976844","4081":"3151187","4082":"2562637","4083":"3041992","4084":"5164","4085":"4587588","4086":"5118","4087":"4294163","4088":"5149172","4089":"3899979","4090":"2591155","4091":"3899978","4092":"3114777","4093":"4197146","4094":"4697397","4095":"4233555","4096":"4697725","4097":"5080171","4098":"4781553","4099":"4352750","4100":"3114","4101":"5080230","4102":"5509","4103":"3899933","4104":"2562624","4105":"4565255","4106":"4915855","4107":"3942905","4108":"5216918","4109":"2562629","4110":"5149199","4111":"3041994","4112":"5160","4113":"3899949","4114":"4697386","4115":"4233566","4116":"3114732","4117":"3114743","4118":"4024833","4119":"2590852","4120":"5149186","4121":"5080220","4122":"4915349","4123":"4697395","4124":"3025662","4125":"5216860","4126":"4697446","4127":"4874718","4128":"4268466","4129":"3042016","4130":"3149843","4131":"5032","4132":"5136617","4133":"5149170","4134":"4233583","4135":"4697438","4136":"4565230","4137":"4565231","4138":"4565244","4139":"3900240","4140":"4874730","4141":"5161","4142":"3941973","4143":"2555315","4144":"4874719","4145":"4062251","4146":"4233536","4147":"5798","4148":"3096249","4149":"4697449","4150":"4874721","4151":"4565228","4152":"5219","4153":"3942061","4154":"3900169","4155":"4697383","4156":"3115032","4157":"5080157","4158":"3735","4159":"5291952","4160":"4565262","4161":"5149211","4162":"5550","4163":"5216897","4164":"4233637","4165":"5428","4166":"5149231","4167":"4233648","4168":"5291935","4169":"3067951","4170":"4587580","4171":"4874741","4172":"2563026","4173":"2976849","4174":"2562609","4175":"2562605","4176":"5216887","4177":"5080207","4178":"4565227","4179":"5361709","4180":"5275337","4181":"3988803","4182":"4697401","4183":"3042037","4184":"3114985","4185":"5291941","4186":"5835","4187":"2563054","4188":"5517","4189":"3988847","4190":"4874722","4191":"5048894","4192":"4565239","4193":"3904189","4194":"4874919","4195":"2563036","4196":"5080159","4197":"5342529","4198":"3069687","4199":"5149245","4200":"4565229","4201":"4697468","4202":"3900219","4203":"3797","4204":"5188599","4205":"4233685","4206":"5291947","4207":"5136616","4208":"5149204","4209":"4587943","4210":"4233575","4211":"4392072","4212":"5080160","4213":"2970615","4214":"4588750","4215":"3648008","4216":"4587713","4217":"5216877","4218":"5302535","4219":"4233643","4220":"4272905","4221":"4894487","4222":"4874737","4223":"5188437","4224":"4587909","4225":"4565259","4226":"3069285","4227":"4697705","4228":"3151981","4229":"3020225","4230":"4712036","4231":"3069266","4232":"4196914","4233":"3904177","4234":"3042109","4235":"3151297","4236":"3042020","4237":"3654006","4238":"5174160","4239":"4587994","4240":"2976847","4241":"4697683","4242":"4319911","4243":"4272888","4244":"3114994","4245":"4393408","4246":"5104602","4247":"3067313","4248":"5452","4249":"5111","4250":"3939714","4251":"3025540","4252":"4271575","4253":"4996097","4254":"5622","4255":"5734","4256":"5657","4257":"4064582","4258":"4736758","4259":"3096217","4260":"4587845"};
+// Same tier multipliers as NFL; NHL_SCALE puts a tier-S star in every other
+// league's range (McDavid ~ $750). Mirrored in worker-pricing-engine/src/engine.js.
+const NHL_SCALE = 85;
+function nhlStatPrice(p){
+  return Math.max(0.01, (p.fpts || 1) * (MULT[p.tier] || 1) * PRICE_SCALE * NHL_SCALE);
+}
+const nhlPlayers = NHL_RAW.map(p => ({
+  ...p,
+  league: 'NHL',
+  statPrice: nhlStatPrice(p),
+  ppg: 0, rpg: 0, apg: 0, // stub NBA fields so shared code doesn't break
+  initials: p.name.split(' ').filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase(),
+  cols: COLS[p.rank % COLS.length],
+}));
+
 // ── LEAGUE STATE ─────────────────────────────────────────────────────────────
 // Declared here - after both nbaPlayers and mlbPlayers are fully initialized
 var currentLeague = localStorage.getItem('ax_league') || defaultLeague();
 // `players` is the active list - mutable, swapped on league change
 const players = currentLeague === 'MLB' ? [...mlbPlayers]
               : currentLeague === 'GOLF' ? [...golfPlayers]
-              : currentLeague === 'NFL' ? [...nflPlayers]
+              : currentLeague === 'NFL' ? [...nflPlayers, ...nhlPlayers]
+              : currentLeague === 'NHL' ? [...nhlPlayers]
               : [...nbaPlayers];
 
 function getLeaguePlayers() {
   if (currentLeague === 'MLB')  return mlbPlayers;
   if (currentLeague === 'GOLF') return golfPlayers;
   if (currentLeague === 'NFL')  return nflPlayers;
+  if (currentLeague === 'NHL')  return nhlPlayers;
   return nbaPlayers;
 }
 
@@ -4400,7 +4700,7 @@ function switchLeague(league) {
   updatePosFilters();
   if (league === 'MLB') applyPitcherAnticipation();
   updateLeagueDrawerUI();
-  showToast(league === 'MLB' ? 'Switched to MLB' : league === 'GOLF' ? 'Switched to Golf' : league === 'NFL' ? 'Switched to NFL' : 'Switched to NBA');
+  showToast(league === 'MLB' ? 'Switched to MLB' : league === 'GOLF' ? 'Switched to Golf' : league === 'NFL' ? 'Switched to NFL' : league === 'NHL' ? 'Switched to NHL' : 'Switched to NBA');
   // Refresh schedule if it's currently showing
   if (document.getElementById('view-schedule')?.style.display !== 'none') {
     scheduleOffset = 0;
@@ -4445,7 +4745,7 @@ function updateLeagueDrawerUI() {
     el.classList.toggle('active', el.dataset.league === currentLeague);
   });
   // Update logo/label in nav, and the compact switcher on Leaderboard if it's rendered
-  const label = currentLeague === 'MLB' ? 'MLB' : currentLeague === 'GOLF' ? 'Golf' : currentLeague === 'NFL' ? 'NFL' : 'NBA';
+  const label = currentLeague === 'MLB' ? 'MLB' : currentLeague === 'GOLF' ? 'Golf' : currentLeague === 'NFL' ? 'NFL' : currentLeague === 'NHL' ? 'NHL' : 'NBA';
   const lbl = document.getElementById('league-label');
   if (lbl) lbl.textContent = label;
   const lblCompact = document.getElementById('league-label-compact');
@@ -4454,7 +4754,7 @@ function updateLeagueDrawerUI() {
   if (lblCompactSched) lblCompactSched.textContent = label;
   // Real counts and real season status - these used to be hard-coded, so NBA
   // said "Live prices" all summer.
-  const counts = { NBA: nbaPlayers.length, MLB: mlbPlayers.length, GOLF: golfPlayers.length, NFL: nflPlayers.length };
+  const counts = { NBA: nbaPlayers.length, MLB: mlbPlayers.length, GOLF: golfPlayers.length, NFL: nflPlayers.length, NHL: nhlPlayers.length };
   document.querySelectorAll('.league-option[data-league]').forEach(el => {
     const lg = el.dataset.league, sub = el.querySelector('.lo-sub');
     if (sub && counts[lg] != null) sub.textContent = `${counts[lg]} ${lg === 'GOLF' ? 'golfers' : 'players'} · ${leagueInSeason(lg) ? 'In season' : 'Offseason'}`;
@@ -4542,7 +4842,7 @@ function poolFor(portfolioId, rank){
     // (holdings keys are always strings) - coerce for the strict-equality
     // player lookup, same as any other object-key access here already does.
     const rankNum = Number(rank);
-    const p = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].find(x => x.rank === rankNum);
+    const p = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].find(x => x.rank === rankNum);
     const x = getPool(p?.tier), y = x * liveP[rank];
     cp[rank] = { x, y, k: x * y };
   }
@@ -5160,6 +5460,12 @@ async function loadInjuries() {
     totalCount += count; allNames.push(...names);
   } catch(e) { console.log('NFL injury feed unavailable'); }
 
+  try {
+    const { count, names } = await _fetchLeagueInjuries(
+      'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/injuries', NHL_IDS, nhlPlayers);
+    totalCount += count; allNames.push(...names);
+  } catch(e) { console.log('NHL injury feed unavailable'); }
+
   // MLB already tracks IL status daily via the official 40-man roster feed
   // (mlbFetchInjuries → window._mlbInjuryStatus, used for price decay) - reuse
   // that instead of a second ESPN call. Any D10/D15/D60 code is OUT.
@@ -5268,7 +5574,7 @@ function _loadLastNight() {
     const result = {};
     for (const [rank, val] of Object.entries(obj)) {
       if (!val || !val.date) continue;
-      const cutoff = new Date(now); cutoff.setDate(now.getDate() - (val.nfl ? 8 : 3)); // see _lnKeepDays
+      const cutoff = new Date(now); cutoff.setDate(now.getDate() - _lnKeepDays(val)); // see _lnKeepDays
       const d = new Date(val.date);
       if (d >= cutoff) {
         if (!result[rank] || val.live || val.date >= result[rank].date) {
@@ -5285,7 +5591,7 @@ function _loadLastNight() {
 // How many days a finished game's box score stays on screen and in sync.
 // Daily leagues turn over fast; an NFL player's last game is still his most
 // recent one until the following week, so it stays until just past then.
-function _lnKeepDays(ln) { return ln && ln.nfl ? 8 : 3; }
+function _lnKeepDays(ln) { return ln && ln.nfl ? 8 : ln && ln.nhl ? 5 : 3; } // NHL teams can go 3-4 days between games
 function _saveLastNight() {
   try {
     localStorage.setItem('athletex_lastNight', JSON.stringify(lastNight));
@@ -5743,6 +6049,7 @@ const ENGINE = (() => {
 
   // Dispatch to the right perf fn by player league/role.
   function perfFor(p, stat){
+    if (p.rank >= 4001) return nhlPerf(p, stat);
     if (p.rank >= 3001) return nflPerf(p, stat);
     if (p.rank >= 2001) return golfPerf(p, stat);
     if (p.rank >= 1001) {
@@ -5790,6 +6097,19 @@ const ENGINE = (() => {
     // damping still meaningfully discounts a small sample (Hutchinson's one
     // tackle still reads under -1%) without flattening a genuinely good
     // quarter-plus of real production down to noise.
+    rel *= frac;
+    return bound(p, rel);
+  }
+
+  // NHL: one game's fantasy points vs the player's expected per-game rate,
+  // paced and damped by game time exactly like nflPerf above. Mirrors
+  // worker-pricing-engine/src/engine.js nhlPerf.
+  function nhlPerf(p, stat){
+    if (!stat) return 0;
+    const base = p.fpts || 2;
+    const got = stat.fpts != null ? stat.fpts : base;
+    const frac = Math.min(1, Math.max(0.15, stat.gameFrac != null ? stat.gameFrac : 1));
+    let rel = (got / frac - base) / Math.max(base, 2);
     rel *= frac;
     return bound(p, rel);
   }
@@ -6000,7 +6320,7 @@ const ENGINE = (() => {
     try { _saveCloses && _saveCloses(); } catch(e){}
   }
 
-  function allPlayers(){ return [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers]; }
+  function allPlayers(){ return [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers]; }
   function round1(n){ return Math.round(n * 10) / 10; }
 
   // Real game stats move price the same way for everyone - fan a fundamental
@@ -6624,7 +6944,7 @@ function eventLocalDate(ev) {
 }
 
 // Initialize ALL players (all leagues) regardless of current league
-[...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].forEach(p=>{
+[...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].forEach(p=>{
   liveP[p.rank]=p.statPrice;
   trueV[p.rank]=p.statPrice;
   dem[p.rank]=INITDEM[p.rank]??DEMBASE[p.tier];
@@ -6646,7 +6966,7 @@ function eventLocalDate(ev) {
 function autoRepairPrices(reason){
   let fixed = 0;
   const today = localDateStr(0);
-  [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].forEach(p => {
+  [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].forEach(p => {
     // 1) Repair the live price itself (grossly out of band vs fundamental value).
     if (!_priceValid(p, liveP[p.rank])) {
       const c = closes[p.rank] || {};
@@ -6704,7 +7024,7 @@ const _priceValid = (p, price) => price > 0 && price >= p.statPrice * 0.55 && pr
 try {
   const savedP = JSON.parse(localStorage.getItem('ax_liveP_cache') || 'null');
   if (savedP) {
-    [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].forEach(p => {
+    [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].forEach(p => {
       return; // ENGINE derives ALL prices from base+stats; never restore stored prices
       const price = savedP[p.rank];
       if (_priceValid(p, price)) {
@@ -8159,6 +8479,115 @@ async function nflReconcileStaleLive() {
   }
 }
 
+
+// ── NHL - LIVE DATA FETCHING ───────────────────────────────────────────────
+// Same shape as nflTick: today's NHL games from ESPN, each player's box-score
+// line read by column label (skater and goalie columns differ), priced on
+// fantasy points against his expected per-game rate, written to lastNight
+// with nhl:true for the "Last game" tiles. Late games that end after midnight
+// are closed by the pricing worker (tickNhl's carryover), which also writes
+// the shared config/lastNight every device restores from.
+// Keep _nhlRawLine / _nhlFpts in sync with worker-pricing-engine/src/nhl.js.
+function _nhlGameFrac(status) {
+  if (!status) return 1;
+  if (status.type?.completed || status.type?.state === 'post') return 1;
+  const period = status.period || 1;
+  if (period >= 4) return 1;
+  const [m, s] = (status.displayClock || '20:00').split(':').map(Number);
+  const left = (m || 0) * 60 + (s || 0);
+  return Math.min(1, Math.max(0, ((period - 1) * 1200 + Math.max(0, 1200 - left)) / 3600));
+}
+function _nhlRawLine(labels, stats) {
+  const L = (labels || []).map(l => (l || '').toUpperCase());
+  const get = n => { const i = L.indexOf(n); return i < 0 ? null : (stats[i] ?? null); };
+  const num = v => (v == null ? 0 : parseFloat(String(v).replace(/[^0-9.\-]/g, '')) || 0);
+  if (L.includes('SV') || L.includes('SA') || L.includes('GA')) {
+    return { goalie: true, sa: num(get('SA')), ga: num(get('GA')), sv: num(get('SV')), svpct: num(get('SV%')), toi: String(get('TOI') ?? '') };
+  }
+  return { goalie: false, g: num(get('G')), a: num(get('A')), sog: num(get('S') ?? get('SOG')), blk: num(get('BS') ?? get('BLK')),
+    hits: num(get('HT') ?? get('HIT')), pm: num(get('+/-')), pim: num(get('PIM')), toi: String(get('TOI') ?? '') };
+}
+function _nhlFpts(l) {
+  if (l.goalie) return (l.sv || 0) * 0.2 - (l.ga || 0) + (l.win ? 3 : 0) + (l.so ? 2 : 0);
+  return (l.g || 0) * 3 + (l.a || 0) * 2 + (l.sog || 0) * 0.5 + (l.blk || 0) * 0.5;
+}
+function _nhlLines(sum) {
+  const out = {};
+  const comp = sum?.header?.competitions?.[0];
+  const winnerId = comp?.competitors?.find(c => c.winner)?.team?.id;
+  const final = !!comp?.status?.type?.completed;
+  const secs = t => { const [m, s] = String(t || '0:00').split(':').map(Number); return (m || 0) * 60 + (s || 0); };
+  for (const tm of sum?.boxscore?.players || []) {
+    const goalies = [];
+    for (const cat of tm.statistics || []) for (const a of cat.athletes || []) {
+      const nm = a.athlete?.displayName;
+      if (!nm || !(a.stats || []).length) continue;
+      const line = _nhlRawLine(cat.labels, a.stats);
+      if (line.goalie) { if (!(secs(line.toi) > 0)) continue; line.so = final && line.ga === 0 && line.sa > 0; goalies.push(line); }
+      out[_normName(nm)] = line;
+    }
+    if (final && tm.team?.id === winnerId && goalies.length) goalies.sort((x, y) => secs(y.toi) - secs(x.toi))[0].win = true;
+    goalies.forEach(g => { if (g.win !== true) g.win = false; });
+  }
+  return out;
+}
+let _nhlNameIndex = null;
+async function nhlTick() {
+  if (typeof espnFetch !== 'function' || typeof nhlPlayers === 'undefined') return;
+  if (!_nhlNameIndex) { _nhlNameIndex = {}; nhlPlayers.forEach(p => { _nhlNameIndex[_normName(p.name)] = p; }); }
+  const today = localDateStr(0);
+  const sb = await espnFetch(`https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=${today.replace(/-/g,'')}`).catch(() => null);
+  const events = sb?.events || [];
+  const finals = events.filter(e => e.status?.type?.completed);
+  const live = events.filter(e => e.status?.type?.state === 'in');
+  const relevant = [...finals, ...live];
+  if (!relevant.length) return { live: false };
+  if (live.length > 0) {
+    window._anyLiveThisCycle = true;
+    if (!isGameLive) { isGameLive = true; localStorage.setItem('ax_isGameLive', 'true'); }
+  }
+  window._engineStats = window._engineStats || {};
+  const finalRanks = [];
+  let moved = 0;
+  for (const ev of relevant) {
+    const frac = _nhlGameFrac(ev.status);
+    const isFinal = !!ev.status?.type?.completed;
+    const sum = await espnFetch(`https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/summary?event=${ev.id}`).catch(() => null);
+    if (!sum) continue;
+    for (const [name, line] of Object.entries(_nhlLines(sum))) {
+      const p = _nhlNameIndex[name];
+      if (!p) continue;
+      const fpts = _nhlFpts(line);
+      window._engineStats[p.rank] = { fpts, gameFrac: frac };
+      _setLastNight(p.rank, { played: true, date: today, live: !isFinal, nhl: true, fpts: Math.round(fpts * 10) / 10, ...line });
+      if (isFinal) finalRanks.push(p);
+      moved++;
+    }
+  }
+  try { if (ENGINE.deriveAll) ENGINE.deriveAll(); } catch(e) {}
+  // intraday ticks for the 1D chart, same as nflTick
+  {
+    const _now = Date.now();
+    nhlPlayers.forEach(p => {
+      const ln = lastNight[p.rank];
+      if (!ln || !ln.live) return;
+      const np = liveP[p.rank];
+      if (!(np > 0)) return;
+      const arr = intraday[p.rank] || (intraday[p.rank] = []);
+      const last = arr.length ? arr[arr.length - 1] : null;
+      if (!last || (_now - last.t) / 60000 > 5 || Math.abs(np - last.price) / last.price > 0.003) {
+        arr.push({ t: _now, price: np });
+        (priceHx[p.rank] || (priceHx[p.rank] = [])).push({ day: todayDayNum(), price: np });
+      }
+    });
+  }
+  finalRanks.forEach(p => { try { ENGINE.finalize(p, today); } catch(e) {} });
+  if (moved > 0) { _saveCloses(); _saveLastNight(); saveLocalPortfolio(); syncPricesToFirestore(); }
+  if (currentLeague === 'NHL') { try { renderAll(); updateMovers(); } catch(e) {} }
+  console.log(`[nhl] scored ${moved} players from ${relevant.length} game(s)`);
+  return { live: live.length > 0 };
+}
+
 // ── GOLF - LIVE DATA FETCHING ───────────────────────────────────────────────
 // PGA tournaments run Thu–Sun. ESPN's golf scoreboard exposes each event's
 // competitors with a cumulative score-to-par and per-round linescores. We map
@@ -8801,6 +9230,7 @@ async function fetchLiveStats(isFinal=false) {
   // Always fetch NFL too (no-op off-season; scores players when games exist)
   try { await nflTick(); } catch(e) { console.warn('NFL fetch:', e.message); }
   try { await nflReconcileStaleLive(); } catch(e) { console.warn('NFL reconcile:', e.message); }
+  try { await nhlTick(); } catch(e) { console.warn('NHL fetch:', e.message); }
   try {
     let _nbaSlateSeen = false;
     for (let ago = 0; ago <= 4; ago++) {
@@ -9071,7 +9501,7 @@ async function sellAll(rank){
   if(held <= 0){ showToast('No shares to sell'); return; }
   const r = ammSell(targetRank, held);
   if(!r) return;
-  const p = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers].find(x=>x.rank===targetRank);
+  const p = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers, ...nhlPlayers].find(x=>x.rank===targetRank);
   const ok = await showTradeConfirm('sell', held, r.returned, p.name);
   if(!ok) return;
   applySell(targetRank, held, r);
@@ -9122,7 +9552,7 @@ function applyBuy(rank, shares, r){
   const ap=activePool(rank); ap.x=r.newX; ap.y=r.newY; syncPool(ap);
   volume[rank]=(volume[rank]||0)+shares;
   priceHx[rank].push({day:todayDayNum(),price:r.newPrice});
-  const pName = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers].find(x=>x.rank===rank)?.name || '';
+  const pName = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers, ...nhlPlayers].find(x=>x.rank===rank)?.name || '';
   logs.unshift({type:'buy',shares,amount:r.cost,name:pName,price:r.newPrice});
   pushTradeToFeed(rank, 'buy', shares, r.newPrice, pName);
   flashHero(true);
@@ -9545,7 +9975,24 @@ function updateHero(){
   const ppgLbl = ppgEl?.nextElementSibling;
   const rpgLbl = rpgEl?.nextElementSibling;
   const apgLbl = apgEl?.nextElementSibling;
-  if (p.role === 'SP' || p.role === 'RP') {
+  if (p.league === 'NHL') {
+    // This season's line (last season's until 5 games in - see NHL_RAW)
+    if (p.role === 'GK') {
+      if(ppgEl) ppgEl.textContent = p.w != null ? p.w : '—';
+      if(rpgEl) rpgEl.textContent = p.gaa ? p.gaa.toFixed(2) : '—';
+      if(apgEl) apgEl.textContent = p.svpct ? p.svpct.toFixed(3).replace(/^0/, '') : '—';
+      if(ppgLbl) ppgLbl.textContent = 'WINS';
+      if(rpgLbl) rpgLbl.textContent = 'GAA';
+      if(apgLbl) apgLbl.textContent = 'SV%';
+    } else {
+      if(ppgEl) ppgEl.textContent = p.g != null ? p.g : '—';
+      if(rpgEl) rpgEl.textContent = p.a != null ? p.a : '—';
+      if(apgEl) apgEl.textContent = p.pts != null ? p.pts : '—';
+      if(ppgLbl) ppgLbl.textContent = 'GOALS';
+      if(rpgLbl) rpgLbl.textContent = 'ASSISTS';
+      if(apgLbl) apgLbl.textContent = 'POINTS';
+    }
+  } else if (p.role === 'SP' || p.role === 'RP') {
     if(ppgEl) ppgEl.textContent = p.era != null ? p.era.toFixed(2) : '—';
     if(rpgEl) rpgEl.textContent = p.kper9 != null ? p.kper9.toFixed(1) : '—';
     if(apgEl) apgEl.textContent = p.ipp != null ? p.ipp.toFixed(1) : '—';
@@ -9773,6 +10220,29 @@ function updateHero(){
         document.getElementById('ln-lbl-ast').textContent = 'H';
         document.getElementById('ln-lbl-stl').textContent = 'BB';
         document.getElementById('ln-lbl-blk').textContent = 'K';
+      }
+    } else if (ln.nhl) {
+      // ── NHL HERO STATS ──────────────────────────────────────────────────
+      ['ln-row-fg','ln-row-3p','ln-row-min','ln-row-pm','ln-row-tov'].forEach(id => {
+        const el = document.getElementById(id); if(el) el.style.display = 'none';
+      });
+      const set = (id, val, cls, lbl) => {
+        const v = document.getElementById(id); if (v) { v.textContent = val; v.className = 'ln-v ' + cls; }
+        const l = document.getElementById('ln-lbl-' + id.slice(3)); if (l) l.textContent = lbl;
+      };
+      if (ln.goalie) {
+        set('ln-pts', ln.sv || 0, (ln.sv||0) >= 30 ? 'great' : (ln.sv||0) >= 20 ? 'good' : 'bad', 'SAVES');
+        set('ln-reb', ln.ga || 0, (ln.ga||0) <= 1 ? 'great' : (ln.ga||0) <= 3 ? 'good' : 'bad', 'GA');
+        set('ln-ast', ln.svpct ? ln.svpct.toFixed(3).replace(/^0/, '') : '—', (ln.svpct||0) >= 0.92 ? 'great' : (ln.svpct||0) >= 0.89 ? 'good' : 'bad', 'SV%');
+        set('ln-stl', ln.win ? 'W' : 'L', ln.win ? 'great' : 'bad', 'RESULT');
+        set('ln-blk', ln.toi || '—', 'good', 'TOI');
+      } else {
+        set('ln-pts', ln.g || 0, (ln.g||0) >= 1 ? 'great' : 'good', 'GOALS');
+        set('ln-reb', ln.a || 0, (ln.a||0) >= 2 ? 'great' : (ln.a||0) >= 1 ? 'good' : 'good', 'ASSISTS');
+        set('ln-ast', ln.sog || 0, (ln.sog||0) >= 4 ? 'great' : 'good', 'SHOTS');
+        const pm = ln.pm || 0;
+        set('ln-stl', (pm > 0 ? '+' : '') + pm, pm > 0 ? 'great' : pm < 0 ? 'bad' : 'good', '+/-');
+        set('ln-blk', ln.toi || '—', 'good', 'TOI');
       }
     } else if (ln.nfl) {
       // ── NFL HERO STATS ──────────────────────────────────────────────────
@@ -10040,7 +10510,7 @@ function getTodayPct(rank){
   // 2026-09-21: Luke Keaschall's only surviving close was 2 days stale (a
   // pedestrian 1-for-5 night) and this fallback read it as +34.9% "today".
   if (prev == null && dates[dates.length - 1] >= localDateStr(1)) {
-    const p = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].find(x => x.rank === rank);
+    const p = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].find(x => x.rank === rank);
     if (p?.statPrice > 0) prev = p.statPrice;
   }
   return prev > 0 ? Math.round((cur - prev) / prev * 1000) / 10 : 0;
@@ -10164,7 +10634,7 @@ function get24hPct(rank){
     // intraday comment) - so this anchor read a real +2.5% since his actual
     // close as -27.2% off a stale pre-correction price instead.
     const _fairRef = _cHist[_latestCloseDate] > 0 ? _cHist[_latestCloseDate]
-      : ([...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].find(x => x.rank === rank)?.statPrice || 0);
+      : ([...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].find(x => x.rank === rank)?.statPrice || 0);
     const _anchorIsStale = _fairRef > 0 && cur > 0
       && Math.abs(basePrice - _fairRef) / _fairRef > 0.35
       && Math.abs(basePrice - cur) / cur > 0.35;
@@ -10419,7 +10889,7 @@ async function pushTradeToFeed(rank, type, shares, price, playerName, portfolioI
     // can differ from the traded player's league for a queued/delayed trade that
     // finishes executing after the user has already switched tabs (this tagged an
     // MLB trade "GOLF" in the feed because Golf was on-screen when it posted).
-    const league = rank >= 3001 ? 'NFL' : rank >= 2001 ? 'GOLF' : rank >= 1001 ? 'MLB' : 'NBA';
+    const league = rank >= 4001 ? 'NHL' : rank >= 3001 ? 'NFL' : rank >= 2001 ? 'GOLF' : rank >= 1001 ? 'MLB' : 'NBA';
     await window._fbAddDoc(window._fbCollection(db, 'trades'), {
       uid: currentUser.uid,
       displayName: userProfile?.displayName || currentUser.displayName || 'Anonymous',
@@ -10462,7 +10932,7 @@ function startPricesListener() {
           const r = parseInt(rankStr);
           if (!liveP[r] || price <= 0) return;
           return; // ENGINE derives ALL prices; never restore stored prices
-          const pl = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers].find(x => x.rank === r);
+          const pl = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers, ...nhlPlayers].find(x => x.rank === r);
           if (pl && !_priceValid(pl, price)) return; // reject inflated prices
           if (Math.abs(price - liveP[r]) / liveP[r] < 0.0001) return;
           liveP[r] = price;
@@ -10506,7 +10976,7 @@ function syncPricesToFirestore() {
       const intradaySnap = {};
       const closesSnap = {};
       const priceAppliedSnap = {};
-      const allP = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers];
+      const allP = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers];
 
       // Guard: don't overwrite Firestore if our prices look like defaults
       // (means ESPN fetch didn't run and we'd wipe real prices with statPrice)
@@ -10722,7 +11192,7 @@ async function loadPricesFromFirestore() {
 
     // Always restore closes from Firestore - they're written immediately after every game
     if (d.closes) {
-      const _allPlayers = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers];
+      const _allPlayers = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers];
       Object.entries(d.closes).forEach(([rank, c]) => {
         const r = parseInt(rank);
         const pl = _allPlayers.find(x => x.rank === r);
@@ -10766,7 +11236,7 @@ async function loadPricesFromFirestore() {
     // Restore liveP from Firestore if today's data
     let applied = 0;
     if (isToday && d.liveP) {
-      const allP = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers];
+      const allP = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers];
       Object.entries(d.liveP).forEach(([rank, price]) => {
         const r = parseInt(rank);
         if (liveP[r] === undefined || price <= 0) return;
@@ -11762,7 +12232,7 @@ function handleOpenPlayerDeepLink(){
   // Strip the param immediately so a later refresh/share of this URL doesn't
   // keep re-triggering the deep link.
   history.replaceState(null, '', location.pathname);
-  const league = rank <= 1000 ? 'NBA' : rank <= 2000 ? 'MLB' : rank <= 3000 ? 'GOLF' : 'NFL';
+  const league = rank <= 1000 ? 'NBA' : rank <= 2000 ? 'MLB' : rank <= 3000 ? 'GOLF' : rank <= 4000 ? 'NFL' : 'NHL';
   const apply = () => {
     if (currentLeague !== league) switchLeague(league);
     showView('market', document.querySelector('.nav-tab'));
@@ -11947,6 +12417,7 @@ function getPosLabels() {
   if (currentLeague === 'MLB') return ['SP','RP','H','OF','C'];
   if (currentLeague === 'GOLF') return ['PRO','','','',''];
   if (currentLeague === 'NFL') return ['QB','RB','WR','TE','DEF','K'];
+  if (currentLeague === 'NHL') return ['C','LW','RW','D','G'];
   return ['PG','SG','SF','PF','C'];
 }
 
@@ -12127,7 +12598,8 @@ function goMarket(rank){
   const league = nbaPlayers.some(p => p.rank === rank) ? 'NBA'
                : mlbPlayers.some(p => p.rank === rank) ? 'MLB'
                : golfPlayers.some(p => p.rank === rank) ? 'GOLF'
-               : nflPlayers.some(p => p.rank === rank) ? 'NFL' : null;
+               : nflPlayers.some(p => p.rank === rank) ? 'NFL'
+               : nhlPlayers.some(p => p.rank === rank) ? 'NHL' : null;
   if (league && league !== currentLeague) switchLeague(league);
   if (rank) selRank = rank;
   showView('market', document.querySelectorAll('.nav-tab')[0]);
@@ -12304,6 +12776,11 @@ MLB_ESPN_IDS_STATIC[1230] = 41171;
 function headshotUrl(rank){
   // Golf players (ranks 2001+) use ESPN's golf CDN, with IDs captured from the golf feed
   // and persisted across sessions.
+  // NHL players (ranks 4001+). ESPN NHL headshot CDN, keyed by the ESPN athlete id.
+  if (rank >= 4001) {
+    const id = (typeof NHL_IDS !== 'undefined') ? NHL_IDS[rank] : null;
+    return id ? `https://a.espncdn.com/i/headshots/nhl/players/full/${id}.png` : null;
+  }
   // NFL players (ranks 3001+). ESPN NFL headshot CDN, keyed by the ESPN athlete id.
   if (rank >= 3001) {
     try {
@@ -12639,7 +13116,7 @@ function buildPortfolio(){
   // Where the Coins are: one bar, each holding at its share of the total in
   // its team colour, unspent Coins in grey. The key names the biggest few.
   if (held.length && total > 0) {
-    const _all = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers];
+    const _all = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers, ...nhlPlayers];
     const segs = held.map(([rk,h]) => {
       const p = _all.find(x => x.rank === +rk);
       return { name: p ? playerLastName(p.name) : '#'+rk, color: (p && teamColor(p)) || '#8e8e96', val: h.shares * activePrice(rk) };
@@ -12666,7 +13143,7 @@ function buildPortfolio(){
     held.sort(([a],[b])=>holdings[b].shares*activePrice(b)-holdings[a].shares*activePrice(a))
       .forEach(([rank,h])=>{
         const r = parseInt(rank);
-        const p = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers].find(x=>x.rank===r);
+        const p = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers, ...nhlPlayers].find(x=>x.rank===r);
         if (!p) return;
         const cur=activePrice(rank),avg=h.totalCost/h.shares;
         const pnlH=(cur-avg)*h.shares,ppH=h.totalCost>0?pnlH/h.totalCost*100:0;
@@ -12776,7 +13253,7 @@ function sharePortfolio() {
   const topHeld = Object.entries(holdings)
     .filter(([, h]) => h.shares > 0)
     .map(([r, h]) => {
-      const p = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers].find(x => x.rank == r);
+      const p = [...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers, ...nhlPlayers].find(x => x.rank == r);
       const cur = liveP[r];
       const avg = h.totalCost / h.shares;
       const holdPct = avg > 0 ? ((cur - avg) / avg * 100) : 0;
@@ -12835,7 +13312,7 @@ function copyShareText() {
   const name = currentUser?.displayName || 'Anonymous';
   const topHeld = Object.entries(holdings)
     .filter(([, h]) => h.shares > 0)
-    .map(([r, h]) => playerLastName([...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers].find(p => p.rank == r)?.name))
+    .map(([r, h]) => playerLastName([...nbaPlayers,...mlbPlayers,...golfPlayers,...nflPlayers, ...nhlPlayers].find(p => p.rank == r)?.name))
     .filter(Boolean).slice(0, 3).join(', ');
   const rankEl = document.getElementById('share-rank-num');
   const rankStr = rankEl?.textContent && rankEl.textContent !== '—' ? ' · ' + rankEl.textContent + ' globally' : '';
@@ -12985,7 +13462,7 @@ function loadLocalPortfolio() {
         const r = parseInt(rank);
         return; // ENGINE derives ALL prices; never restore stored prices
         if (liveP[r] !== undefined && price > 0) {
-          const allP = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers];
+          const allP = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers];
           const pl = allP.find(x => x.rank === r);
           if (pl && !_priceValid(pl, price)) {
             console.warn(`[portfolio] Clamped corrupt price for ${pl.name}: $${price.toFixed(2)}`);
@@ -13674,7 +14151,7 @@ async function smartTracker() {
           const _pgExisting = JSON.parse(localStorage.getItem('ax_pregame') || 'null');
           if (!_pgExisting || _pgExisting.date !== _pgNow) {
             const _pgSnap = {};
-            [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].forEach(p => { _pgSnap[String(p.rank)] = liveP[p.rank]; });
+            [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].forEach(p => { _pgSnap[String(p.rank)] = liveP[p.rank]; });
             const _pgObj = { date: _pgNow, prices: _pgSnap };
             localStorage.setItem('ax_pregame', JSON.stringify(_pgObj));
             if (db) window._fbSetDoc(window._fbDoc(db, 'config', 'pregame'), _pgObj, { merge: false }).catch(()=>{});
@@ -13733,6 +14210,13 @@ async function smartTracker() {
       trackerInterval = setInterval(smartTracker, 20 * 1000); setRefreshInterval(20000);
     }
   } catch(e) { console.log('NFL tracker error:', e.message); }
+  try {
+    const nhlResult = await nhlTick();
+    if (nhlResult?.live && _refreshSecs > 20) {
+      clearInterval(trackerInterval);
+      trackerInterval = setInterval(smartTracker, 20 * 1000); setRefreshInterval(20000);
+    }
+  } catch(e) { console.log('NHL tracker error:', e.message); }
 
   // Also run NBA tracker if on NBA tab
   if (currentLeague !== 'NBA') {
@@ -13791,7 +14275,7 @@ async function smartTracker() {
           const _pgExisting = JSON.parse(localStorage.getItem('ax_pregame') || 'null');
           if (!_pgExisting || _pgExisting.date !== _pgNow) {
             const _pgSnap = {};
-            [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].forEach(p => { _pgSnap[String(p.rank)] = liveP[p.rank]; });
+            [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].forEach(p => { _pgSnap[String(p.rank)] = liveP[p.rank]; });
             const _pgObj = { date: _pgNow, prices: _pgSnap };
             localStorage.setItem('ax_pregame', JSON.stringify(_pgObj));
             if (db) {
@@ -13948,7 +14432,7 @@ async function refreshAll() {
   try {
     const statSnap = JSON.parse(localStorage.getItem('ax_playerStats') || 'null');
     if (statSnap) {
-      [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].forEach(p => {
+      [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].forEach(p => {
         const s = statSnap[p.rank];
         if (s) {
           if (s.ppg > 0) p.ppg = s.ppg;
@@ -13963,7 +14447,7 @@ async function refreshAll() {
   {
     let backfilled = false;
     const twoDaysAgo = localDateStr(2);
-    [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].forEach(p => {
+    [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].forEach(p => {
       if (!closes[p.rank]) closes[p.rank] = {};
       // Remove stale closes older than 31 days - they cause wrong 7/30D anchors
       Object.keys(closes[p.rank]).forEach(ds => {
@@ -14047,7 +14531,7 @@ async function _backgroundSync() {
         const ydStr = localDateStr(1);
         const todayStr = localDateStr();
         if (pg?.prices && (pg.date === todayStr || pg.date === ydStr)) {
-          [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].forEach(p => {
+          [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].forEach(p => {
             const pgPrice = pg.prices[String(p.rank)] || pg.prices[p.rank];
             if (!(pgPrice > 0)) return;
             const c = closes[p.rank];
@@ -14067,7 +14551,7 @@ async function _backgroundSync() {
       } catch(e) {}
 
       // Re-seed priceHx from closes for 7/30D chart history
-      [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].forEach(p => {
+      [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].forEach(p => {
         const c = closes[p.rank] || {};
         Object.entries(c).forEach(([ds, price]) => {
           if (!price || price <= 0) return;
@@ -14696,7 +15180,7 @@ async function refreshProfileRanks(){
 //  PUBLIC PROFILE
 // ═══════════════════════════════════════════
 function _lookupPlayer(rank){
-  return [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].find(p => p.rank === +rank);
+  return [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].find(p => p.rank === +rank);
 }
 
 // Username + "member since" are always shown - both are already public elsewhere
@@ -15272,7 +15756,7 @@ function renderChat() {
     const ts = m.createdAt?.toMillis ? m.createdAt.toMillis() : (m.ts || 0);
     const tradeCard = (m.kind === 'trade' && m.trade) ? `
       <div class="chat-trade-card" onclick="goMarket(${m.trade.rank})">${(() => {
-        const tp = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers].find(x => x.rank === m.trade.rank);
+        const tp = [...nbaPlayers, ...mlbPlayers, ...golfPlayers, ...nflPlayers, ...nhlPlayers].find(x => x.rank === m.trade.rank);
         if (!tp) return '';
         const u = headshotUrl(tp.rank);
         return `<span class="pface" style="--team:${teamColor(tp) || '#3a3a40'}">${u ? `<img src="${u}" alt="" loading="lazy" onerror="this.remove()">` : ''}<span class="pinit">${tp.initials}</span></span>`;
@@ -15808,10 +16292,13 @@ async function loadSchedule() {
   }
 
   const isNFL = currentLeague === 'NFL';
+  const isNHL = currentLeague === 'NHL';
   const apiUrl = isMLB
     ? `https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard?dates=${dateStr}&limit=20`
     : isNFL
     ? `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${dateStr}&limit=20`
+    : isNHL
+    ? `https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard?dates=${dateStr}&limit=20`
     : `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateStr}&limit=20`;
 
   try {
@@ -15820,7 +16307,7 @@ async function loadSchedule() {
 
     if (!events.length) {
       el.innerHTML = emptyState(
-        `No ${isMLB?'MLB':isNFL?'NFL':'NBA'} games ${scheduleOffset===0?'today':'this day'}`,
+        `No ${isMLB?'MLB':isNFL?'NFL':isNHL?'NHL':'NBA'} games ${scheduleOffset===0?'today':'this day'}`,
         'Prices move when players play. Check the next day, or switch to a league that’s in season.',
         `<button class="es-btn" onclick="scheduleOffset++; loadSchedule()">Next day</button><button class="es-btn ghost" onclick="openLeagueDrawer()">Switch league</button>`);
       return;
@@ -15842,8 +16329,8 @@ async function loadSchedule() {
       const isLive = state === 'in';
       const isFinal = completed;
 
-      const homeAbbrev = TEAM_ABBREV[homeTeam] || homeTeam.split(' ').pop();
-      const awayAbbrev = TEAM_ABBREV[awayTeam] || awayTeam.split(' ').pop();
+      const homeAbbrev = TEAM_ABBREV[homeTeam] || home?.team?.abbreviation || homeTeam.split(' ').pop();
+      const awayAbbrev = TEAM_ABBREV[awayTeam] || away?.team?.abbreviation || awayTeam.split(' ').pop();
 
       // Match players to this game - normalize ESPN name to player data name
       let gamePlayers = [];
@@ -16895,7 +17382,7 @@ function setLbSortMode(mode, el) {
 async function renderGlobalLeaderboard() {
   const el = document.getElementById('lb-tab-content');
   if (!el) return;
-  const leagueName = currentLeague === 'MLB' ? 'MLB' : currentLeague === 'GOLF' ? 'Golf' : currentLeague === 'NFL' ? 'NFL' : 'NBA';
+  const leagueName = currentLeague === 'MLB' ? 'MLB' : currentLeague === 'GOLF' ? 'Golf' : currentLeague === 'NFL' ? 'NFL' : currentLeague === 'NHL' ? 'NHL' : 'NBA';
   el.innerHTML = `
     <div class="lb-toolbar">
       <div class="seg" role="group" aria-label="Rank by">
@@ -18019,6 +18506,41 @@ async function loadLast10(rank) {
     return;
   }
 
+  if (rank >= 4001) {
+    // NHL game log straight from ESPN's per-player game log (one request,
+    // newest first) - skaters and goalies have different columns.
+    const espnId = (typeof NHL_IDS !== 'undefined') ? NHL_IDS[rank] : null;
+    if (!espnId) { el.innerHTML = '<div class="g10-loading">No game log for this player yet.</div>'; return; }
+    try {
+      const d = await espnFetch(`https://site.web.api.espn.com/apis/common/v3/sports/hockey/nhl/athletes/${espnId}/gamelog`);
+      const labels = (d.labels || []).map(l => (l || '').toUpperCase());
+      const at = (stats, k) => { const i = labels.indexOf(k); return i < 0 ? null : stats[i]; };
+      const n = v => parseFloat(String(v ?? '0').replace(/[^0-9.\-]/g, '')) || 0;
+      const reg = (d.seasonTypes || []).find(s => /Regular/i.test(s.displayName || '')) || (d.seasonTypes || [])[0];
+      const evs = (reg?.categories || []).flatMap(c => c.events || []);
+      const games = [];
+      for (const e of evs) {
+        const m = d.events?.[e.eventId] || {};
+        const s = e.stats || [];
+        const base = { date: (m.gameDate ? new Date(m.gameDate).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }) : ''),
+          opp: (m.atVs === '@' ? '@' : '') + (m.opponent?.abbreviation || '?'), result: `${m.gameResult || ''} ${m.score || ''}`.trim(), nhl: true };
+        if (p.role === 'GK') {
+          if (!n(at(s, 'GS')) && !n(at(s, 'SA'))) continue;
+          games.push({ ...base, goalie: true, sa: n(at(s, 'SA')), sv: n(at(s, 'SV')), ga: n(at(s, 'GA')), svpct: n(at(s, 'SV%')), toi: at(s, 'TOI/G') || '' });
+        } else {
+          games.push({ ...base, g: n(at(s, 'G')), a: n(at(s, 'A')), pts: n(at(s, 'PTS')), pm: n(at(s, '+/-')), sog: n(at(s, 'S')), toi: at(s, 'TOI/G') || '' });
+        }
+        if (games.length >= 10) break;
+      }
+      if (!games.length) { el.innerHTML = '<div class="g10-loading">No games yet this season.</div>'; return; }
+      g10Cache[rank] = games;
+      if (selRank === rank) renderG10(rank, games);
+    } catch(e) {
+      el.innerHTML = '<div class="g10-loading">Couldn\'t load game log.</div>';
+    }
+    return;
+  }
+
   if (rank >= 3001) {
     // NFL game log. Games cluster Thu/Sun/Mon (not daily like NBA/MLB), so
     // getting to 10 games can mean spanning most of a season - scan a much
@@ -18241,6 +18763,38 @@ function renderG10(rank, games) {
         <th>H/AB</th><th>AVG</th><th>HR</th><th>RBI</th><th>BB</th><th>K</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>`;
+    return;
+  }
+
+  if (games[0]?.nhl) {
+    const wl = g => (g.result || '').startsWith('W') ? 'g10-great' : (g.result || '').startsWith('L') ? 'g10-bad' : '';
+    const bars = (vals, ref) => {
+      const max = Math.max(...vals, 1);
+      return vals.map(v => {
+        const h = Math.max(4, Math.round((v / max) * 28));
+        const col = v >= ref ? '#12d47e' : v >= ref * 0.6 ? '#6b7684' : '#f5445f';
+        return `<div class="g10-bar" style="height:${h}px;background:${col};flex:1;"></div>`;
+      }).join('');
+    };
+    if (games[0].goalie) {
+      const rows = games.map(g => `<tr><td>${_g10Date(g.date)}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wl(g)}">${g.result}</td>
+        <td style="text-align:right">${g.sv}</td><td style="text-align:right">${g.sa}</td>
+        <td style="text-align:right;color:${g.ga<=2?'var(--green)':g.ga>=4?'var(--red)':'inherit'}">${g.ga}</td>
+        <td style="text-align:right">${g.svpct ? g.svpct.toFixed(3).replace(/^0/,'') : '—'}</td></tr>`).join('');
+      el.innerHTML = `<div class="g10-cap">Saves in the last ${games.length} ${games.length===1?'start':'starts'}</div>
+        <div class="g10-sparkline">${bars(games.map(g => g.sv), 25)}</div>
+        <table class="g10-table"><thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
+        <th>SV</th><th>SA</th><th>GA</th><th>SV%</th></tr></thead><tbody>${rows}</tbody></table>`;
+      return;
+    }
+    const rows = games.map(g => `<tr><td>${_g10Date(g.date)}</td><td style="color:var(--fg)">${g.opp}</td><td class="${wl(g)}">${g.result}</td>
+      <td style="text-align:right;color:${g.g>0?'var(--green)':'inherit'}">${g.g}</td><td style="text-align:right">${g.a}</td>
+      <td style="text-align:right">${g.pts}</td><td style="text-align:right">${g.sog}</td>
+      <td style="text-align:right;color:${g.pm>0?'var(--green)':g.pm<0?'var(--red)':'var(--muted)'}">${g.pm>0?'+':''}${g.pm}</td></tr>`).join('');
+    el.innerHTML = `<div class="g10-cap">Points in the last ${games.length} ${games.length===1?'game':'games'}</div>
+      <div class="g10-sparkline">${bars(games.map(g => g.pts), 1)}</div>
+      <table class="g10-table"><thead><tr><th>Date</th><th style="text-align:left">Opp</th><th style="text-align:left">W/L</th>
+      <th>G</th><th>A</th><th>PTS</th><th>SOG</th><th>+/-</th></tr></thead><tbody>${rows}</tbody></table>`;
     return;
   }
 
@@ -18915,12 +19469,11 @@ window.addEventListener('DOMContentLoaded', function() {
       <div class="lo-sub">408 players · Season in progress</div>
     </div>
   </div>
-  <div class="drawer-section-label" style="margin-top:8px">Coming Soon</div>
-  <div class="league-option" style="opacity:.45;cursor:default;">
+  <div class="league-option" data-league="NHL" onclick="switchLeague(&#39;NHL&#39;)">
     <div class="lo-icon"><img src="assets/leagues/NHL.png" alt="NHL" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="lo-fallback">NHL</span></div>
     <div class="lo-info">
       <div class="lo-name">NHL</div>
-      <div class="lo-sub">Coming soon</div>
+      <div class="lo-sub">260 players · In season</div>
     </div>
   </div>
 </div>

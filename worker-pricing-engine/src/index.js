@@ -2,9 +2,10 @@ import nbaRaw from '../data/nba-raw.json' assert { type: 'json' };
 import mlbRaw from '../data/mlb-raw.json' assert { type: 'json' };
 import golfRaw from '../data/golf-raw.json' assert { type: 'json' };
 import nflRaw from '../data/nfl-raw.json' assert { type: 'json' };
+import nhlRaw from '../data/nhl-raw.json' assert { type: 'json' };
 
 import {
-  statPriceFor, nbaPerf, mlbHitterPerf, mlbPitcherPerf, nflPerf,
+  statPriceFor, nbaPerf, mlbHitterPerf, mlbPitcherPerf, nflPerf, nhlPerf,
   golfPerf, priceFromPerf, finalize,
 } from './engine.js';
 import * as espnNba from './espn.js';
@@ -12,6 +13,7 @@ import { fetchSeasonAverages, blendAverage, espnSeasonLabel } from './espn-stats
 import * as mlb from './mlb.js';
 import * as golf from './golf.js';
 import * as nfl from './nfl.js';
+import * as nhl from './nhl.js';
 import {
   firestoreBatchGetDocs, firestoreBatchWriteDocs, firestoreListCollection, firestorePatchDoc,
   firestoreSetDeepFields, firestoreGetDoc,
@@ -128,6 +130,7 @@ for (const p of nbaRaw) rankToLeague[p.rank] = 'nba';
 for (const p of mlbRaw) rankToLeague[p.rank] = 'mlb';
 for (const p of golfRaw) rankToLeague[p.rank] = 'golf';
 for (const p of nflRaw) rankToLeague[p.rank] = 'nfl';
+for (const p of nhlRaw) rankToLeague[p.rank] = 'nhl';
 
 function defaultState(league, player) {
   return {
@@ -653,10 +656,97 @@ async function tickNflDay(env, today, carryover) {
   return { league: 'nfl', games: relevant.length, processed: toProcess.length, finalized, movers: movers.length, notified, lastNightWritten };
 }
 
+// ── NHL ── same shape as tickNfl: per-player finals, closes mirrored into
+// config/prices, each finished game's stat line written to config/lastNight
+// (the app's "Last game" tiles), and before 6am ET yesterday's late games
+// (West Coast puck drops end after midnight) are swept too.
+async function tickNhl(env, today) {
+  const today_ = await tickNhlDay(env, today, false);
+  if (easternHour() >= 6) return today_;
+  const carryover = await tickNhlDay(env, easternDateStr(1), true);
+  return { ...today_, carryover };
+}
+
+async function tickNhlDay(env, today, carryover) {
+  const sb = await nhl.fetchScoreboard(today.replaceAll('-', ''));
+  const events = sb.events || [];
+  const finals = events.filter(e => e.status?.type?.completed);
+  const live = carryover ? [] : events.filter(e => e.status?.type?.state === 'in');
+  const relevant = [...finals, ...live];
+  if (!relevant.length) return { league: 'nhl', date: today, games: 0, processed: 0, finalized: 0 };
+
+  const byName = {}, byRank = {};
+  for (const p of nhlRaw) { byName[nhl.normalizeName(p.name)] = p; byRank[p.rank] = p; }
+  const lineByRank = {}, fracByRank = {}, finalByRank = {};
+  for (const ev of relevant) {
+    const frac = nhl.gameFrac(ev.status);
+    const isFinal = !!ev.status?.type?.completed;
+    const lines = nhl.extractNhlLines(await nhl.fetchSummary(ev.id));
+    for (const [name, line] of Object.entries(lines)) {
+      const p = byName[name];
+      if (!p) continue;
+      lineByRank[p.rank] = line; fracByRank[p.rank] = frac; finalByRank[p.rank] = isFinal;
+    }
+  }
+  let toProcess = Object.keys(lineByRank).map(Number).map(r => byRank[r]);
+  const clientCloses = (await firestoreGetDoc(env, 'config/prices').catch(() => null))?.closes || {};
+  if (carryover) toProcess = toProcess.filter(p => finalByRank[p.rank] && clientCloses[String(p.rank)]?.[today] === undefined);
+  if (!toProcess.length) return { league: 'nhl', date: today, games: relevant.length, processed: 0, finalized: 0 };
+
+  const states = await loadStatesBatch(env, 'nhl', toProcess);
+  const updates = [], movers = [], configWrites = [];
+  const now = Date.now();
+  let finalized = 0;
+  for (const player of toProcess) {
+    const st = states[player.rank];
+    // Roster is the source of truth for scale, same as tickNfl (see there).
+    const statPrice = statPriceFor('nhl', player);
+    const p = { rank: player.rank, tier: player.tier, fpts: player.fpts, statPrice };
+    const line = lineByRank[player.rank];
+    const perf = nhlPerf(p, { fpts: nhl.fpts(line), gameFrac: fracByRank[player.rank] });
+    const { value, newBaseRecord } = priceFromPerf(p, perf, today, st.closes, st.base);
+    const fields = { base: newBaseRecord, tier: player.tier, statPrice, fpts: player.fpts };
+    if (finalByRank[player.rank]) {
+      const closeVal = finalize(value, today, st.closes);
+      fields.closes = { ...st.closes, [today]: closeVal };
+      finalized++;
+      const mirrored = mirrorClose(player.rank, perf, closeVal, statPrice, today, clientCloses);
+      configWrites.push({ segments: ['closes', String(player.rank), today], value: mirrored });
+    }
+    const { events: mv, fields: moveFields } = detectMovers({ rank: player.rank, name: player.name, perf, value, st, dateKey: today, now });
+    Object.assign(fields, moveFields);
+    movers.push(...mv);
+    updates.push({ path: docPath('nhl', player.rank), fields });
+  }
+  await firestoreBatchWriteDocs(env, updates);
+  if (configWrites.length) {
+    try { await firestoreSetDeepFields(env, 'config/prices', configWrites); }
+    catch (e) { console.error('config/prices NHL close mirror failed:', e.message); }
+  }
+  let lastNightWritten = 0;
+  try {
+    const stored = (await firestoreGetDoc(env, 'config/lastNight').catch(() => null))?.data || {};
+    const lnWrites = [];
+    for (const player of toProcess) {
+      if (!finalByRank[player.rank]) continue;
+      const cur = stored[String(player.rank)];
+      if (cur && (cur.date > today || (cur.date === today && cur.live === false))) continue;
+      lnWrites.push({ segments: ['data', String(player.rank)], value: nhl.lastNightEntry(lineByRank[player.rank], today) });
+    }
+    if (lnWrites.length) {
+      lnWrites.push({ segments: ['updatedAt'], value: Date.now() });
+      await firestoreSetDeepFields(env, 'config/lastNight', lnWrites);
+      lastNightWritten = lnWrites.length - 1;
+    }
+  } catch (e) { console.error('config/lastNight NHL write failed:', e.message); }
+  const notified = await announceMovers(env, movers);
+  return { league: 'nhl', date: today, games: relevant.length, processed: toProcess.length, finalized, movers: movers.length, notified, lastNightWritten };
+}
+
 export async function runGameDayTick(env) {
   const today = easternDateStr(0);
   const results = [];
-  for (const fn of [tickNba, tickMlb, tickGolf, tickNfl]) {
+  for (const fn of [tickNba, tickMlb, tickGolf, tickNfl, tickNhl]) {
     try {
       results.push(await fn(env, today));
     } catch (e) {

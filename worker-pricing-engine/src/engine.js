@@ -68,7 +68,17 @@ export function nflStatPrice(p) {
   return Math.max(0.01, raw * (MULT[p.tier] || 1) * PRICE_SCALE * NFL_SCALE);
 }
 
+// NHL: expected fantasy points per game (fpts, from data/nhl-raw.json -
+// skater G*3 + A*2 + SOG*0.5, goalie W*3 + SV*0.2 - GA + SO*2) on the same
+// tier multipliers as NFL. NHL_SCALE puts a tier-S star in the same range
+// as every other league's (McDavid ~ $750). Mirrored in index.html.
+const NHL_SCALE = 85;
+export function nhlStatPrice(p) {
+  return Math.max(0.01, (p.fpts || 1) * (MULT[p.tier] || 1) * PRICE_SCALE * NHL_SCALE);
+}
+
 export function statPriceFor(league, p) {
+  if (league === 'nhl') return nhlStatPrice(p);
   if (league === 'nba') return nbaStatPrice(p);
   if (league === 'mlb') return mlbStatPrice(p);
   if (league === 'golf') return golfStatPrice(p);
@@ -219,6 +229,19 @@ export function nflPerf(p, stat) {
   // TD down to ~1-2% a third of the way into the game. See index.html's
   // nflPerf for the live-confirmed cases (Hutchinson, Josh Allen, Derrick
   // Henry/Tank Bigsby) this was tuned against.
+  rel *= frac;
+  return bound(p, rel);
+}
+
+// NHL: one game's fantasy points against the player's expected per-game
+// rate, paced by game time like nflPerf (a goal in the first period is a
+// strong pace, not yet a great night). Mirrors index.html's nhlPerf.
+export function nhlPerf(p, stat) {
+  if (!stat) return 0;
+  const base = p.fpts || 2;
+  const got = stat.fpts != null ? stat.fpts : base;
+  const frac = Math.min(1, Math.max(0.15, stat.gameFrac != null ? stat.gameFrac : 1));
+  let rel = (got / frac - base) / Math.max(base, 2);
   rel *= frac;
   return bound(p, rel);
 }
