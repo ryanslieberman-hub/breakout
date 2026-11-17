@@ -75,8 +75,11 @@ for (const p of raw) {
   }
   if (!Object.keys(closes).length) continue;
   summary.push({ name: p.name, games: Object.keys(closes).length, from: statPrice, to: prior });
-  for (const [d, v] of Object.entries(closes)) cfgWrites.push({ segments: ['closes', String(p.rank), d], value: v });
-  cfgWrites.push({ segments: ['liveP', String(p.rank)], value: prior });
+  // Skip fields already holding this exact value, so a re-run after an
+  // interrupted write only sends what's missing.
+  const have = cfg.closes?.[String(p.rank)] || {};
+  for (const [d, v] of Object.entries(closes)) if (have[d] !== v) cfgWrites.push({ segments: ['closes', String(p.rank), d], value: v });
+  if (cfg.liveP?.[String(p.rank)] !== prior) cfgWrites.push({ segments: ['liveP', String(p.rank)], value: prior });
   engineWrites.push({ path: `priceEngine/nhl_${p.rank}`, fields: { closes, base: null, tier: p.tier, statPrice, fpts: p.fpts } });
 }
 summary.sort((a, b) => (b.to / b.from) - (a.to / a.from));

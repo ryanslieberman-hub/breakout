@@ -2454,6 +2454,45 @@ button.pl-row:active{background:rgba(255,255,255,.05);}
 
 /* Small brand mark everywhere picks up the new icon's weight */
 .brand-mark path{stroke-width:2.8;}
+
+/* ════════════════════════════════════════════════════════════════════════
+   MARKET PULSE, ROW SPARKLINES, APP FEEL
+   Breadth bar above the board, a 7-session trend in every row, press
+   feedback, and install-mode chrome (standalone display only).
+   ════════════════════════════════════════════════════════════════════════ */
+.pulse{margin:14px 16px 4px;padding:14px 16px 12px;border-radius:16px;background:linear-gradient(135deg,var(--card2),var(--card));box-shadow:inset 0 0 0 1px var(--hairline);}
+.pulse-top{display:flex;align-items:baseline;justify-content:space-between;}
+.pulse-name{font-family:var(--font-sport);font-weight:800;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+.pulse-avg{font-family:var(--font-sport);font-weight:800;font-size:30px;line-height:1;font-variant-numeric:tabular-nums;}
+.pulse-avg.up{color:var(--green);} .pulse-avg.down{color:var(--red);}
+.pulse-bar{display:flex;gap:3px;height:6px;margin:10px 0 8px;border-radius:3px;overflow:hidden;}
+.pulse-bar i{display:block;border-radius:3px;transform-origin:left;animation:pulse-in .7s cubic-bezier(.2,.8,.2,1) both;}
+.pulse-bar .u{background:var(--green);} .pulse-bar .d{background:var(--red);animation-delay:.08s;}
+.pulse-foot{display:flex;justify-content:space-between;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;}
+.pulse-foot .up{color:var(--green);} .pulse-foot .down{color:var(--red);}
+@keyframes pulse-in{from{transform:scaleX(0);}to{transform:scaleX(1);}}
+
+.pspark{width:30px;height:16px;flex-shrink:0;overflow:visible;margin:0 2px 0 -2px;}
+@media (max-width:420px){.prow .prk{min-width:14px;width:14px;text-align:left;}.prow{gap:6px;}}
+.pspark polyline{fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;opacity:.9;}
+.pspark.up polyline{stroke:var(--green);} .pspark.up circle{fill:var(--green);}
+.pspark.down polyline{stroke:var(--red);} .pspark.down circle{fill:var(--red);}
+.pspark.flat polyline{stroke:var(--muted);} .pspark.flat circle{fill:var(--muted);}
+@media (max-width:359px){.pspark{display:none;}}
+
+/* Press feedback: rows and controls give a little under the thumb */
+@media (hover:none){
+  .prow,.mvc,.pod,.nav-tab,.tf{transition:transform .12s cubic-bezier(.2,.8,.2,1),background .12s;}
+  .prow:active,.mvc:active,.pod:active{transform:scale(.985);}
+  .nav-tab:active,.tf:active{transform:scale(.94);}
+}
+
+/* Installed (standalone) mode: it is an app now, not a page in a browser */
+@media (display-mode:standalone){
+  html{-webkit-user-select:none;user-select:none;}
+  input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;}
+  .net-banner{top:calc(env(safe-area-inset-top) + 8px);}
+}
 </style>
 </head>
 <body>
@@ -6924,7 +6963,9 @@ function todayDayNum(){ return dateToDayNum(new Date()); }
 // Always use local date strings - toISOString() returns UTC and shifts date after ~7pm EST
 // NFL plays once a week, so the 31-35 day close window that suits daily leagues shows only ~4 games
 // (CeeDee Lamb 2026-10-29: 7 closes in Firestore, 4 visible). Keep the whole season for NFL.
-function closeKeepDays(p, daily){ return p && p.league==='NFL' ? 200 : daily; }
+// NFL and NHL keep the whole season client-side (NHL's history is backfilled
+// from opening night); the daily leagues keep the usual window.
+function closeKeepDays(p, daily){ return p && (p.league==='NFL' || p.league==='NHL') ? 200 : daily; }
 function localDateStr(offsetDays=0){
   const d = new Date(); d.setDate(d.getDate() - offsetDays);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -9797,6 +9838,41 @@ function _moverCardsHtml(){
     <div class="mvc-row">${cards}</div></div>`;
 }
 
+// ── Row sparkline + market pulse ──────────────────────────────────────────
+// A 7-session trend drawn from the same `closes` history the chart uses, ended
+// on the live price so the line and the number beside it never disagree.
+function sparkSvg(rank, price){
+  const c = closes[rank] || {};
+  const pts = Object.keys(c).filter(d => c[d] > 0).sort().slice(-7).map(d => c[d]);
+  if (price > 0) pts.push(price);
+  if (pts.length < 3) return '';
+  const lo = Math.min(...pts), hi = Math.max(...pts), span = (hi - lo) || 1;
+  const W = 44, H = 18, step = W / (pts.length - 1);
+  const xy = pts.map((v, i) => [(i * step).toFixed(1), (H - 2 - ((v - lo) / span) * (H - 4)).toFixed(1)]);
+  const dir = pts[pts.length - 1] > pts[0] ? 'up' : pts[pts.length - 1] < pts[0] ? 'down' : 'flat';
+  const last = xy[xy.length - 1];
+  return `<svg class="pspark ${dir}" viewBox="0 0 ${W} ${H}" aria-hidden="true"><polyline points="${xy.map(q => q.join(',')).join(' ')}"/><circle cx="${last[0]}" cy="${last[1]}" r="1.8"/></svg>`;
+}
+
+// "How is the whole market doing today": breadth (advancers vs decliners) and
+// the average move, as one bar. Reads like an index ticker; costs one pass.
+function _pulseHtml(){
+  let up = 0, dn = 0, sum = 0, n = 0;
+  players.forEach(p => {
+    const pc = getTodayPct(p.rank);
+    if (isFlatPct(pc)) return;
+    n++; sum += pc;
+    if (pc > 0) up++; else dn++;
+  });
+  if (n < 5) return '';
+  const avg = sum / n, upPct = Math.round(up / n * 100);
+  return `<div class="pulse" role="img" aria-label="${up} players up, ${dn} down, average ${avg >= 0 ? 'gain' : 'loss'} ${Math.abs(avg).toFixed(1)} percent">
+    <div class="pulse-top"><span class="pulse-name">${currentLeague} market</span><span class="pulse-avg ${avg >= 0 ? 'up' : 'down'}">${fmtP(avg)}</span></div>
+    <div class="pulse-bar"><i class="u" style="width:${upPct}%"></i><i class="d" style="width:${100 - upPct}%"></i></div>
+    <div class="pulse-foot"><span class="up">${up} up</span><span class="down">${dn} down</span></div>
+  </div>`;
+}
+
 function renderList(){
   const el=document.getElementById('plist');
   const filtered=players.filter(p=>{
@@ -9814,7 +9890,7 @@ function renderList(){
   // the whole market - not while searching, filtering or on the watchlist.
   const _browsing = !searchQ && posF==='all' && tierF==='all' && !watchlistOnly;
   const _head = _browsing
-    ? _moverCardsHtml() + `<div class="plist-head"><span class="plist-title">All players</span><span class="plist-sub">By price</span></div>`
+    ? _pulseHtml() + _moverCardsHtml() + `<div class="plist-head"><span class="plist-title">All players</span><span class="plist-sub">By price</span></div>`
     : '';
   el.innerHTML=_head+sorted.map((p,_i)=>{
     const price=liveP[p.rank];
@@ -9867,6 +9943,7 @@ function renderList(){
         <div class="pname">${p.name}${isInj?' <span class="inj-badge">OUT</span>':''}${isQtm?' <span class="q-badge">Q</span>':''}${isHot?' <span class="hot-tag up">HOT</span>':''}${isCold?' <span class="hot-tag down">COLD</span>':''}</div>
         <div class="psub">${p.team} · ${p.pos}${owned?' · <span style="color:var(--green)">'+fmt(ownVal)+'</span>':''}</div>
       </div>
+      ${sparkSvg(p.rank, price)}
       <div class="pright">
         <div class="pprice${tickCls}" style="${isInj?'color:var(--red)':''}">${fmt(price)}</div>
         <div class="pchg ${pctDir(pct)}">${fmtP(pct)}</div>
@@ -11448,7 +11525,9 @@ function updateMovers(){
         const isGolf = p.rank >= 2001 && p.rank < 3001;
         // NFL plays once a week, so a player's prior close is normally 7 days back
         // (Sun->Sun); a 2-day guard rejected every NFL player after Week 1.
-        const maxGap = currentLeague === 'NFL' ? 8 : isGolf ? 5 : 2;
+        // NHL teams routinely go 2-4 days between games, so a 2-day guard
+        // dropped most of a night's movers.
+        const maxGap = currentLeague === 'NFL' ? 8 : (isGolf || currentLeague === 'NHL') ? 5 : 2;
         const dayGap = Math.round((Date.parse(slateDate) - Date.parse(prevDate)) / 86400000);
         if (dayGap > maxGap) return null;
         const pct = (c[slateDate] - prevClose) / prevClose * 100;
@@ -18982,6 +19061,13 @@ if ('serviceWorker' in navigator) {
     .then(reg => { window._swReg = reg; console.log('[push] service worker registered'); })
     .catch(err => console.warn('[push] SW register failed:', err.message));
 }
+
+// ── Haptics (Android/Chrome only; iOS ignores vibrate) ───────────────────
+// A 6ms tick on taps of real controls. Delegated, so it covers every render.
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch' || !navigator.vibrate) return;
+  if (e.target.closest('.nav-tab,.tf,.prow,.mvc,.star-btn,.pod')) navigator.vibrate(6);
+}, { passive: true });
 
 // ── PWA Install Prompt ────────────────────────────────────────────────────────
 let _deferredInstallPrompt = null;
