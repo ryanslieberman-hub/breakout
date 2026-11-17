@@ -2270,6 +2270,8 @@ button.pl-row:active{background:rgba(255,255,255,.05);}
 .mvc img + .mvc-init,.pface img + .pinit{display:none;}
 .mvc-name{position:absolute;left:10px;top:9px;right:10px;font-family:var(--font-sport);font-weight:800;font-size:20px;line-height:.95;
   text-transform:uppercase;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.4);overflow-wrap:anywhere;}
+.mvc-team{display:block;margin-top:5px;font-family:var(--font-body);font-size:11px;font-weight:600;line-height:1.2;
+  text-transform:none;color:rgba(255,255,255,.78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .mvc-foot{position:absolute;left:10px;right:10px;bottom:9px;display:flex;align-items:flex-end;justify-content:space-between;gap:4px;}
 .mvc-price{font-family:var(--font-sport);font-weight:700;font-size:20px;line-height:1;color:#fff;}
 .mvc-pct{font-size:12px;font-weight:700;line-height:1;padding:4px 6px;border-radius:6px;background:rgba(0,0,0,.55);color:rgba(255,255,255,.85);white-space:nowrap;}
@@ -3035,7 +3037,7 @@ const RAW=[
   {rank:4,  name:'Victor Wembanyama',       team:'San Antonio Spurs',     pos:'C',  tier:'S', ppg:24.3,rpg:11.1, apg:2.9},
   {rank:5,  name:'Anthony Edwards',         team:'Minnesota Timberwolves',    pos:'SG', tier:'S', ppg:29.5,rpg:5.1, apg:3.7},
   {rank:6,  name:'Luka Doncic',             team:'LA Lakers',             pos:'PG', tier:'S', ppg:33.4,rpg:7.9, apg:8.4},
-  {rank:7,  name:'LeBron James',            team:'LA Lakers',             pos:'SF', tier:'S', ppg:21.4,rpg:5.6, apg:7.0},
+  {rank:7,  name:'LeBron James',            team:'Philadelphia 76ers',             pos:'SF', tier:'S', ppg:21.4,rpg:5.6, apg:7.0},
   {rank:8,  name:'Jayson Tatum',            team:'Boston Celtics',        pos:'SF', tier:'S', ppg:25.8,rpg:8.5, apg:5.8},
   {rank:9,  name:'Stephen Curry',           team:'Golden State Warriors', pos:'PG', tier:'S', ppg:27.2,rpg:3.5, apg:4.8},
   {rank:10, name:'Kevin Durant',            team:'Houston Rockets',       pos:'SF', tier:'S', ppg:25.7,rpg:5.5, apg:4.5},
@@ -3063,9 +3065,9 @@ const RAW=[
   {rank:30, name:'Evan Mobley',             team:'Cleveland Cavaliers',        pos:'PF', tier:'B', ppg:18.3,rpg:8.9, apg:3.6},
   {rank:31, name:'Chet Holmgren',           team:'OKC Thunder',           pos:'C',  tier:'B', ppg:17.2,rpg:9.0, apg:1.7},
   {rank:32, name:'Jaren Jackson Jr.',       team:'Utah Jazz',     pos:'PF', tier:'B', ppg:19.2,rpg:5.8, apg:1.9},
-  {rank:33, name:'DeMar DeRozan',           team:'Sacramento Kings',      pos:'SF', tier:'B', ppg:18.5,rpg:3.0, apg:4.0},
+  {rank:33, name:'DeMar DeRozan',           team:'Denver Nuggets',      pos:'SF', tier:'B', ppg:18.5,rpg:3.0, apg:4.0},
   {rank:34, name:'Zach LaVine',             team:'Sacramento Kings',         pos:'SG', tier:'B', ppg:19.2,rpg:2.8, apg:2.3},
-  {rank:35, name:'Brandon Ingram',          team:'Toronto Raptors',  pos:'SF', tier:'B', ppg:21.8,rpg:5.6, apg:3.7},
+  {rank:35, name:'Brandon Ingram',          team:'LA Clippers',  pos:'SF', tier:'B', ppg:21.8,rpg:5.6, apg:3.7},
   {rank:36, name:'LaMelo Ball',             team:'Minnesota Timberwolves',     pos:'PG', tier:'B', ppg:19.5,rpg:4.9, apg:7.1},
   {rank:37, name:'Jamal Murray',          team:'Denver Nuggets',        pos:'PG', tier:'B', ppg:25.9,rpg:4.4, apg:7.3},
   {rank:38, name:'Mikal Bridges',           team:'New York Knicks',       pos:'SF', tier:'B', ppg:14.7,rpg:4.1, apg:3.8},
@@ -3110,12 +3112,12 @@ const RAW=[
   // ── TIER D - Deep cuts, rookies, high-upside flyers ($2-6) ───────────────
   {rank:76, name:'Scoot Henderson',         team:'Portland Trail Blazers',pos:'PG', tier:'D', ppg:13.5,rpg:3.2, apg:5.8},
   {rank:77, name:'Cason Wallace',           team:'OKC Thunder',           pos:'SG', tier:'D', ppg:8.6,rpg:3.1, apg:2.7},
-  {rank:78, name:'Gradey Dick',             team:'Toronto Raptors',       pos:'SG', tier:'D', ppg:11.5,rpg:2.8, apg:1.8},
+  {rank:78, name:'Gradey Dick',             team:'LA Clippers',       pos:'SG', tier:'D', ppg:11.5,rpg:2.8, apg:1.8},
   {rank:79, name:'Jaime Jaquez Jr.',        team:'Milwaukee Bucks',            pos:'SF', tier:'D', ppg:15.0,rpg:5.1, apg:4.8},
   {rank:80, name:'Brandin Podziemski',      team:'Golden State Warriors', pos:'SG', tier:'D', ppg:13.0,rpg:5.2, apg:3.8},
   {rank:81, name:'Dereck Lively II',        team:'Dallas Mavericks',      pos:'C',  tier:'D', ppg:9.5, rpg:7.0, apg:1.5},
   {rank:82, name:'Jared McCain',            team:'OKC Thunder',    pos:'SG', tier:'D', ppg:7.3, rpg:2.2, apg:1.6},
-  {rank:83, name:'Jordan Hawkins',          team:'New Orleans Pelicans',  pos:'SG', tier:'D', ppg:9.5,rpg:2.5, apg:1.5},
+  {rank:83, name:'Jordan Hawkins',          team:'Chicago Bulls',  pos:'SG', tier:'D', ppg:9.5,rpg:2.5, apg:1.5},
   {rank:84, name:'Dariq Whitehead',         team:'Brooklyn Nets',         pos:'SG', tier:'D', ppg:7.5, rpg:2.8, apg:1.8},
   {rank:85, name:'Leonard Miller',          team:'Chicago Bulls',    pos:'SF', tier:'D', ppg:8.0, rpg:4.0, apg:1.5},
   {rank:86, name:'Jalen Hood-Schifino',     team:'Philadelphia 76ers',    pos:'PG', tier:'D', ppg:5.5, rpg:2.0, apg:2.5},
@@ -3123,15 +3125,15 @@ const RAW=[
   {rank:88, name:'Bilal Coulibaly',         team:'Washington Wizards',    pos:'SF', tier:'D', ppg:11.0,rpg:4.5, apg:2.5},
   {rank:89, name:'Jarace Walker',           team:'Indiana Pacers',        pos:'PF', tier:'D', ppg:8.5, rpg:4.5, apg:2.0},
   {rank:90, name:'Kris Murray',             team:'Memphis Grizzlies',pos:'SF', tier:'D', ppg:9.5, rpg:4.0, apg:1.5},
-  {rank:91, name:'Cam Whitmore',            team:'Washington Wizards',       pos:'SF', tier:'D', ppg:12.5,rpg:4.2, apg:1.5},
-  {rank:92, name:'Jett Howard',             team:'Detroit Pistons',       pos:'SG', tier:'D', ppg:9.0, rpg:3.0, apg:1.5},
+  {rank:91, name:'Cam Whitmore',            team:'Denver Nuggets',       pos:'SF', tier:'D', ppg:12.5,rpg:4.2, apg:1.5},
+  {rank:92, name:'Jett Howard',             team:'Dallas Mavericks',       pos:'SG', tier:'D', ppg:9.0, rpg:3.0, apg:1.5},
   {rank:93, name:'Jordan Walsh',            team:'Boston Celtics',        pos:'SF', tier:'D', ppg:5.5, rpg:3.2, apg:1.0},
   {rank:94, name:'Ben Sheppard',            team:'Indiana Pacers',        pos:'SG', tier:'D', ppg:9.0, rpg:2.8, apg:2.2},
   {rank:95, name:'Terquavion Smith',        team:'Cleveland Cavs',        pos:'PG', tier:'D', ppg:8.5, rpg:2.0, apg:2.5},
   {rank:96, name:'Kyle Filipowski',         team:'Utah Jazz',             pos:'C',  tier:'D', ppg:10.6, rpg:6.9, apg:2.4},
   {rank:97, name:'Tristan da Silva',        team:'Orlando Magic',         pos:'SF', tier:'D', ppg:9.0, rpg:3.5, apg:1.8},
   {rank:98, name:'Jaylen Wells',            team:'Memphis Grizzlies',     pos:'SG', tier:'D', ppg:12.7,rpg:3.3, apg:1.6},
-  {rank:99, name:'Zaccharie Risacher',      team:'Atlanta Hawks',         pos:'SF', tier:'D', ppg:13.3,rpg:6.2, apg:2.8},
+  {rank:99, name:'Zaccharie Risacher',      team:'Dallas Mavericks',         pos:'SF', tier:'D', ppg:13.3,rpg:6.2, apg:2.8},
   {rank:100,name:'Matas Buzelis',           team:'Chicago Bulls',         pos:'SF', tier:'D', ppg:16.1, rpg:5.6, apg:2.0},
   {rank:101, name:'Anthony Davis',             team:'Washington Wizards',    pos:'C',  tier:'A', ppg:20.4,rpg:11.1,apg:2.8},
   {rank:102, name:'Trey Murphy III',           team:'New Orleans Pelicans',  pos:'SF', tier:'B', ppg:22.0,rpg:5.7, apg:3.9},
@@ -3149,20 +3151,20 @@ const RAW=[
   {rank:114, name:'Tre Jones',                 team:'Chicago Bulls',     pos:'PG', tier:'C', ppg:12.9,rpg:2.9, apg:5.4},
   {rank:115, name:'Jarrett Allen',             team:'Cleveland Cavaliers',        pos:'C',  tier:'C', ppg:15.3,rpg:8.5,apg:1.9},
   {rank:116, name:'Isaiah Hartenstein',        team:'OKC Thunder',           pos:'C',  tier:'C', ppg:9.7,rpg:9.2,apg:3.6},
-  {rank:117, name:'Max Strus',                 team:'Cleveland Cavaliers',        pos:'SG', tier:'C', ppg:13.0,rpg:4.5, apg:3.5},
+  {rank:117, name:'Max Strus',                 team:'LA Clippers',        pos:'SG', tier:'C', ppg:13.0,rpg:4.5, apg:3.5},
   {rank:118, name:'Jusuf Nurkic',              team:'Utah Jazz',          pos:'C',  tier:'C', ppg:14.5,rpg:10.5,apg:3.5},
-  {rank:119, name:'Klay Thompson',             team:'Dallas Mavericks',      pos:'SG', tier:'C', ppg:11.9,rpg:2.2, apg:1.4},
+  {rank:119, name:'Klay Thompson',             team:'Miami Heat',      pos:'SG', tier:'C', ppg:11.9,rpg:2.2, apg:1.4},
   {rank:120, name:'Draymond Green',            team:'Golden State Warriors', pos:'PF', tier:'C', ppg:8.4, rpg:5.6, apg:5.3},
   {rank:121, name:'Payton Pritchard',          team:'Boston Celtics',    pos:'PG', tier:'C', ppg:16.7,rpg:4.1, apg:5.3},
   {rank:122, name:'Kelly Oubre Jr.',           team:'Indiana Pacers',    pos:'SF', tier:'C', ppg:15.5,rpg:5.0, apg:2.0},
   {rank:123, name:'Gary Trent Jr.',            team:'Milwaukee Bucks',       pos:'SG', tier:'C', ppg:7.4,rpg:1.0, apg:1.2},
   {rank:124, name:'Dillon Brooks',         team:'Phoenix Suns',       pos:'SF', tier:'C', ppg:20.9,rpg:3.7, apg:1.8},
   {rank:125, name:'Jaden Ivey',            team:'Chicago Bulls',       pos:'PG', tier:'C', ppg:15.5,rpg:4.0, apg:5.5},
-  {rank:126, name:'Jonathan Kuminga',          team:'Atlanta Hawks',         pos:'SF', tier:'C', ppg:12.1,rpg:5.9, apg:2.5},
+  {rank:126, name:'Jonathan Kuminga',          team:'Minnesota Timberwolves',         pos:'SF', tier:'C', ppg:12.1,rpg:5.9, apg:2.5},
   {rank:127, name:'Moritz Wagner',             team:'Brooklyn Nets',         pos:'C',  tier:'C', ppg:14.5,rpg:6.5, apg:2.5},
   {rank:128, name:"D'Angelo Russell",     team:'Memphis Grizzlies',             pos:'PG', tier:'C', ppg:15.5,rpg:3.2, apg:6.5},
   {rank:129, name:'Patrick Williams',          team:'Chicago Bulls',         pos:'SF', tier:'C', ppg:13.5,rpg:5.5, apg:2.5},
-  {rank:130, name:'Luguentz Dort',             team:'OKC Thunder',           pos:'SG', tier:'C', ppg:8.5,rpg:3.8, apg:1.3},
+  {rank:130, name:'Luguentz Dort',             team:'Atlanta Hawks',           pos:'SG', tier:'C', ppg:8.5,rpg:3.8, apg:1.3},
   {rank:131, name:'Malaki Branham',            team:'Charlotte Hornets',     pos:'SG', tier:'D', ppg:14.5,rpg:3.5, apg:3.0},
   {rank:132, name:'Herbert Jones',             team:'New Orleans Pelicans',  pos:'SF', tier:'D', ppg:10.5,rpg:4.5, apg:2.5},
   {rank:133, name:'Alex Caruso',               team:'OKC Thunder',           pos:'SG', tier:'D', ppg:6.4, rpg:2.8, apg:1.9},
@@ -3183,7 +3185,7 @@ const RAW=[
   {rank:148, name:'Isaiah Joe',                  team:'Detroit Pistons',           pos:'SG', tier:'D', ppg:8.5, rpg:2.5, apg:2.0},
   {rank:149, name:'Dalen Terry',               team:'Philadelphia 76ers' ,         pos:'SF', tier:'D', ppg:9.5, rpg:4.0, apg:3.0},
   {rank:150, name:'Jordan Nwora',              team:'Portland Trail Blazers',pos:'SF', tier:'D', ppg:9.5, rpg:4.0, apg:1.5},
-  {rank:151, name:'Matisse Thybulle',          team:'Portland Trail Blazers',pos:'SG', tier:'D', ppg:8.0, rpg:3.5, apg:1.5},
+  {rank:151, name:'Matisse Thybulle',          team:'Los Angeles Lakers',pos:'SG', tier:'D', ppg:8.0, rpg:3.5, apg:1.5},
   {rank:152, name:'Jerami Grant',              team:'Memphis Grizzlies',pos:'SF', tier:'C', ppg:18.6,rpg:3.5, apg:2.2},
   {rank:153, name:'Shaedon Sharpe',            team:'Portland Trail Blazers',pos:'SG', tier:'C', ppg:21.4,rpg:4.4, apg:2.6},
   {rank:154, name:'Donovan Clingan',           team:'Portland Trail Blazers',pos:'C',  tier:'D', ppg:12.3,rpg:11.6, apg:2.2},
@@ -3192,19 +3194,19 @@ const RAW=[
   {rank:157, name:'Rayan Rupert',              team:'Philadelphia 76ers',     pos:'SG', tier:'D', ppg:9.5, rpg:5.7, apg:1.0},
   {rank:158, name:'Isaiah Collier',            team:'Utah Jazz',             pos:'PG', tier:'D', ppg:11.5,rpg:3.5, apg:5.8},
   {rank:159, name:'Taylor Hendricks',          team:'Memphis Grizzlies',             pos:'PF', tier:'D', ppg:11.5,rpg:5.5, apg:1.8},
-  {rank:160, name:'Cody Williams',             team:'Utah Jazz',             pos:'SF', tier:'D', ppg:8.5, rpg:3.5, apg:2.5},
+  {rank:160, name:'Cody Williams',             team:'Minnesota Timberwolves',             pos:'SF', tier:'D', ppg:8.5, rpg:3.5, apg:2.5},
   {rank:161, name:'Brice Sensabaugh',          team:'Utah Jazz',             pos:'SG', tier:'D', ppg:10.5,rpg:3.0, apg:1.5},
   {rank:162, name:'Derik Queen',               team:'New Orleans Pelicans',  pos:'C',  tier:'C', ppg:11.5,rpg:6.9, apg:3.8},
   {rank:163, name:'Alexandre Sarr',            team:'Washington Wizards',    pos:'C',  tier:'C', ppg:16.5,rpg:7.4, apg:2.6},
   {rank:164, name:'Carlton Carrington',        team:'Washington Wizards',    pos:'PG', tier:'D', ppg:9.5, rpg:3.0, apg:4.5},
-  {rank:165, name:'Tre Mann',                  team:'Charlotte Hornets',     pos:'PG', tier:'D', ppg:11.0,rpg:2.5, apg:3.5},
+  {rank:165, name:'Tre Mann',                  team:'Washington Wizards',     pos:'PG', tier:'D', ppg:11.0,rpg:2.5, apg:3.5},
   {rank:166, name:'Nick Smith Jr.',            team:'Charlotte Hornets',     pos:'PG', tier:'D', ppg:12.5,rpg:3.0, apg:3.5},
   {rank:167, name:'Brandon Miller',            team:'Charlotte Hornets',     pos:'SF', tier:'B', ppg:20.4,rpg:5.0, apg:3.5},
   {rank:168, name:'Mark Williams',             team:'Phoenix Suns',     pos:'C',  tier:'D', ppg:11.6,rpg:8.0, apg:1.0},
   {rank:169, name:'Dyson Daniels',             team:'Atlanta Hawks',         pos:'PG', tier:'D', ppg:11.5,rpg:6.6, apg:6.0},
   {rank:170, name:'Jalen Johnson',             team:'Atlanta Hawks',         pos:'SF', tier:'A', ppg:22.7,rpg:10.4, apg:8.0},
   {rank:171, name:"De'Andre Hunter",           team:'Sacramento Kings',         pos:'SF', tier:'D', ppg:12.5,rpg:4.0, apg:2.5},
-  {rank:172, name:'Buddy Hield',               team:'Atlanta Hawks',         pos:'SG', tier:'D', ppg:8.0,rpg:2.5, apg:1.5},
+  {rank:172, name:'Buddy Hield',               team:'Chicago Bulls',         pos:'SG', tier:'D', ppg:8.0,rpg:2.5, apg:1.5},
   {rank:173, name:'Keegan Murray',             team:'Sacramento Kings',      pos:'PF', tier:'D', ppg:13.5,rpg:4.5, apg:2.0},
   {rank:174, name:'Kevin Huerter',             team:'Detroit Pistons',       pos:'SG', tier:'D', ppg:10.0,rpg:3.5, apg:3.0},
   {rank:175, name:'Grayson Allen',             team:'Charlotte Hornets',          pos:'SG', tier:'C', ppg:17.2,rpg:3.0, apg:4.1},
@@ -3213,7 +3215,7 @@ const RAW=[
   {rank:178, name:'Zach Edey',                 team:'Memphis Grizzlies',     pos:'C',  tier:'D', ppg:11.5,rpg:9.5, apg:1.5},
   {rank:179, name:'GG Jackson II',             team:'Memphis Grizzlies',     pos:'PF', tier:'D', ppg:12.5,rpg:4.5, apg:2.0},
   {rank:180, name:'Aaron Nesmith',             team:'Indiana Pacers',        pos:'SF', tier:'D', ppg:13.5,rpg:4.5, apg:2.0},
-  {rank:181, name:'Bennedict Mathurin',        team:'LA Clippers'   ,        pos:'SG', tier:'D', ppg:13.5,rpg:4.5, apg:2.5},
+  {rank:181, name:'Bennedict Mathurin',        team:'New Orleans Pelicans'   ,        pos:'SG', tier:'D', ppg:13.5,rpg:4.5, apg:2.5},
   {rank:182, name:'Andrew Nembhard',           team:'Indiana Pacers',        pos:'PG', tier:'C', ppg:17.4,rpg:2.6, apg:7.2},
   {rank:183, name:'Myles Turner',              team:'Milwaukee Bucks',       pos:'C',  tier:'D', ppg:12.0,rpg:5.4, apg:1.5},
   {rank:184, name:'Nikola Topic',              team:'OKC Thunder',           pos:'PG', tier:'D', ppg:8.5, rpg:3.5, apg:4.5},
@@ -3227,7 +3229,7 @@ const RAW=[
   {rank:192, name:'Dario Saric',               team:'Chicago Bulls',       pos:'PF', tier:'D', ppg:1.0, rpg:1.2, apg:0.4},
   {rank:193, name:'Jock Landale',              team:'Atlanta Hawks',         pos:'C',  tier:'D', ppg:9.0, rpg:5.0, apg:1.5},
   {rank:194, name:'VJ Edgecombe',              team:'Philadelphia 76ers',    pos:'SG', tier:'C', ppg:15.6,rpg:5.6, apg:4.0},
-  {rank:195, name:'Dorian Finney-Smith',       team:'Charlotte Hornets',       pos:'SF', tier:'D', ppg:9.5, rpg:4.0, apg:2.0},
+  {rank:195, name:'Dorian Finney-Smith',       team:'Atlanta Hawks',       pos:'SF', tier:'D', ppg:9.5, rpg:4.0, apg:2.0},
   {rank:196, name:'Dean Wade',                 team:'Philadelphia 76ers',        pos:'PF', tier:'D', ppg:9.5, rpg:4.5, apg:1.5},
   {rank:197, name:'Lindy Waters III',          team:'San Antonio Spurs',     pos:'SG', tier:'D', ppg:8.0, rpg:3.0, apg:1.5},
   {rank:198, name:'Marcus Sasser',             team:'Dallas Mavericks',       pos:'PG', tier:'D', ppg:9.5, rpg:2.5, apg:3.5},
@@ -3235,7 +3237,7 @@ const RAW=[
   {rank:200, name:'Deandre Ayton',             team:'Washington Wizards',    pos:'C',  tier:'D', ppg:12.4,rpg:8.2, apg:0.9},
 
   // ── New additions (ranks 201-250) ──
-  {rank:201, name:'Kawhi Leonard',             team:'LA Clippers',           pos:'SF', tier:'A', ppg:28.2,rpg:6.4, apg:3.6},
+  {rank:201, name:'Kawhi Leonard',             team:'Toronto Raptors',           pos:'SF', tier:'A', ppg:28.2,rpg:6.4, apg:3.6},
   {rank:202, name:'Norman Powell',             team:'Chicago Bulls',            pos:'SG', tier:'B', ppg:22.3,rpg:3.6, apg:2.6},
   {rank:203, name:'Michael Porter Jr.',        team:'Brooklyn Nets',         pos:'SF', tier:'B', ppg:24.2,rpg:7.1, apg:3.0},
   {rank:204, name:'Aaron Gordon',              team:'Denver Nuggets',        pos:'PF', tier:'B', ppg:18.6,rpg:7.7, apg:5.1},
@@ -3248,7 +3250,7 @@ const RAW=[
   {rank:211, name:'Rui Hachimura',             team:'LA Clippers',             pos:'SF', tier:'C', ppg:11.3,rpg:3.2, apg:0.8},
   {rank:212, name:'Saddiq Bey',                team:'New Orleans Pelicans',  pos:'SF', tier:'C', ppg:17.4,rpg:5.7, apg:2.6},
   {rank:213, name:'P.J. Washington',           team:'Dallas Mavericks',      pos:'PF', tier:'C', ppg:14.2,rpg:7.0, apg:1.9},
-  {rank:214, name:'Kentavious Caldwell-Pope',  team:'Memphis Grizzlies',     pos:'SG', tier:'C', ppg:11.0,rpg:3.5, apg:2.0},
+  {rank:214, name:'Kentavious Caldwell-Pope',  team:'Philadelphia 76ers',     pos:'SG', tier:'C', ppg:11.0,rpg:3.5, apg:2.0},
   {rank:215, name:'Khris Middleton',           team:'Washington Wizards',      pos:'SF', tier:'C', ppg:14.5,rpg:5.0, apg:4.5},
   {rank:216, name:'Rob Dillingham',            team:'Chicago Bulls',         pos:'PG', tier:'C', ppg:13.5,rpg:2.5, apg:4.5},
   {rank:217, name:'Bogdan Bogdanovic',         team:'Houston Rockets',           pos:'SG', tier:'C', ppg:13.5,rpg:3.0, apg:3.5},
@@ -3261,7 +3263,7 @@ const RAW=[
   {rank:224, name:'Cam Johnson',               team:'Denver Nuggets',        pos:'SF', tier:'C', ppg:14.5,rpg:4.5, apg:2.5},
   {rank:225, name:'Onyeka Okongwu',            team:'Atlanta Hawks',         pos:'C',  tier:'C', ppg:15.6,rpg:7.8, apg:3.2},
   {rank:226, name:'Jaden Hardy',               team:'Los Angeles Lakers',    pos:'SG', tier:'D', ppg:11.5,rpg:2.5, apg:2.0},
-  {rank:227, name:'AJ Johnson',               team:'Memphis Grizzlies',      pos:'SF', tier:'D', ppg:9.5, rpg:4.5, apg:2.5},
+  {rank:227, name:'AJ Johnson',               team:'New Orleans Pelicans',      pos:'SF', tier:'D', ppg:9.5, rpg:4.5, apg:2.5},
   {rank:228, name:'Quentin Grimes',            team:'Los Angeles Lakers',    pos:'SG', tier:'D', ppg:13.7,rpg:3.7, apg:3.4},
   {rank:229, name:'Ousmane Dieng',             team:'Milwaukee Bucks',       pos:'SF', tier:'D', ppg:9.5, rpg:4.0, apg:2.0},
   {rank:230, name:'AJ Griffin',               team:'Atlanta Hawks',         pos:'SF', tier:'D', ppg:11.5,rpg:3.5, apg:1.5},
@@ -4906,7 +4908,7 @@ const ESPN_IDS = {
   224:3138196, // Cam Johnson
   225:4431820, // Onyeka Okongwu
   226:4868423, // Jaden Hardy
-  227:5291019, // AJ Johnson
+  227:5170947, // AJ Johnson
   228:4397014, // Quentin Grimes
   229:4997526, // Ousmane Dieng
   230:4700715, // AJ Griffin
@@ -9285,16 +9287,19 @@ function _moverCardsHtml(){
   let mv = window._moverCards;
   if ((!mv || !mv.list || !mv.list.length) && currentLeague === 'NFL') mv = _lastGameDayMovers();
   if (!mv || !mv.list || !mv.list.length) return '';
+  const _lastCount = {};
+  mv.list.forEach(m => { const q = players.find(x => x.rank === m.rank); if (q) { const l = playerLastName(q.name); _lastCount[l] = (_lastCount[l] || 0) + 1; } });
   const cards = mv.list.map(m => {
     const p = players.find(x => x.rank === m.rank);
     if (!p) return '';
     const url = heroPhotoUrl(p.rank);
-    const last = playerLastName(p.name);
+    const _l = playerLastName(p.name);
+    const last = _lastCount[_l] > 1 ? p.name[0] + '. ' + _l : _l;
     return `<div class="mvc" style="--team:${teamColor(p) || '#3a3a40'}" role="button" tabindex="0"
         onclick="selectPlayerFromList(${p.rank})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectPlayerFromList(${p.rank});}"
         aria-label="${escHtml(p.name)}, ${fmt(liveP[p.rank])}, ${m.pct>=0?'up':'down'} ${Math.abs(m.pct).toFixed(1)} percent">
       ${url ? `<img src="${url}" alt="" loading="lazy" onerror="this.remove()">` : ''}<span class="mvc-init">${p.initials}</span>
-      <span class="mvc-name">${escHtml(last)}</span>
+      <span class="mvc-name">${escHtml(last)}<span class="mvc-team">${escHtml(p.team)}</span></span>
       <span class="mvc-foot"><span class="mvc-price">${fmt(liveP[p.rank])}</span><span class="mvc-pct ${pctDir(m.pct)}">${fmtP(m.pct)}</span></span>
     </div>`;
   }).join('');
@@ -12303,6 +12308,7 @@ function headshotUrl(rank){
     51:true,   // Stephon Castle
     100:true,  // Matas Buzelis
     234:true,  // Nickeil Alexander-Walker - NBA CDN ID wrong
+    227:true,  // AJ Johnson - NBA CDN serves a blank silhouette
   };
   if (ESPN_OVERRIDES[rank]) {
     const espnId = ESPN_IDS[rank];
