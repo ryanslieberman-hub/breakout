@@ -3,10 +3,36 @@
   "appName": "Breakout",
   "webDir": "www",
   "backgroundColor": "#06070a",
-  "ios": { "contentInset": "never", "backgroundColor": "#06070a" },
-  "android": { "backgroundColor": "#06070a" },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#06070a"
+  },
+  "android": {
+    "backgroundColor": "#06070a"
+  },
   "plugins": {
-    "SplashScreen": { "launchAutoHide": true, "backgroundColor": "#06070a", "showSpinner": false },
-    "StatusBar": { "style": "DARK", "backgroundColor": "#06070a" }
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "backgroundColor": "#06070a",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#06070a"
+    },
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": [
+        "google.com",
+        "apple.com"
+      ]
+    },
+    "FirebaseMessaging": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    }
   }
 }

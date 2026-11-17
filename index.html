@@ -2493,6 +2493,10 @@ button.pl-row:active{background:rgba(255,255,255,.05);}
   input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;}
   .net-banner{top:calc(env(safe-area-inset-top) + 8px);}
 }
+
+/* Native shell (Capacitor): Apple sign-in shows on iOS builds only */
+.apple-signin-btn{display:none;width:100%;padding:11px;margin:0 0 12px;background:#fff;color:#000;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;align-items:center;justify-content:center;gap:10px;}
+html.native-ios .apple-signin-btn{display:flex;}
 </style>
 </head>
 <body>
@@ -15144,8 +15148,10 @@ function renderProfileView() {
         <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
         Continue with Google
       </button>
+      <button class="apple-signin-btn" id="apple-signin-btn" type="button"><svg width="16" height="18" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>Continue with Apple</button>
       <button class="es-btn ghost signin-browse" onclick="goToMarketTop()">Keep browsing the market</button>`;
     document.getElementById('google-signin-btn').addEventListener('click', signInWithGoogle);
+    document.getElementById('apple-signin-btn').addEventListener('click', signInWithApple);
   } else {
     // Show profile editor
     const p = userProfile;
@@ -15532,8 +15538,49 @@ async function removeCustomAvatar(){
   } catch(e) { showToast('Could not remove photo: ' + (e.code || e.message)); }
 }
 
+// ── Native shell (Capacitor) ──────────────────────────────────────────────
+// Capacitor injects window.Capacitor into the bundled app, so no bundler is
+// needed: plugins are reached through Capacitor.Plugins. On the website all of
+// this is inert (IS_NATIVE is false).
+const IS_NATIVE = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+const NATIVE_PLATFORM = IS_NATIVE ? window.Capacitor.getPlatform() : '';
+const nativePlugin = (name) => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[name]) || null;
+if (IS_NATIVE) document.documentElement.classList.add('native', 'native-' + NATIVE_PLATFORM);
+// Store builds are coins-only: no entry fees, no payouts, no cash prizes. Paid
+// contests stay on the website (app stores treat prize contests as gambling).
+const STORE_COINS_ONLY = IS_NATIVE;
+
+// Native sign-in: the OS account sheet (Google / Apple) returns an ID token and
+// the web Firebase SDK signs in with it, so the session lives in the same
+// place as on the website (skipNativeAuth in capacitor.config.json).
+async function signInNative(kind) {
+  const plug = nativePlugin('FirebaseAuthentication');
+  if (!plug) { showToast('Native sign-in is not set up in this build'); return; }
+  try {
+    let cred;
+    if (kind === 'apple') {
+      const r = await plug.signInWithApple({ skipNativeAuth: true });
+      const p = new window._fbOAuthProvider('apple.com');
+      cred = p.credential({ idToken: r.credential.idToken, rawNonce: r.credential.nonce });
+    } else {
+      const r = await plug.signInWithGoogle({ skipNativeAuth: true });
+      cred = window._fbGoogleAuthProvider.credential(r.credential.idToken);
+    }
+    const result = await window._fbSignInWithCredential(auth, cred);
+    closeProfile();
+    showToast('Signed in as ' + (result.user.displayName || 'you'));
+  } catch (e) {
+    const msg = String((e && (e.code || e.message)) || e);
+    if (/cancel/i.test(msg)) { showToast('Sign-in cancelled'); return; }
+    showToast('Sign-in didn\u2019t finish. Try again.');
+    console.warn('[auth] native sign-in failed', msg);
+  }
+}
+function signInWithApple() { return signInNative('apple'); }
+
 async function signInWithGoogle() {
   if (!auth) { showToast('Auth not ready, try again'); return; }
+  if (IS_NATIVE) return signInNative('google');
   const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   // Build the provider synchronously - no awaits before the popup call, so Safari
@@ -15597,7 +15644,46 @@ const PUSH_VAPID_KEY = "BPF-6WBT2WmPKW21Oz6CSJarnUa4nIUkPFYqdb-qWfh3qJ8rRysCe20d
 
 // Ask permission, get the device's FCM token, and store it under the user's profile so
 // the backend can send them pushes. Call this from an "Enable notifications" button.
+// Native push: Firebase Messaging plugin returns an FCM token on both iOS and
+// Android, so the backend (which already sends to FCM tokens) needs no changes.
+async function enablePushNativeApp() {
+  const plug = nativePlugin('FirebaseMessaging');
+  if (!plug) { showToast('Notifications are not set up in this build'); return; }
+  if (!currentUser) { showToast('Sign in first to enable notifications'); return; }
+  try {
+    const perm = await plug.requestPermissions();
+    if (perm.receive !== 'granted') { showToast('Notifications not enabled'); return; }
+    const { token } = await plug.getToken();
+    if (!token) { showToast('Could not get notification token'); return; }
+    await window._fbSetDoc(window._fbDoc(db, 'pushTokens', token),
+      { uid: currentUser.uid, name: currentUser.displayName || '', token, platform: NATIVE_PLATFORM,
+        updated: window._fbServerTimestamp() }, { merge: true });
+    try {
+      const prev = localStorage.getItem('ax_push_token');
+      if (prev && prev !== token) await window._fbDeleteDoc(window._fbDoc(db, 'pushTokens', prev));
+    } catch (e) {}
+    localStorage.setItem('ax_push_token', token);
+    if (!window._nativePushWired) {
+      window._nativePushWired = true;
+      plug.addListener('notificationReceived', (ev) => {
+        const d = (ev.notification && ev.notification.data) || {};
+        showToast(`${d.title || 'Breakout'}: ${d.body || ''}`);
+      });
+      // Tapping a mover alert opens that player, same as the web notificationclick.
+      plug.addListener('notificationActionPerformed', (ev) => {
+        const d = (ev.notification && ev.notification.data) || {};
+        if (d.rank) { history.replaceState(null, '', '/?openPlayer=' + encodeURIComponent(d.rank)); handleOpenPlayerDeepLink(); }
+      });
+    }
+    showToast('Notifications on');
+  } catch (e) {
+    console.error('[push] native enable failed', e);
+    showToast('Couldn\u2019t turn on notifications. Check your phone settings.');
+  }
+}
+
 async function enablePushNotifications() {
+  if (IS_NATIVE) return enablePushNativeApp();
   try {
     if (!window._fbMessaging) { showToast('This browser doesn’t support notifications'); return; }
     if (!currentUser)         { showToast('Sign in first to enable notifications'); return; }
@@ -17904,6 +17990,7 @@ async function joinChallenge(challengeId) {
     if (Date.now() > data.joinDeadline) { showToast('Join deadline has passed'); return; }
 
     const entryFee = Number(data.entryFee) || 0;
+    if (entryFee > 0 && STORE_COINS_ONLY) { showToast('Paid contests are on breakoutmarket.com'); return; }
     if (entryFee > 0) {
       // Confirm the charge BEFORE the compliance gate. The gate asks for ID,
       // location and terms; there is no reason to collect any of that from
@@ -18061,7 +18148,7 @@ async function renderChallengeList() {
 
   try {
     const snap = await (window._fbGetDocsFromServer || window._fbGetDocs)(window._fbQuery(window._fbCollection(db, 'challenges'), window._fbOrderBy('createdAt', 'desc'), window._fbLimit(50)));
-    const challenges = snap.docs.map(d => d.data()).sort((a,b) => b.createdAt - a.createdAt);
+    const challenges = snap.docs.map(d => d.data()).filter(c => !(STORE_COINS_ONLY && Number(c.entryFee) > 0)).sort((a,b) => b.createdAt - a.createdAt);
 
     if (!challenges.length) {
       el.innerHTML = adminBtn + `<div class="wc-no-challenge">No challenges yet.<br><br>Check back soon.</div>`;
@@ -19115,7 +19202,7 @@ window.addEventListener('appinstalled', () => {
 <script type="module">
   import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
   import { getAuth, onAuthStateChanged,
-           GoogleAuthProvider, signInWithPopup, signInWithRedirect,
+           GoogleAuthProvider, OAuthProvider, signInWithCredential, signInWithPopup, signInWithRedirect,
            signOut, getRedirectResult, deleteUser, reauthenticateWithPopup,
            setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
   import { getFirestore, initializeFirestore, serverTimestamp, doc, getDoc, getDocFromServer, setDoc, updateDoc, collection, getDocs, getDocsFromServer, limit, query, orderBy, where, onSnapshot, addDoc, deleteDoc, deleteField, increment, arrayUnion, arrayRemove }  from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
@@ -19153,6 +19240,8 @@ window.addEventListener('appinstalled', () => {
   window._firebaseDb   = initializeFirestore(app, { localCache: { kind: 'memory' } });
 
   window._fbGoogleAuthProvider  = GoogleAuthProvider;
+  window._fbOAuthProvider       = OAuthProvider;
+  window._fbSignInWithCredential = signInWithCredential;
   window._fbSignInWithPopup     = signInWithPopup;
   window._fbSignInWithRedirect  = signInWithRedirect;
   window._fbGetRedirectResult   = getRedirectResult;
@@ -19263,6 +19352,7 @@ window.addEventListener('appinstalled', () => {
           <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path></svg>
           Sign in with Google
         </button>
+        <button class="apple-signin-btn" id="ob-apple-signin-btn" type="button"><svg width="16" height="18" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>Continue with Apple</button>
         <div style="font-size:11px;color:var(--muted);margin-top:12px;text-align:center;">By continuing you agree to our <a href="/terms.html" target="_blank" rel="noopener" style="color:var(--text);">Terms</a> and <a href="/privacy.html" target="_blank" rel="noopener" style="color:var(--text);">Privacy Policy</a>.</div>
       </div>
 
@@ -19523,6 +19613,8 @@ window.addEventListener('DOMContentLoaded', function() {
   // Wire onboarding sign in button
   const obSignIn = document.getElementById('ob-google-signin-btn');
   if (obSignIn) obSignIn.addEventListener('click', () => { signInWithGoogle(); });
+  const obApple = document.getElementById('ob-apple-signin-btn');
+  if (obApple) obApple.addEventListener('click', () => { signInWithApple(); });
   // Auth restore is async: if no signed-in user has arrived shortly after load,
   // show the gate. handleAuthChange hides it the moment a user signs in.
   setTimeout(() => {

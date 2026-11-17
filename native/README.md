@@ -12,19 +12,28 @@ npx cap add android      # and on a Mac: npx cap add ios
 npm run android          # builds www/, syncs, opens Android Studio
 ```
 
-## Before this can ship to a store
+## What the app code already does (index.html)
 
-1. **Push notifications.** Web push (`firebase-messaging-sw.js`) does not run in a
-   native webview. Use `@capacitor/push-notifications` (APNs/FCM) and register the
-   token the same place `enablePushNotifications()` stores web tokens.
-2. **Sign-in.** Firebase popup/redirect auth is unreliable in webviews. Switch the
-   native build to `@capacitor-firebase/authentication` (Apple + Google native sheets).
-   Apple requires Sign in with Apple if any other social login is offered.
-3. **Real-money contests.** Apple and Google treat paid, prize-based contests as
-   gambling-adjacent: iOS needs the geo/age gating plus a licensed-where-required
-   review, and entry fees cannot use in-app purchase. Ship the **coins-only** build
-   first (hide paid challenges when `Capacitor.isNativePlatform()`), per handoff.md.
-4. **App Review 4.2 (minimum functionality).** A bare website wrapper gets rejected.
-   Native push, haptics (`@capacitor/haptics`), and the status-bar/splash polish are
-   what get it approved.
-5. Icons/splash: generate from `icon-512.png` with `@capacitor/assets`.
+- `IS_NATIVE` / `STORE_COINS_ONLY`: inside the app, challenges with an entry fee are
+  hidden and cannot be joined. Paid contests stay on the website.
+- Sign-in uses the native Google sheet, plus **Sign in with Apple on iOS**
+  (`@capacitor-firebase/authentication`, `skipNativeAuth` so the session is the web SDK's).
+- Notifications use `@capacitor-firebase/messaging` (FCM token on iOS and Android),
+  stored in the same `pushTokens` collection; tapping an alert opens that player.
+
+## Setup you still have to do by hand
+
+1. **Firebase console:** add an Android app (`com.breakoutmarket.app`) and an iOS app
+   (same bundle id). Download `google-services.json` into `android/app/` and
+   `GoogleService-Info.plist` into `ios/App/App/`. Add your SHA-1/SHA-256 for Android.
+2. **Apple:** enable Sign in with Apple capability in Xcode and the Apple provider in
+   Firebase Auth. Upload an APNs key to Firebase (Project settings -> Cloud Messaging).
+3. **Google sign-in:** the Google provider must be enabled in Firebase Auth (it is).
+4. **Server push payload:** pushes are data-only (`worker-pricing-engine/src/lib/push.js`).
+   Android delivers those in the background; iOS only wakes the app for data-only
+   messages when sent with `apns-push-type: background` + `content-available`, and
+   will not show a banner. For iOS banners, add a `notification` block for tokens whose
+   doc has `platform: "ios"` (web tokens must stay data-only to avoid double display).
+5. **App Review 4.2:** native sign-in, push, and haptics are what keep this from being
+   rejected as a website wrapper. Add `@capacitor/haptics` calls if reviewers push back.
+6. Icons/splash: generate from `icon-512.png` with `@capacitor/assets`.
