@@ -278,18 +278,10 @@ export function price(p, stat, today, closesForRank, baseRecord) {
   return priceFromPerf(p, nbaPerf(p, stat), today, closesForRank, baseRecord);
 }
 
-// Locks today's price as today's close, applying the ±15%/day-vs-prior-close
-// cap (history-dependent - must be called in date order across a backfill).
+// Locks today's price as today's close. No daily-move cap (the old ±15% cap
+// was removed on purpose); signature kept so existing callers still work.
 export function finalize(liveValue, dateStr, closesForRank) {
-  const prior = closesForRank || {};
-  const pds = Object.keys(prior).filter(d => d < dateStr && prior[d] > 0).sort();
-  let val = liveValue;
-  if (pds.length) {
-    const prev = prior[pds[pds.length - 1]];
-    const maxUp = prev * 1.15, maxDown = prev * 0.85;
-    val = Math.min(maxUp, Math.max(maxDown, val));
-  }
-  return val;
+  return liveValue;
 }
 
 // Kept for backwards compat with the earlier NBA-only export name.

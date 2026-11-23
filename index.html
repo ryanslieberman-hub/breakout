@@ -5330,6 +5330,40 @@ const ESPN_IDS = {
   250:3593,    // Bojan Bogdanovic
   286:4065733, // Ty Jerome
 };
+// Audited 2026-11-23 against live ESPN NBA rosters (matched by player name): ~65 of the ids above
+// belonged to other players. These win. ESPN is now the primary NBA headshot source.
+Object.assign(ESPN_IDS, {
+  1:4278073, 2:3112335, 3:3032977, 4:5104157, 5:4594268, 6:3945274, 7:1966, 8:4065648,
+  9:3975, 10:3202, 11:4432166, 12:4277905, 13:3908809, 14:3136193, 15:3059318, 16:3136195,
+  17:4279888, 18:3934672, 19:5041939, 20:3155942, 21:4066261, 22:4396993, 23:3917376, 24:4396907,
+  25:4395628, 26:4432573, 27:4871144, 28:4566434, 29:4433134, 30:4432158, 31:4433255, 32:4277961,
+  33:3978, 34:3064440, 35:3913176, 36:4432816, 37:3936299, 38:3147657, 39:4066259, 40:3032976,
+  41:3149673, 42:6430, 43:3078576, 44:4066457, 45:3992, 46:3102531, 47:3064514, 48:4066336,
+  49:4251, 50:6442, 51:4845367, 52:4712849, 53:4593803, 54:6478, 55:4395725, 56:4277956,
+  57:4066383, 58:6440, 59:4351851, 60:3934719, 61:4432165, 62:4395651, 63:4395724, 64:4066320,
+  65:4433136, 66:3064482, 67:4017837, 68:4683021, 69:4871145, 72:4433627, 73:4684740, 74:4684742,
+  75:4432639, 76:4683678, 77:4683692, 78:5106258, 79:4432848, 80:4709138, 81:4683688, 82:4683778,
+  83:4683750, 85:5044385, 87:4712896, 88:5104155, 89:5106060, 90:4594326, 91:5105592, 92:5105806,
+  93:4683689, 94:4433076, 96:4684793, 97:4702382, 98:5112087, 99:5211175, 100:4711294, 101:6583,
+  102:4397688, 103:4396971, 104:4437244, 105:3448, 106:4278067, 107:4395630, 108:4431678, 109:3062679,
+  110:4395625, 111:6580, 112:3134907, 113:4433192, 114:4395626, 115:4066328, 116:4222252, 117:4065778,
+  118:3102530, 119:6475, 120:6589, 121:4066354, 122:3133603, 123:4277843, 124:3155526, 126:4433247,
+  127:3150844, 129:4431687, 130:4397020, 132:4277813, 133:2991350, 134:4592691, 135:4593125, 136:4397183,
+  137:3133626, 138:4888725, 139:4601023, 140:4432171, 141:4277847, 142:4431679, 145:4348700, 147:3135046,
+  148:4395702, 151:3907498, 152:2991070, 153:4914336, 154:5105565, 155:4431736, 156:4432446, 157:5099752,
+  158:4683766, 159:4684806, 160:4895758, 161:5105839, 162:4869780, 163:5160992, 165:4432819, 167:4433287,
+  168:4701232, 169:4869342, 170:4701230, 171:4065732, 172:2990984, 173:4594327, 174:4066372, 175:3135045,
+  176:2583632, 177:4711272, 178:4600663, 179:5105550, 180:4396909, 181:4683634, 182:4395712, 183:3133628,
+  184:5159925, 185:4433621, 186:2528210, 187:4432810, 188:4683771, 189:4593016, 190:4431684, 191:3134903,
+  193:3146557, 194:5124612, 195:2578185, 196:3912848, 198:4432107, 199:4277811, 200:4278129, 201:6450,
+  202:2595516, 203:4278104, 204:3064290, 205:4431671, 206:2991230, 207:4397424, 208:5105623, 209:3059319,
+  210:3934673, 211:4066648, 212:4397136, 213:4278078, 214:2581018, 215:6609, 217:3037789, 218:4065654,
+  219:2990992, 220:4395723, 221:3995, 222:2993874, 223:3138160, 224:3138196, 225:4431680, 226:4868423,
+  227:5170947, 228:4397014, 229:4997526, 231:5061575, 232:5037871, 233:4702177, 234:4278039, 235:4397077,
+  237:4900671, 238:4432582, 239:4873201, 240:4395702, 241:4683747, 242:4433137, 243:5203685, 244:2530530,
+  245:3064560, 246:4065731, 247:4397002,
+});
+
 
 // Load any previously auto-corrected ESPN IDs from localStorage
 try {
@@ -6208,21 +6242,11 @@ const ENGINE = (() => {
   // Lock today's price as today's close (called when a game finalizes).
   function finalize(p, dateStr){
     if (!closes[p.rank]) closes[p.rank] = {};
-    // Daily-move cap: a close can't jump more than ±15% from the most recent prior close.
-    // A single 0-for-3 was reverting hitters toward statPrice in one day (Lane Thomas fell
-    // $7.88 → $5.22, -34%, on a hitless game) - a violent cliff that reads as broken. Real
-    // day-over-day moves are gradual; cap the stored close so accumulated value bleeds off
-    // over several days instead of collapsing at once.
-    const prior = closes[p.rank];
-    const pds = Object.keys(prior).filter(d => d < dateStr && prior[d] > 0).sort();
-    let val = liveP[p.rank];
-    if (pds.length) {
-      const prev = prior[pds[pds.length - 1]];
-      const maxUp = prev * 1.15, maxDown = prev * 0.85;
-      val = Math.min(maxUp, Math.max(maxDown, val));
-    }
+    // No daily-move cap (the old ±15% close cap was removed on purpose): the close is
+    // simply wherever the live price ended up.
+    const val = liveP[p.rank];
     closes[p.rank][dateStr] = val;
-    liveP[p.rank] = val; // keep live price consistent with the capped close
+    liveP[p.rank] = val;
     // Unconditional (bypasses _logPricePoint's throttle) - finalize is a rare,
     // meaningful event and its capped value can differ from whatever price()
     // last logged, so the rolling 24h log needs this exact point on record.
@@ -8702,23 +8726,8 @@ window._repairPrices = function repairPrices(){
         outliers += before - priceHx[r].length;
       }
     });
-    // Retroactively smooth existing daily cliffs in stored closes (from before the ±15%
-    // finalize cap existed). Walk each player's closes in date order; if a day dropped/rose
-    // more than 25% from the prior close, pull it back toward a ±15% move. Catches the Lane
-    // Thomas $7.88→$5.22 cliff already sitting in people's stored history.
-    let smoothed = 0;
-    roster.forEach(p => {
-      const c = closes[p.rank]; if (!c) return;
-      const ds = Object.keys(c).filter(d => c[d] > 0).sort();
-      for (let i = 1; i < ds.length; i++) {
-        const prev = c[ds[i-1]], cur = c[ds[i]];
-        if (prev > 0 && Math.abs(cur - prev) / prev > 0.25) {
-          c[ds[i]] = cur > prev ? prev * 1.15 : prev * 0.85;
-          smoothed++;
-        }
-      }
-    });
-    if (smoothed) { try { _saveCloses(); } catch(e){} }
+    // (Daily-cliff smoothing removed along with the ±15% finalize cap - stored closes
+    // are no longer pulled back toward a ±15% move.)
 
     let phantom = 0, orphan = 0;
     roster.forEach(p => {
@@ -12927,21 +12936,10 @@ function headshotUrl(rank){
     return null;
   }
 
-  // NBA CDN is primary - has headshots for all 250 players reliably
-  // ESPN CDN only used where NBA CDN serves the wrong person's photo
-  const ESPN_OVERRIDES = {
-    18:true,   // Jalen Brunson - NBA CDN shows FVV
-    42:true,   // Jimmy Butler - NBA CDN shows Dwyane Wade
-    51:true,   // Stephon Castle
-    100:true,  // Matas Buzelis
-    234:true,  // Nickeil Alexander-Walker - NBA CDN ID wrong
-    227:true,  // AJ Johnson - NBA CDN serves a blank silhouette
-    228:true,  // Quentin Grimes - NBA CDN id 1630221 is a different player (OKC)
-  };
-  if (ESPN_OVERRIDES[rank]) {
-    const espnId = ESPN_IDS[rank];
-    if (espnId) return `https://a.espncdn.com/i/headshots/nba/players/full/${espnId}.png`;
-  }
+  // ESPN is primary for NBA: ESPN_IDS was audited against ESPN's live rosters by name, whereas
+  // NBA_IDS had many wrong-person ids (Kornet, Brunson, Butler, Grimes...). NBA CDN is only a fallback.
+  { const espnId = ESPN_IDS[rank];
+    if (espnId) return `https://a.espncdn.com/i/headshots/nba/players/full/${espnId}.png`; }
   const nbaId = NBA_IDS[rank];
   if (!nbaId) {
     // Rookies / anyone missing from NBA_IDS: ESPN id looked up by name from the rosters

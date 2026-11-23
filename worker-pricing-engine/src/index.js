@@ -315,7 +315,6 @@ function mirrorClose(rank, perf, workerCloseVal, statPrice, today, clientClosesB
   if (priorDates.length) {
     const clientPrior = clientCloses[priorDates[priorDates.length - 1]];
     val = clientPrior * (1 + (perf || 0));
-    val = Math.min(clientPrior * 1.15, Math.max(clientPrior * 0.85, val));
   } else {
     // No client history yet for this rank - nothing to re-derive against.
     val = workerCloseVal;
